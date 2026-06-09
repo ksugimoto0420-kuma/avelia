@@ -1,0 +1,642 @@
+// Avelia FunClub — イベント販売EC / デジタルコンテンツ販売基盤
+// 仕様書 12.DB設計 に基づくスキーマ
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum AdminRole {
+  OWNER
+  MANAGER
+  OPERATOR
+  VIEWER
+}
+
+enum ProductType {
+  PHYSICAL // 物販
+  DIGITAL // デジタルコンテンツ
+}
+
+enum DigitalDeliveryType {
+  SHARED // 共通即DL（購入時に全員へ同一ファイルを付与）
+  PERSONALIZED // 個別サイン納品（決済後に購入者ごとのサイン画像を制作・納品）
+}
+
+enum DigitalDeliveryStatus {
+  PENDING // サイン制作待ち
+  READY // 納品済み（ダウンロード可能）
+}
+
+enum EventType {
+  MEET_GREET // オンライン特典会・サイン会
+  KUJI // すきくじ（抽選くじ）
+  TRADING_CARD // トレカ
+  GOODS // 通常グッズ
+}
+
+enum SaleMethod {
+  FIRST_COME // 先着販売
+  LOTTERY // 抽選販売
+}
+
+enum OrderStatus {
+  PENDING // 注文作成済み・決済未完了
+  PAID // 決済完了
+  CANCELLED // ユーザーキャンセル
+  REFUNDED // 返金済み
+  FAILED // 決済失敗
+}
+
+enum PaymentStatus {
+  PENDING // 注文作成済み・決済未完了
+  AUTHORIZED // 与信済み
+  PAID // 決済完了
+  FAILED // 決済失敗
+  CANCELLED // ユーザーキャンセル
+  REFUNDED // 返金済み
+}
+
+enum PaymentProvider {
+  STRIPE
+  PAYJP
+}
+
+enum ReservationStatus {
+  HELD // 仮確保中
+  CONFIRMED // 決済完了で確定（在庫正式減算済み）
+  RELEASED // 期限切れ・キャンセルで解放
+}
+
+enum ShipmentStatus {
+  UNFULFILLED
+  PREPARING
+  SHIPPED
+  DELIVERED
+  RETURNED
+}
+
+enum DigitalContentType {
+  IMAGE
+  VIDEO
+  AUDIO
+  FILE
+}
+
+enum LotteryStatus {
+  DRAFT
+  OPEN // 応募受付中
+  CLOSED // 応募締切
+  DRAWN // 抽選実行済み
+}
+
+enum LotteryEntryStatus {
+  ENTERED // 応募済み
+  WON // 当選
+  LOST // 落選
+  PURCHASED // 当選者が購入完了
+  EXPIRED // 購入期限切れ
+}
+
+// ---------------------------------------------------------------------------
+// ユーザー / 管理者
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  nameKana     String?
+  phone        String?
+  postalCode   String?
+  address      String?
+  emailVerified DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  cart                Cart?
+  orders              Order[]
+  lotteryEntries      LotteryEntry[]
+  digitalContents     UserDigitalContent[]
+  digitalDeliveries   DigitalDelivery[]
+  passwordResetTokens PasswordResetToken[]
+
+  @@map("users")
+}
+
+model AdminUser {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  name         String
+  role         AdminRole @default(OPERATOR)
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  operationLogs OperationLog[]
+
+  @@map("admin_users")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+// ---------------------------------------------------------------------------
+// イベント / 商品 / 在庫
+// ---------------------------------------------------------------------------
+
+model Event {
+  id              String   @id @default(cuid())
+  slug            String   @unique
+  title           String
+  description     String?
+  coverImageUrl   String?
+  // 特典会・サイン会向け項目
+  artistName      String? // 出演者・アーティスト名
+  eventType       EventType   @default(MEET_GREET) // 種別（オンライン特典会 / すきくじ / トレカ）
+  saleMethod      SaleMethod  @default(FIRST_COME) // 販売方式（先着 / 抽選）
+  eventDate       DateTime? // 開催日時
+  // YouTube Live等の配信URL（視聴は任意）
+  streamingUrl    String?
+  isPublished     Boolean  @default(false)
+  saleStartAt     DateTime?
+  saleEndAt       DateTime?
+  // イベント単位の1ユーザー累計購入上限（null=無制限）
+  maxPerUser      Int?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  products      Product[]
+  lotteries     Lottery[]
+  revenueShares RevenueShare[]
+
+  @@index([isPublished, saleStartAt, saleEndAt])
+  @@map("events")
+}
+
+model Product {
+  id           String      @id @default(cuid())
+  eventId      String
+  slug         String      @unique
+  name         String
+  description  String?
+  type         ProductType @default(PHYSICAL)
+  basePrice    Int // 表示用基準価格（円）。実価格は variant.price
+  imageUrl     String?
+  // 特典会向け項目
+  benefit      String? // 特典内容（例: 直筆サイン入り / 2ショットチェキ）
+  deliveryDate DateTime? // 配信予定日 / お届け予定日
+  notes        String? // 商品ごとの注意事項
+  // ニックネーム入力の案内文（サイン宛名など）。requiresNickname=true 時に表示
+  nicknameNote String?
+  isPublished  Boolean     @default(false)
+  // 商品単位の販売期間（null時はイベントの期間に従う）
+  saleStartAt  DateTime?
+  saleEndAt    DateTime?
+  // 購入制限
+  maxPerOrder  Int? // 1注文あたり購入数上限
+  maxPerUser   Int? // 1ユーザー累計購入数上限
+  // 当選者限定購入（抽選経由のみ購入可）
+  lotteryOnly  Boolean     @default(false)
+  // 宛名・ニックネーム入力が必要か（制作リスト用）
+  requiresNickname Boolean @default(false)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  event           Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  variants        ProductVariant[]
+  digitalContents DigitalContent[]
+  lotteries       Lottery[]
+  revenueShares   RevenueShare[]
+
+  @@index([eventId])
+  @@map("products")
+}
+
+model ProductVariant {
+  id        String  @id @default(cuid())
+  productId String
+  name      String  @default("標準") // サイズ・種類・メンバー等
+  sku       String  @unique
+  price     Int // 実販売価格（円）
+  isDefault Boolean @default(false)
+  // SKU単位でニックネーム（サイン宛名）入力を必須にするか
+  requiresNickname Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  inventory  Inventory?
+  cartItems  CartItem[]
+  orderItems OrderItem[]
+
+  @@index([productId])
+  @@map("product_variants")
+}
+
+model Inventory {
+  id        String @id @default(cuid())
+  variantId String @unique
+  quantity  Int    @default(0) // 総在庫数
+  reserved  Int    @default(0) // 仮確保中（決済前）
+  sold      Int    @default(0) // 販売済み
+  updatedAt DateTime @updatedAt
+
+  variant      ProductVariant     @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  reservations StockReservation[]
+
+  @@map("inventories")
+}
+
+// 在庫仮確保レコード（TTL付き）。決済成功で CONFIRMED、期限切れ/キャンセルで RELEASED
+model StockReservation {
+  id          String            @id @default(cuid())
+  inventoryId String
+  quantity    Int
+  status      ReservationStatus @default(HELD)
+  expiresAt   DateTime
+  cartItemId  String?
+  orderItemId String?           @unique
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  inventory Inventory  @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+  orderItem OrderItem? @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+
+  @@index([status, expiresAt])
+  @@index([inventoryId])
+  @@map("stock_reservations")
+}
+
+// ---------------------------------------------------------------------------
+// カート
+// ---------------------------------------------------------------------------
+
+model Cart {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items CartItem[]
+
+  @@map("carts")
+}
+
+model CartItem {
+  id        String   @id @default(cuid())
+  cartId    String
+  variantId String
+  quantity  Int
+  // カート投入時に入力するニックネーム（サイン宛名）。注文時に order_item へ引き継ぐ
+  nickname     String?
+  nicknameKana String?
+  note         String?
+  // 数量分のニックネーム [{nickname, nicknameKana, note}]
+  unitNicknames Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cart    Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, variantId])
+  @@index([cartId])
+  @@map("cart_items")
+}
+
+// ---------------------------------------------------------------------------
+// 注文 / 決済 / 発送
+// ---------------------------------------------------------------------------
+
+model Order {
+  id            String      @id @default(cuid())
+  orderNumber   String      @unique
+  userId        String
+  status        OrderStatus @default(PENDING)
+  currency      String      @default("jpy")
+  subtotal      Int         @default(0)
+  shippingFee   Int         @default(0)
+  total         Int         @default(0)
+  // 配送先（注文時スナップショット）
+  recipientName     String?
+  recipientKana     String?
+  recipientPhone    String?
+  recipientPostal   String?
+  recipientAddress  String?
+  shippingMethod    String?
+  paidAt        DateTime?
+  cancelledAt   DateTime?
+  reservationExpiresAt DateTime? // 仮確保の最終期限
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  user            User                 @relation(fields: [userId], references: [id])
+  items           OrderItem[]
+  payment         Payment?
+  shipment        Shipment?
+  digitalContents UserDigitalContent[]
+  digitalDeliveries DigitalDelivery[]
+  lotteryEntries  LotteryEntry[]
+
+  @@index([userId])
+  @@index([status])
+  @@map("orders")
+}
+
+model OrderItem {
+  id          String  @id @default(cuid())
+  orderId     String
+  variantId   String
+  productName String // スナップショット
+  variantName String
+  unitPrice   Int
+  quantity    Int
+  // 制作用入力（代表値 = 1個目。数量別はunitNicknames）
+  nickname    String?
+  nicknameKana String?
+  note        String?
+  // 数量分のニックネーム [{nickname, nicknameKana, note}]（要・宛名SKUで数量≥2のとき）
+  unitNicknames Json?
+
+  order             Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  variant           ProductVariant    @relation(fields: [variantId], references: [id])
+  reservation       StockReservation?
+  digitalDeliveries DigitalDelivery[]
+
+  @@index([orderId])
+  @@map("order_items")
+}
+
+model Payment {
+  id                String          @id @default(cuid())
+  orderId           String          @unique
+  provider          PaymentProvider @default(STRIPE)
+  providerSessionId String? // Checkout Session ID
+  providerPaymentId String? // PaymentIntent / Charge ID
+  status            PaymentStatus   @default(PENDING)
+  amount            Int
+  currency          String          @default("jpy")
+  paidAt            DateTime?
+  refundedAt        DateTime?
+  failureReason     String?
+  rawEvent          Json?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([providerSessionId])
+  @@index([providerPaymentId])
+  @@map("payments")
+}
+
+model Shipment {
+  id             String         @id @default(cuid())
+  orderId        String         @unique
+  status         ShipmentStatus @default(UNFULFILLED)
+  carrier        String?
+  trackingNumber String?
+  shippedAt      DateTime?
+  deliveredAt    DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("shipments")
+}
+
+// ---------------------------------------------------------------------------
+// デジタルコンテンツ
+// ---------------------------------------------------------------------------
+
+model DigitalContent {
+  id             String             @id @default(cuid())
+  productId      String?
+  title          String
+  description    String?
+  type           DigitalContentType @default(IMAGE)
+  // 配信方式（SHARED=共通即DL / PERSONALIZED=個別サイン納品）
+  deliveryType   DigitalDeliveryType @default(SHARED)
+  fileKey        String? // SHARED時の配信ファイルキー
+  baseImageKey   String? // PERSONALIZED時のサイン用ベース画像（原本）キー
+  publishAt      DateTime? // 公開開始日時
+  viewLimitDays  Int? // 付与/納品から閲覧可能な日数
+  downloadLimit  Int? // ダウンロード回数上限
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  product    Product?             @relation(fields: [productId], references: [id], onDelete: SetNull)
+  userGrants UserDigitalContent[]
+  deliveries DigitalDelivery[]
+
+  @@index([productId])
+  @@map("digital_contents")
+}
+
+// 個別サイン納品（注文明細ユニット単位）。決済後にPENDINGで生成し、
+// 管理者がサイン済みファイルをアップロードするとREADYになる。
+model DigitalDelivery {
+  id               String                @id @default(cuid())
+  digitalContentId String
+  orderId          String
+  orderItemId      String
+  userId           String // 認可チェック用に非正規化
+  unitIndex        Int // 明細内の何個目か（0..quantity-1）
+  // 宛名スナップショット（注文時点）
+  nickname         String?
+  nicknameKana     String?
+  note             String?
+  status           DigitalDeliveryStatus @default(PENDING)
+  fileKey          String? // サイン済み成果物のキー（READY時に必須）
+  originalFilename String? // アップロード元ファイル名（Content-Disposition用）
+  deliveredAt      DateTime?
+  downloadCount    Int                   @default(0)
+  expiresAt        DateTime?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+
+  digitalContent DigitalContent @relation(fields: [digitalContentId], references: [id], onDelete: Cascade)
+  order          Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderItem      OrderItem      @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([orderItemId, digitalContentId, unitIndex])
+  @@index([userId, status])
+  @@index([status])
+  @@index([orderId])
+  @@map("digital_deliveries")
+}
+
+model UserDigitalContent {
+  id               String   @id @default(cuid())
+  userId           String
+  digitalContentId String
+  orderId          String?
+  grantedAt        DateTime @default(now())
+  expiresAt        DateTime?
+  downloadCount    Int      @default(0)
+  viewCount        Int      @default(0)
+
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  digitalContent DigitalContent @relation(fields: [digitalContentId], references: [id], onDelete: Cascade)
+  order          Order?         @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, digitalContentId])
+  @@index([userId])
+  @@map("user_digital_contents")
+}
+
+// ---------------------------------------------------------------------------
+// 抽選販売
+// ---------------------------------------------------------------------------
+
+model Lottery {
+  id                 String        @id @default(cuid())
+  eventId            String?
+  productId          String? // 当選者が購入できる対象商品
+  title              String
+  description        String?
+  entryStartAt       DateTime
+  entryEndAt         DateTime
+  drawAt             DateTime?
+  winnersCount       Int           @default(0)
+  purchaseDeadlineAt DateTime? // 当選者の購入期限
+  status             LotteryStatus @default(DRAFT)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  event   Event?         @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  product Product?       @relation(fields: [productId], references: [id], onDelete: SetNull)
+  entries LotteryEntry[]
+
+  @@index([status])
+  @@map("lotteries")
+}
+
+model LotteryEntry {
+  id                 String             @id @default(cuid())
+  lotteryId          String
+  userId             String
+  status             LotteryEntryStatus @default(ENTERED)
+  enteredAt          DateTime           @default(now())
+  wonAt              DateTime?
+  purchaseDeadlineAt DateTime?
+  orderId            String?
+
+  lottery Lottery @relation(fields: [lotteryId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order   Order?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@unique([lotteryId, userId])
+  @@index([lotteryId, status])
+  @@map("lottery_entries")
+}
+
+// ---------------------------------------------------------------------------
+// R/S 収益管理 / 操作ログ
+// ---------------------------------------------------------------------------
+
+model RevenueShare {
+  id           String   @id @default(cuid())
+  eventId      String?
+  productId    String?
+  period       String // "2026-06" 月次
+  grossSales   Int      @default(0) // 総売上
+  paymentFee   Int      @default(0) // 決済手数料
+  shippingFee  Int      @default(0) // 送料
+  refunds      Int      @default(0) // 返金
+  externalCost Int      @default(0) // 外部費
+  ourShareRate Float    @default(0) // 弊社取り分率(0-1)
+  ourAmount    Int      @default(0) // 弊社取り分
+  aveliaAmount Int      @default(0) // Avelia取り分
+  conditions   Json? // 契約条件
+  computedAt   DateTime @default(now())
+
+  event   Event?   @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([period])
+  @@map("revenue_shares")
+}
+
+model OperationLog {
+  id          String   @id @default(cuid())
+  adminUserId String?
+  action      String // 例: "event.create"
+  targetType  String? // 例: "Event"
+  targetId    String?
+  detail      Json?
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+
+  adminUser AdminUser? @relation(fields: [adminUserId], references: [id], onDelete: SetNull)
+
+  @@index([adminUserId])
+  @@index([action])
+  @@map("operation_logs")
+}
+
+// ---------------------------------------------------------------------------
+// FAQ / お問い合わせ
+// ---------------------------------------------------------------------------
+
+model Faq {
+  id          String   @id @default(cuid())
+  question    String
+  answer      String
+  sortOrder   Int      @default(0) // 表示順（昇順）
+  isPublished Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isPublished, sortOrder])
+  @@map("faqs")
+}
+
+enum ContactStatus {
+  OPEN // 未対応
+  IN_PROGRESS // 対応中
+  RESOLVED // 対応済み
+  SPAM
+}
+
+model ContactMessage {
+  id        String        @id @default(cuid())
+  userId    String? // ログイン済みなら紐付け
+  name      String
+  email     String
+  subject   String?
+  message   String
+  status    ContactStatus @default(OPEN)
+  adminNote String?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@index([status, createdAt])
+  @@map("contact_messages")
+}

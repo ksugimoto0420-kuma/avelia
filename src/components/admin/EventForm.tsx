@@ -1,0 +1,200 @@
+import { Button } from "@/components/ui/Button";
+import { Card, CardBody, CardHeader } from "@/components/ui/Card";
+import { saveEvent } from "@/app/admin/events/actions";
+
+type EventData = {
+  id: string;
+  title: string;
+  slug: string;
+  description: string | null;
+  coverImageUrl: string | null;
+  artistName: string | null;
+  eventType: string;
+  saleMethod: string;
+  eventDate: Date | null;
+  streamingUrl: string | null;
+  isPublished: boolean;
+  saleStartAt: Date | null;
+  saleEndAt: Date | null;
+  maxPerUser: number | null;
+  notes: string | null;
+};
+
+function dtLocal(d: Date | null): string {
+  if (!d) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+const labelCls = "mb-1 block text-sm font-medium text-gray-700";
+const inputCls =
+  "w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200";
+
+export function EventForm({ event }: { event?: EventData }) {
+  return (
+    <form action={saveEvent} className="space-y-6">
+      {event && <input type="hidden" name="id" value={event.id} />}
+
+      <Card>
+        <CardHeader title="基本情報" />
+        <CardBody className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className={labelCls}>種別 *</label>
+              <select
+                name="eventType"
+                defaultValue={event?.eventType ?? "MEET_GREET"}
+                className={inputCls}
+              >
+                <option value="MEET_GREET">オンライン特典会</option>
+                <option value="KUJI">すきくじ（抽選くじ）</option>
+                <option value="TRADING_CARD">トレカ</option>
+                <option value="GOODS">グッズ</option>
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>販売方式 *</label>
+              <select
+                name="saleMethod"
+                defaultValue={event?.saleMethod ?? "FIRST_COME"}
+                className={inputCls}
+              >
+                <option value="FIRST_COME">先着販売</option>
+                <option value="LOTTERY">抽選販売</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className={labelCls}>出演者・アーティスト名</label>
+            <input
+              name="artistName"
+              defaultValue={event?.artistName ?? ""}
+              className={inputCls}
+              placeholder="例: 星野ひなた"
+            />
+          </div>
+          <div>
+            <label className={labelCls}>タイトル *</label>
+            <input
+              name="title"
+              required
+              defaultValue={event?.title}
+              className={inputCls}
+              placeholder="例: 星野ひなた オンライン特典会 2026"
+            />
+          </div>
+          <div>
+            <label className={labelCls}>スラッグ（URL識別子・省略可）</label>
+            <input
+              name="slug"
+              defaultValue={event?.slug}
+              className={inputCls}
+              placeholder="summer-live-2026"
+            />
+          </div>
+          <div>
+            <label className={labelCls}>説明</label>
+            <textarea
+              name="description"
+              defaultValue={event?.description ?? ""}
+              className={`${inputCls} min-h-28`}
+            />
+          </div>
+          <div>
+            <label className={labelCls}>カバー画像URL</label>
+            <input
+              name="coverImageUrl"
+              defaultValue={event?.coverImageUrl ?? ""}
+              className={inputCls}
+              placeholder="https://…"
+            />
+          </div>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader title="販売設定" />
+        <CardBody className="space-y-4">
+          <div>
+            <label className={labelCls}>開催日時（特典会・サイン会の実施日時）</label>
+            <input
+              type="datetime-local"
+              name="eventDate"
+              defaultValue={dtLocal(event?.eventDate ?? null)}
+              className={inputCls}
+            />
+          </div>
+          <div>
+            <label className={labelCls}>配信URL（YouTube Live等）</label>
+            <input
+              type="url"
+              name="streamingUrl"
+              defaultValue={event?.streamingUrl ?? ""}
+              className={inputCls}
+              placeholder="https://www.youtube.com/watch?v=..."
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              購入者は視聴任意。開催日時が近づくと、購入者向けに「視聴する」ボタンとして表示されます。
+            </p>
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className={labelCls}>販売開始日時</label>
+              <input
+                type="datetime-local"
+                name="saleStartAt"
+                defaultValue={dtLocal(event?.saleStartAt ?? null)}
+                className={inputCls}
+              />
+            </div>
+            <div>
+              <label className={labelCls}>販売終了日時</label>
+              <input
+                type="datetime-local"
+                name="saleEndAt"
+                defaultValue={dtLocal(event?.saleEndAt ?? null)}
+                className={inputCls}
+              />
+            </div>
+          </div>
+          <div>
+            <label className={labelCls}>
+              1ユーザーあたりイベント累計購入上限（空欄=無制限）
+            </label>
+            <input
+              type="number"
+              name="maxPerUser"
+              min={0}
+              defaultValue={event?.maxPerUser ?? ""}
+              className={inputCls}
+            />
+          </div>
+          <div>
+            <label className={labelCls}>注意事項</label>
+            <textarea
+              name="notes"
+              defaultValue={event?.notes ?? ""}
+              className={`${inputCls} min-h-20`}
+            />
+          </div>
+          <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+            <input
+              type="checkbox"
+              name="isPublished"
+              defaultChecked={event?.isPublished}
+              className="h-4 w-4 rounded border-gray-300 text-brand-600"
+            />
+            公開する
+          </label>
+        </CardBody>
+      </Card>
+
+      <div className="flex justify-end gap-3">
+        <Button href="/admin/events" variant="outline">
+          キャンセル
+        </Button>
+        <Button type="submit">{event ? "更新する" : "作成する"}</Button>
+      </div>
+    </form>
+  );
+}

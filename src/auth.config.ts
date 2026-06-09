@@ -1,0 +1,54 @@
+import type { AdminRole } from "@prisma/client";
+import type { NextAuthConfig } from "next-auth";
+import { NextResponse } from "next/server";
+
+// Edge セーフな設定（prisma / bcrypt を含めない）。
+// providers の authorize 実装は auth.ts 側（Node ランタイム）で注入する。
+export const authConfig = {
+  session: { strategy: "jwt" },
+  pages: { signIn: "/auth/login" },
+  trustHost: true,
+  providers: [],
+  callbacks: {
+    jwt({ token, user }) {
+      if (user) {
+        token.id = user.id as string;
+        // @ts-expect-error custom fields set in authorize()
+        token.kind = user.kind;
+        // @ts-expect-error custom fields set in authorize()
+        token.role = (user.role ?? null) as AdminRole | null;
+      }
+      return token;
+    },
+    session({ session, token }) {
+      if (session.user) {
+        session.user.id = token.id;
+        session.user.kind = token.kind;
+        session.user.role = token.role ?? null;
+      }
+      return session;
+    },
+    authorized({ auth, request }) {
+      const { nextUrl } = request;
+      const path = nextUrl.pathname;
+      const user = auth?.user;
+
+      // 管理画面：/admin/login 以外は管理者必須
+      if (path.startsWith("/admin")) {
+        if (path === "/admin/login") return true;
+        if (user?.kind === "admin") return true;
+        return NextResponse.redirect(new URL("/admin/login", nextUrl));
+      }
+
+      // ユーザー専用ページ：要ログイン
+      if (path.startsWith("/mypage") || path.startsWith("/checkout")) {
+        if (user?.kind === "user") return true;
+        const loginUrl = new URL("/auth/login", nextUrl);
+        loginUrl.searchParams.set("callbackUrl", path);
+        return NextResponse.redirect(loginUrl);
+      }
+
+      return true;
+    },
+  },
+} satisfies NextAuthConfig;

@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: avelia_funclub_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: avelia
+      POSTGRES_PASSWORD: avelia_password
+      POSTGRES_DB: avelia_funclub
+    ports:
+      - "5432:5432"
+    volumes:
+      - avelia_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U avelia -d avelia_funclub"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  avelia_pgdata:
