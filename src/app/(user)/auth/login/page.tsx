@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { Suspense, useState } from "react";
 import { Button } from "@/components/ui/Button";
@@ -10,7 +10,6 @@ import { Input } from "@/components/ui/Input";
 import { Alert } from "@/components/ui/Alert";
 
 function LoginForm() {
-  const router = useRouter();
   const params = useSearchParams();
   const callbackUrl = params.get("callbackUrl") ?? "/mypage";
   const [email, setEmail] = useState("");
@@ -27,13 +26,14 @@ function LoginForm() {
       password,
       redirect: false,
     });
-    setLoading(false);
     if (res?.error) {
+      setLoading(false);
       setError("メールアドレスまたはパスワードが正しくありません");
       return;
     }
-    router.push(callbackUrl);
-    router.refresh();
+    // ソフトナビゲーションだと新しいCookieが次のRSCに反映されないことがあるため
+    // ハードリダイレクトでサーバー側に新セッションを確実に反映させる。
+    window.location.href = callbackUrl;
   }
 
   return (

@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { useState } from "react";
 import { Alert } from "@/components/ui/Alert";
@@ -8,7 +7,6 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 
 export default function AdminLoginPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -23,13 +21,13 @@ export default function AdminLoginPage() {
       password,
       redirect: false,
     });
-    setLoading(false);
     if (res?.error) {
+      setLoading(false);
       setError("認証に失敗しました");
       return;
     }
-    router.push("/admin/dashboard");
-    router.refresh();
+    // ソフトナビゲーションだと新しいCookieが反映されないことがあるためハードリダイレクト
+    window.location.href = "/admin/dashboard";
   }
 
   return (
