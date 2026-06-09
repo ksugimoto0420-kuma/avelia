@@ -13,11 +13,7 @@ const schema = z.object({
   message: z.string().trim().min(5, "5文字以上で入力してください").max(5000),
 });
 
-export type ContactResult =
-  | { ok: true }
-  | { ok: false; error: string };
-
-export async function submitContact(formData: FormData): Promise<ContactResult> {
+export async function submitContact(formData: FormData): Promise<void> {
   const parsed = schema.safeParse({
     name: formData.get("name") ?? "",
     email: formData.get("email") ?? "",
@@ -26,10 +22,9 @@ export async function submitContact(formData: FormData): Promise<ContactResult> 
   });
 
   if (!parsed.success) {
-    return {
-      ok: false,
-      error: parsed.error.issues[0]?.message ?? "入力内容を確認してください",
-    };
+    throw new Error(
+      parsed.error.issues[0]?.message ?? "入力内容を確認してください",
+    );
   }
 
   const session = await getOptionalUser();
