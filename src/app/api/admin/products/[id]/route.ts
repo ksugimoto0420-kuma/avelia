@@ -2,6 +2,7 @@ import { AppError, handleError, ok } from "@/lib/api";
 import { requireAdmin } from "@/lib/auth/guards";
 import { logOperation } from "@/lib/operation-log";
 import { prisma } from "@/lib/prisma";
+import { parseJstDateTimeLocal } from "@/lib/utils";
 import { productInputSchema } from "@/lib/validators";
 
 export async function PATCH(
@@ -28,12 +29,12 @@ export async function PATCH(
           basePrice: input.basePrice,
           imageUrl: input.imageUrl ?? null,
           benefit: input.benefit ?? null,
-          deliveryDate: input.deliveryDate ? new Date(input.deliveryDate) : null,
+          deliveryDate: input.deliveryDate ? parseJstDateTimeLocal(input.deliveryDate) : null,
           notes: input.notes ?? null,
           nicknameNote: input.nicknameNote ?? null,
           isPublished: input.isPublished ?? false,
-          saleStartAt: input.saleStartAt ? new Date(input.saleStartAt) : null,
-          saleEndAt: input.saleEndAt ? new Date(input.saleEndAt) : null,
+          saleStartAt: input.saleStartAt ? parseJstDateTimeLocal(input.saleStartAt) : null,
+          saleEndAt: input.saleEndAt ? parseJstDateTimeLocal(input.saleEndAt) : null,
           maxPerOrder: input.maxPerOrder ?? null,
           maxPerUser: input.maxPerUser ?? null,
           lotteryOnly: input.lotteryOnly ?? false,

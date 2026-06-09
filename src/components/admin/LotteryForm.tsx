@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { saveLottery } from "@/app/admin/lotteries/actions";
+import { toJstDateTimeLocalString } from "@/lib/utils";
 
 export type LotteryFormData = {
   id?: string;
@@ -15,11 +16,7 @@ export type LotteryFormData = {
   status: string;
 };
 
-function dtLocal(d: Date | null): string {
-  if (!d) return "";
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
+const dtLocal = (d: Date | null) => toJstDateTimeLocalString(d);
 
 const labelCls = "mb-1 block text-sm font-medium text-gray-700";
 const inputCls =

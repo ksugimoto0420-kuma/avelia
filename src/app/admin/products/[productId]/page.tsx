@@ -3,15 +3,12 @@ import { ProductForm, type ProductFormData } from "@/components/admin/ProductFor
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { requireAdminPage } from "@/lib/auth/admin-page";
 import { prisma } from "@/lib/prisma";
+import { toJstDateTimeLocalString } from "@/lib/utils";
 import { deleteProduct } from "../actions";
 
 export const dynamic = "force-dynamic";
 
-function dtLocal(d: Date | null): string {
-  if (!d) return "";
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
+const dtLocal = (d: Date | null) => toJstDateTimeLocalString(d);
 
 export default async function EditProductPage({
   params,

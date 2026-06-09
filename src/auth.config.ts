@@ -4,8 +4,18 @@ import { NextResponse } from "next/server";
 
 // Edge セーフな設定（prisma / bcrypt を含めない）。
 // providers の authorize 実装は auth.ts 側（Node ランタイム）で注入する。
+// セッション有効期間（30日）。アクティブな操作があるたびにスライド延長される。
+const SESSION_MAX_AGE = 60 * 60 * 24 * 30;
+
 export const authConfig = {
-  session: { strategy: "jwt" },
+  session: {
+    strategy: "jwt",
+    maxAge: SESSION_MAX_AGE,
+    updateAge: 60 * 60 * 24, // 1日ごとに署名トークンをローテーション
+  },
+  jwt: {
+    maxAge: SESSION_MAX_AGE,
+  },
   pages: { signIn: "/auth/login" },
   trustHost: true,
   providers: [],

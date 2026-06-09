@@ -7,10 +7,11 @@ import { logOperation } from "@/lib/operation-log";
 import { prisma } from "@/lib/prisma";
 import { slugify } from "@/lib/utils";
 
+import { parseJstDateTimeLocal } from "@/lib/utils";
+
 function parseDate(v: FormDataEntryValue | null): Date | null {
   if (!v || typeof v !== "string" || v.trim() === "") return null;
-  const d = new Date(v);
-  return Number.isNaN(d.getTime()) ? null : d;
+  return parseJstDateTimeLocal(v);
 }
 
 function parseIntOrNull(v: FormDataEntryValue | null): number | null {

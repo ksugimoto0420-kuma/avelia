@@ -12,11 +12,15 @@ export function formatYen(amount: number): string {
   return `¥${amount.toLocaleString("ja-JP")}`;
 }
 
-/** 日時表示（日本時間想定の簡易フォーマット） */
+// アプリ全体で日本時間を基準にする。Vercel本番（UTC）でもJSTで表示・解釈する。
+const APP_TIMEZONE = "Asia/Tokyo";
+
+/** 日時表示（日本時間で固定表示） */
 export function formatDateTime(date: Date | string | null | undefined): string {
   if (!date) return "-";
   const d = typeof date === "string" ? new Date(date) : date;
   return d.toLocaleString("ja-JP", {
+    timeZone: APP_TIMEZONE,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -29,10 +33,53 @@ export function formatDate(date: Date | string | null | undefined): string {
   if (!date) return "-";
   const d = typeof date === "string" ? new Date(date) : date;
   return d.toLocaleDateString("ja-JP", {
+    timeZone: APP_TIMEZONE,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
   });
+}
+
+/**
+ * datetime-local 入力（"2026-06-09T19:40" 等）を日本時間として解釈し
+ * UTC基準のDateに変換する。サーバーのTZに依存しない。
+ */
+export function parseJstDateTimeLocal(value: string): Date | null {
+  const m = value.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/);
+  if (!m) {
+    // フォーマット外でも new Date() で試みる（ISO文字列等）
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  const [, y, mo, d, h, mi, s] = m;
+  // JST は UTC+9
+  const utcMs = Date.UTC(
+    Number(y),
+    Number(mo) - 1,
+    Number(d),
+    Number(h) - 9,
+    Number(mi),
+    s ? Number(s) : 0,
+  );
+  return new Date(utcMs);
+}
+
+/** Date を datetime-local input の value 用に「日本時間」で yyyy-MM-ddTHH:mm 文字列化する */
+export function toJstDateTimeLocalString(date: Date | null | undefined): string {
+  if (!date) return "";
+  // JST に変換した各パーツを取り出す
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: APP_TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const get = (type: string) =>
+    parts.find((p) => p.type === type)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}`;
 }
 
 /** ランダムな注文番号を生成（年月 + ランダム英数字） */
