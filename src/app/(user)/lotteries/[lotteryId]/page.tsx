@@ -24,7 +24,14 @@ export default async function LotteryDetailPage({
   const lottery = await prisma.lottery.findUnique({
     where: { id: lotteryId },
     include: {
-      event: { select: { id: true, title: true, artistName: true } },
+      event: {
+        select: {
+          id: true,
+          title: true,
+          artistName: true,
+          coverImageUrl: true,
+        },
+      },
       product: {
         select: { id: true, name: true, imageUrl: true, basePrice: true },
       },
@@ -32,6 +39,10 @@ export default async function LotteryDetailPage({
     },
   });
   if (!lottery) notFound();
+
+  // 対象商品の画像 → なければイベントカバー画像
+  const heroImage =
+    lottery.product?.imageUrl ?? lottery.event?.coverImageUrl ?? null;
 
   const now = new Date();
   const isOpen =
@@ -60,6 +71,19 @@ export default async function LotteryDetailPage({
         <Alert tone="success" title="ご応募ありがとうございました">
           応募を受け付けました。抽選結果はマイページからご確認いただけます。
         </Alert>
+      )}
+
+      {heroImage && (
+        <div className="overflow-hidden rounded-2xl bg-gradient-to-br from-brand-100 to-brand-50">
+          <div className="aspect-[16/9] w-full">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={heroImage}
+              alt={lottery.title}
+              className="h-full w-full object-cover"
+            />
+          </div>
+        </div>
       )}
 
       <div className="space-y-3">

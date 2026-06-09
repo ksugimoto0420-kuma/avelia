@@ -19,7 +19,9 @@ export default async function LotteriesListPage() {
     },
     orderBy: { entryEndAt: "asc" },
     include: {
-      event: { select: { title: true, artistName: true } },
+      event: {
+        select: { title: true, artistName: true, coverImageUrl: true },
+      },
       product: { select: { name: true, imageUrl: true, basePrice: true } },
       _count: { select: { entries: true } },
     },
@@ -54,8 +56,27 @@ export default async function LotteriesListPage() {
             const isOpen =
               l.status === "OPEN" && l.entryStartAt <= now && l.entryEndAt >= now;
             const myStatus = entryMap.get(l.id);
+            // 対象商品の画像 → なければイベントカバー画像
+            const imageUrl =
+              l.product?.imageUrl ?? l.event?.coverImageUrl ?? null;
             return (
-              <Card key={l.id}>
+              <Card key={l.id} className="overflow-hidden">
+                <Link href={`/lotteries/${l.id}`} className="block">
+                  <div className="aspect-[16/9] w-full bg-gradient-to-br from-brand-100 to-brand-50">
+                    {imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={imageUrl}
+                        alt={l.title}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center text-3xl font-black text-brand-300">
+                        {l.title}
+                      </div>
+                    )}
+                  </div>
+                </Link>
                 <CardBody className="space-y-3">
                   <div className="flex flex-wrap items-center gap-2">
                     {l.status === "OPEN" && isOpen && (
