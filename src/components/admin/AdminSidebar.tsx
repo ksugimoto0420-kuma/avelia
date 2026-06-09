@@ -52,6 +52,7 @@ const GROUPS: { title: string; items: { href: string; label: string; icon: strin
       title: "システム",
       items: [
         { href: "/admin/users", label: "ユーザー", icon: "👥" },
+        { href: "/admin/admins", label: "管理者", icon: "🔑" },
         { href: "/admin/operation-logs", label: "操作ログ", icon: "📝" },
       ],
     },

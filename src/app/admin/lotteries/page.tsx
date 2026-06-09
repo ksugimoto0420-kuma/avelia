@@ -1,7 +1,9 @@
 import type { Prisma } from "@prisma/client";
+import Link from "next/link";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { DrawButton } from "@/components/admin/DrawButton";
 import { FilterBar, FilterField, FilterSelect, FilterText } from "@/components/admin/Filters";
+import { Button } from "@/components/ui/Button";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Pagination } from "@/components/ui/Pagination";
 import { requireAdminPage } from "@/lib/auth/admin-page";
@@ -59,10 +61,15 @@ export default async function AdminLotteriesPage({
 
   return (
     <div className="space-y-5">
-      <h1 className="text-2xl font-bold text-gray-900">抽選管理</h1>
-      <p className="text-sm text-gray-500">
-        当選者のみが対象商品を購入できます（仕様書 9）。抽選実行は確認後に行われます。
-      </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">抽選管理</h1>
+          <p className="text-sm text-gray-500">
+            当選者のみが対象商品を購入できます（仕様書 9）。抽選実行は確認後に行われます。
+          </p>
+        </div>
+        <Button href="/admin/lotteries/new">＋ 新規抽選</Button>
+      </div>
 
       <FilterBar action="/admin/lotteries" clearHref="/admin/lotteries">
         <FilterField label="キーワード">
@@ -109,8 +116,13 @@ export default async function AdminLotteriesPage({
                 ) : (
                   lotteries.map((l) => (
                     <tr key={l.id} className="hover:bg-gray-50/60">
-                      <td className="px-4 py-3 font-medium text-gray-900">
-                        {l.title}
+                      <td className="px-4 py-3 font-medium">
+                        <Link
+                          href={`/admin/lotteries/${l.id}`}
+                          className="text-brand-600 hover:underline"
+                        >
+                          {l.title}
+                        </Link>
                       </td>
                       <td className="px-4 py-3">
                         <p>{l.product?.name ?? "-"}</p>

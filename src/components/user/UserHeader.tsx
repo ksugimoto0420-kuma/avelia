@@ -42,7 +42,7 @@ export function UserHeader() {
           <Link href="/events?type=MEET_GREET" className="hover:text-brand-600">
             オンライン特典会
           </Link>
-          <Link href="/events?type=KUJI" className="hover:text-brand-600">
+          <Link href="/lotteries" className="hover:text-brand-600">
             すきくじ
           </Link>
           <Link href="/events?type=TRADING_CARD" className="hover:text-brand-600">

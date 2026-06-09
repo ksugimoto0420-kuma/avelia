@@ -82,3 +82,45 @@ export async function toggleEventPublish(id: string, next: boolean) {
   });
   revalidatePath("/admin/events");
 }
+
+export async function deleteEvent(formData: FormData) {
+  const admin = await requireAdmin("MANAGER");
+  const id = formData.get("id") as string | null;
+  if (!id) throw new Error("イベントIDが指定されていません");
+
+  const existing = await prisma.event.findUnique({
+    where: { id },
+    include: {
+      products: {
+        include: {
+          variants: { select: { _count: { select: { orderItems: true } } } },
+        },
+      },
+    },
+  });
+  if (!existing) throw new Error("イベントが見つかりません");
+
+  const orderCount = existing.products.reduce(
+    (sum, p) =>
+      sum + p.variants.reduce((s, v) => s + v._count.orderItems, 0),
+    0,
+  );
+  if (orderCount > 0) {
+    throw new Error(
+      "注文履歴がある商品を含むイベントは削除できません。非公開にしてください。",
+    );
+  }
+
+  await prisma.event.delete({ where: { id } });
+
+  await logOperation({
+    adminUserId: admin.id,
+    action: "event.delete",
+    targetType: "Event",
+    targetId: id,
+    detail: { title: existing.title, productsCount: existing.products.length },
+  });
+
+  revalidatePath("/admin/events");
+  redirect("/admin/events");
+}

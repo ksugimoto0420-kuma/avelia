@@ -88,3 +88,54 @@ export async function PATCH(
     return handleError(err);
   }
 }
+
+export async function DELETE(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const admin = await requireAdmin("MANAGER");
+    const { id } = await params;
+
+    const existing = await prisma.product.findUnique({
+      where: { id },
+      include: {
+        _count: {
+          select: {
+            variants: true,
+            lotteries: true,
+            digitalContents: true,
+          },
+        },
+        variants: {
+          select: {
+            _count: { select: { orderItems: true, cartItems: true } },
+          },
+        },
+      },
+    });
+    if (!existing) throw new AppError("商品が見つかりません", 404);
+
+    const hasOrders = existing.variants.some((v) => v._count.orderItems > 0);
+    if (hasOrders) {
+      throw new AppError(
+        "注文履歴がある商品は削除できません。非公開にしてください。",
+        409,
+      );
+    }
+
+    await prisma.product.delete({ where: { id } });
+
+    await logOperation({
+      adminUserId: admin.id,
+      action: "product.delete",
+      targetType: "Product",
+      targetId: id,
+      detail: { name: existing.name },
+    });
+
+    return ok({ id });
+  } catch (err) {
+    return handleError(err);
+  }
+}
