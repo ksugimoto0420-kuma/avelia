@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { EventCard, type EventCardData } from "@/components/user/EventCard";
 import { ProductCard } from "@/components/user/ProductCard";
-import { Button } from "@/components/ui/Button";
 import { availableStock } from "@/lib/inventory";
 import { prisma } from "@/lib/prisma";
 
@@ -76,18 +75,19 @@ export default async function HomePage() {
             </button>
           </form>
 
-          <div className="mt-6 flex gap-3">
-            <Button href="/events" size="lg" variant="secondary">
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link
+              href="/events"
+              className="inline-flex h-12 items-center rounded-lg bg-gray-900 px-6 text-base font-medium text-white hover:bg-gray-800"
+            >
               特典会・サイン会を見る
-            </Button>
-            <Button
+            </Link>
+            <Link
               href="/auth/register"
-              size="lg"
-              variant="outline"
-              className="border-white/70 bg-transparent text-white hover:bg-white/10"
+              className="inline-flex h-12 items-center rounded-lg border-2 border-white bg-white/10 px-6 text-base font-medium text-white backdrop-blur hover:bg-white hover:text-brand-600"
             >
               新規登録
-            </Button>
+            </Link>
           </div>
         </div>
       </section>
