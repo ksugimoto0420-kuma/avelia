@@ -47,6 +47,7 @@ export async function saveEvent(formData: FormData) {
     saleStartAt: parseDate(formData.get("saleStartAt")),
     saleEndAt: parseDate(formData.get("saleEndAt")),
     maxPerUser: parseIntOrNull(formData.get("maxPerUser")),
+    capacity: parseIntOrNull(formData.get("capacity")),
     notes: (formData.get("notes") as string) || null,
   };
 

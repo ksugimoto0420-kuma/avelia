@@ -1,7 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { AppError } from "@/lib/api";
 import { env } from "@/lib/env";
-import { reserveStock } from "@/lib/inventory";
+import { eventCapacityRemaining, reserveStock } from "@/lib/inventory";
 import { allUnitsFilled, normalizeUnitNicknames } from "@/lib/nickname";
 import { prisma } from "@/lib/prisma";
 import { isPurchasable } from "@/lib/sale";
@@ -270,6 +270,20 @@ export async function createPendingOrder(params: {
             409,
           );
         }
+      }
+    }
+
+    // イベント定員（capacity）チェック：複数商品の販売数合計に対する上限。
+    // eventCapacityRemaining はこのリクエストで既に reserveStock 済みの分も
+    // reserved として含めるため、その時点で残数が 0 以上であれば OK。
+    for (const eventId of eventRequested.keys()) {
+      const remaining = await eventCapacityRemaining(tx, eventId);
+      if (remaining != null && remaining < 0) {
+        const r = resolved.find((x) => x.event.id === eventId)!;
+        throw new AppError(
+          `「${r.product.name}」を含むイベントの参加枠（定員）が不足しています`,
+          409,
+        );
       }
     }
 

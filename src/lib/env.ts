@@ -18,6 +18,8 @@ export const env = {
     from: process.env.MAIL_FROM ?? "Avelia FunClub <no-reply@example.com>",
     resendApiKey: process.env.RESEND_API_KEY ?? "",
   },
+  // 運営者向け通知の宛先（低在庫アラート等）。複数アドレスはカンマ区切り。
+  alertEmailTo: process.env.ALERT_EMAIL_TO ?? "",
   reservationTtlMinutes: Number(process.env.RESERVATION_TTL_MINUTES ?? "15"),
   cronSecret: process.env.CRON_SECRET ?? "",
 };

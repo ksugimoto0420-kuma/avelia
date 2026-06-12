@@ -18,6 +18,7 @@ type EventData = {
   saleStartAt: Date | null;
   saleEndAt: Date | null;
   maxPerUser: number | null;
+  capacity: number | null;
   notes: string | null;
 };
 
@@ -165,6 +166,22 @@ export function EventForm({ event }: { event?: EventData }) {
               defaultValue={event?.maxPerUser ?? ""}
               className={inputCls}
             />
+          </div>
+          <div>
+            <label className={labelCls}>
+              サイン会の参加枠（定員、空欄=物理在庫だけで制限）
+            </label>
+            <input
+              type="number"
+              name="capacity"
+              min={0}
+              defaultValue={event?.capacity ?? ""}
+              className={inputCls}
+              placeholder="例: 100"
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              複数商品（CD・チェキ等）の販売数合計に対する上限です。出演者の対応可能人数を設定してください。
+            </p>
           </div>
           <div>
             <label className={labelCls}>注意事項</label>

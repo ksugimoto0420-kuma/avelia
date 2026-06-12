@@ -185,6 +185,10 @@ model Event {
   saleEndAt       DateTime?
   // イベント単位の1ユーザー累計購入上限（null=無制限）
   maxPerUser      Int?
+  // サイン会の参加枠（定員）。出演者がさばける上限。
+  // null = 無制限（物理在庫だけで制限）。
+  // 物理在庫合計とは別軸で「参加可能な合計人数」を制限する。
+  capacity        Int?
   notes           String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -263,12 +267,49 @@ model Inventory {
   quantity  Int    @default(0) // 総在庫数
   reserved  Int    @default(0) // 仮確保中（決済前）
   sold      Int    @default(0) // 販売済み
+  // 低在庫アラートの閾値（残数がこれ以下になったら通知）。null = 通知しない。
+  lowStockThreshold Int?
+  // 直近の低在庫アラート送信日時（同じ閾値で連続送信しないよう抑制）
+  lowStockAlertedAt DateTime?
   updatedAt DateTime @updatedAt
 
   variant      ProductVariant     @relation(fields: [variantId], references: [id], onDelete: Cascade)
   reservations StockReservation[]
+  adjustments  InventoryAdjustment[]
 
   @@map("inventories")
+}
+
+// 在庫調整の履歴。誰が・いつ・なぜ・どれだけ動かしたかを保持。
+enum AdjustmentReason {
+  INITIAL // 初期登録（商品作成時）
+  RESTOCK // 再入荷・追加発注
+  LOSS // ロス（破損・紛失）
+  RETURN // 返品入庫
+  STOCKTAKE // 棚卸調整
+  CORRECTION // 単純訂正・誤入力修正
+  CSV_IMPORT // CSV一括取り込み
+  OTHER // その他
+}
+
+model InventoryAdjustment {
+  id          String           @id @default(cuid())
+  inventoryId String
+  variantId   String           // 検索性のため非正規化
+  delta       Int              // 増減（正負）。実際にquantityへ加算された値
+  before      Int              // 変更前のquantity
+  after       Int              // 変更後のquantity
+  reason      AdjustmentReason @default(CORRECTION)
+  note        String?          // 自由記述メモ
+  adminUserId String?
+  createdAt   DateTime         @default(now())
+
+  inventory Inventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+
+  @@index([inventoryId, createdAt])
+  @@index([variantId, createdAt])
+  @@index([createdAt])
+  @@map("inventory_adjustments")
 }
 
 // 在庫仮確保レコード（TTL付き）。決済成功で CONFIRMED、期限切れ/キャンセルで RELEASED

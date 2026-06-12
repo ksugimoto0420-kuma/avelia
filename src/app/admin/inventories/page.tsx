@@ -1,6 +1,8 @@
 import { Prisma } from "@prisma/client";
+import Link from "next/link";
 import { FilterBar, FilterField, FilterSelect, FilterText } from "@/components/admin/Filters";
 import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Pagination } from "@/components/ui/Pagination";
 import { requireAdminPage } from "@/lib/auth/admin-page";
@@ -18,11 +20,16 @@ type InvRow = {
   reserved: number;
   sold: number;
   available: number;
+  lowStockThreshold: number | null;
   variantId: string;
   variantName: string;
   sku: string;
+  productId: string;
   productName: string;
+  productPublished: boolean;
   eventTitle: string;
+  eventPublished: boolean;
+  eventEnded: boolean;
 };
 
 export default async function AdminInventoriesPage({
@@ -61,8 +68,13 @@ export default async function AdminInventoriesPage({
     prisma.$queryRaw<InvRow[]>`
       SELECT i.id, i.quantity, i.reserved, i.sold,
              (i.quantity - i.reserved - i.sold) AS available,
+             i."lowStockThreshold",
              pv.id AS "variantId", pv.name AS "variantName", pv.sku,
-             p.name AS "productName", e.title AS "eventTitle"
+             p.id AS "productId", p.name AS "productName",
+             p."isPublished" AS "productPublished",
+             e.title AS "eventTitle",
+             e."isPublished" AS "eventPublished",
+             (e."saleEndAt" IS NOT NULL AND e."saleEndAt" < NOW()) AS "eventEnded"
       FROM inventories i
       JOIN product_variants pv ON pv.id = i."variantId"
       JOIN products p ON p.id = pv."productId"
@@ -127,7 +139,23 @@ export default async function AdminInventoriesPage({
 
       <Card>
         <CardBody className="space-y-4">
-          <p className="text-sm text-gray-500">{total} 件中 {rows.length} 件を表示</p>
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-gray-500">
+              {total} 件中 {rows.length} 件を表示
+            </p>
+            <div className="flex gap-2">
+              <Button href="/admin/inventories/import" variant="outline" size="sm">
+                CSV取込
+              </Button>
+              <Button
+                href="/api/admin/exports/inventories"
+                variant="outline"
+                size="sm"
+              >
+                CSV出力
+              </Button>
+            </div>
+          </div>
           <div className="overflow-x-auto rounded-xl border border-gray-200">
             <table className="w-full text-sm">
               <thead>
@@ -137,7 +165,7 @@ export default async function AdminInventoriesPage({
                   <th className="px-4 py-3 text-right">仮確保</th>
                   <th className="px-4 py-3 text-right">販売済</th>
                   <th className="px-4 py-3 text-right">残数</th>
-                  <th className="px-4 py-3 text-right">在庫調整</th>
+                  <th className="px-4 py-3 text-left">在庫調整</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -148,51 +176,103 @@ export default async function AdminInventoriesPage({
                     </td>
                   </tr>
                 ) : (
-                  rows.map((r) => (
-                    <tr key={r.id} className="hover:bg-gray-50/60">
-                      <td className="px-4 py-3">
-                        <p className="font-medium text-gray-900">{r.productName}</p>
-                        <p className="text-xs text-gray-400">
-                          {r.eventTitle} / {r.variantName}（{r.sku}）
-                        </p>
-                      </td>
-                      <td className="px-4 py-3 text-right">{r.quantity}</td>
-                      <td className="px-4 py-3 text-right text-yellow-600">
-                        {r.reserved}
-                      </td>
-                      <td className="px-4 py-3 text-right">{r.sold}</td>
-                      <td className="px-4 py-3 text-right">
-                        {r.available <= 0 ? (
-                          <Badge color="red">売切</Badge>
-                        ) : r.available <= 10 ? (
-                          <Badge color="yellow">{r.available}</Badge>
-                        ) : (
-                          <Badge color="green">{r.available}</Badge>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <form
-                          action={adjustInventory}
-                          className="flex items-center justify-end gap-2"
-                        >
-                          <input type="hidden" name="variantId" value={r.variantId} />
-                          <input
-                            type="number"
-                            name="quantity"
-                            defaultValue={r.quantity}
-                            min={0}
-                            className="w-20 rounded-lg border border-gray-300 px-2 py-1 text-right text-sm"
-                          />
-                          <button
-                            type="submit"
-                            className="rounded-lg bg-brand-600 px-3 py-1 text-xs font-medium text-white hover:bg-brand-700"
+                  rows.map((r) => {
+                    // 整合性警告
+                    const warnings: string[] = [];
+                    if (!r.productPublished) warnings.push("商品が非公開");
+                    if (!r.eventPublished) warnings.push("イベントが非公開");
+                    if (r.eventEnded) warnings.push("販売終了済み");
+                    if (
+                      r.lowStockThreshold != null &&
+                      r.available <= r.lowStockThreshold &&
+                      r.available > 0
+                    ) {
+                      warnings.push(`閾値(${r.lowStockThreshold})到達`);
+                    }
+                    return (
+                      <tr key={r.id} className="hover:bg-gray-50/60">
+                        <td className="px-4 py-3">
+                          <Link
+                            href={`/admin/inventories/${r.variantId}`}
+                            className="font-medium text-brand-600 hover:underline"
                           >
-                            更新
-                          </button>
-                        </form>
-                      </td>
-                    </tr>
-                  ))
+                            {r.productName}
+                          </Link>
+                          <p className="text-xs text-gray-400">
+                            {r.eventTitle} / {r.variantName}（{r.sku}）
+                          </p>
+                          {warnings.length > 0 && (
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              {warnings.map((w) => (
+                                <Badge key={w} color="yellow">
+                                  ⚠ {w}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-right">{r.quantity}</td>
+                        <td className="px-4 py-3 text-right text-yellow-600">
+                          {r.reserved}
+                        </td>
+                        <td className="px-4 py-3 text-right">{r.sold}</td>
+                        <td className="px-4 py-3 text-right">
+                          {r.available <= 0 ? (
+                            <Badge color="red">売切</Badge>
+                          ) : r.available <= 10 ? (
+                            <Badge color="yellow">{r.available}</Badge>
+                          ) : (
+                            <Badge color="green">{r.available}</Badge>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <form
+                            action={adjustInventory}
+                            className="flex flex-wrap items-center gap-2"
+                          >
+                            <input
+                              type="hidden"
+                              name="variantId"
+                              value={r.variantId}
+                            />
+                            <input
+                              type="number"
+                              name="quantity"
+                              defaultValue={r.quantity}
+                              min={0}
+                              aria-label="新しい在庫数"
+                              className="w-20 rounded-lg border border-gray-300 px-2 py-1 text-right text-sm"
+                            />
+                            <select
+                              name="reason"
+                              defaultValue="CORRECTION"
+                              aria-label="調整理由"
+                              className="rounded-lg border border-gray-300 px-2 py-1 text-xs"
+                            >
+                              <option value="RESTOCK">再入荷</option>
+                              <option value="LOSS">ロス</option>
+                              <option value="RETURN">返品入庫</option>
+                              <option value="STOCKTAKE">棚卸</option>
+                              <option value="CORRECTION">訂正</option>
+                              <option value="OTHER">その他</option>
+                            </select>
+                            <input
+                              name="note"
+                              placeholder="メモ"
+                              aria-label="メモ"
+                              className="w-32 rounded-lg border border-gray-300 px-2 py-1 text-xs"
+                            />
+                            <button
+                              type="submit"
+                              className="rounded-lg bg-brand-600 px-3 py-1 text-xs font-medium text-white hover:bg-brand-700"
+                            >
+                              更新
+                            </button>
+                          </form>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>

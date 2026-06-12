@@ -348,6 +348,15 @@ export default function CartPage() {
               ニックネームが必要な商品は、数量分すべて入力後にレジへ進めます。
             </p>
           )}
+          <div className="mt-4 rounded-lg border border-yellow-200 bg-yellow-50 p-3 text-xs text-yellow-800">
+            <p className="font-medium">⏱ 在庫の確保について</p>
+            <p className="mt-1">
+              カートに入れた時点では在庫は確保されません。先着順のため、
+              「レジに進む」を押した時点から{" "}
+              <b>15分以内に決済</b>
+              完了されると確保が確定します。
+            </p>
+          </div>
         </div>
       </div>
     </div>

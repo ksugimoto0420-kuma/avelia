@@ -252,6 +252,14 @@ export default function CheckoutPage() {
           <p className="mt-3 text-center text-xs text-gray-400">
             「決済に進む」で外部決済画面に移動します
           </p>
+          <div className="mt-4 rounded-lg border border-yellow-200 bg-yellow-50 p-3 text-xs text-yellow-800">
+            <p className="font-medium">⏱ 在庫の仮確保</p>
+            <p className="mt-1">
+              「この内容で決済する」を押した時点から{" "}
+              <b>15分以内</b>
+              に決済を完了してください。15分を超えると仮確保が解除され、商品が他の方に購入される可能性があります。
+            </p>
+          </div>
           {/* 実送信は submit ボタンで行う */}
           <Button
             type="submit"

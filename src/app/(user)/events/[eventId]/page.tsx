@@ -104,6 +104,45 @@ export default async function EventDetailPage({
       )}
       <h1 className="mt-1 text-3xl font-bold text-gray-900">{event.title}</h1>
 
+      {(() => {
+        // 参加枠（定員）の残り計算：全商品バリアントの reserved+sold 合計を引く
+        if (event.capacity == null) return null;
+        const used = event.products.reduce(
+          (s, p) =>
+            s +
+            p.variants.reduce(
+              (sv, v) =>
+                sv + (v.inventory ? v.inventory.reserved + v.inventory.sold : 0),
+              0,
+            ),
+          0,
+        );
+        const remaining = Math.max(0, event.capacity - used);
+        const ratio = remaining / event.capacity;
+        const color =
+          remaining === 0
+            ? "red"
+            : ratio < 0.2
+              ? "yellow"
+              : "green";
+        const colorCls =
+          color === "red"
+            ? "border-red-200 bg-red-50 text-red-700"
+            : color === "yellow"
+              ? "border-yellow-200 bg-yellow-50 text-yellow-800"
+              : "border-emerald-200 bg-emerald-50 text-emerald-700";
+        return (
+          <div
+            className={`mt-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border px-4 py-3 text-sm ${colorCls}`}
+          >
+            <span className="font-medium">参加枠（定員）</span>
+            <span>
+              残り <b>{remaining}</b> / {event.capacity} 名
+            </span>
+          </div>
+        );
+      })()}
+
       <dl className="mt-4 grid grid-cols-1 gap-x-8 gap-y-2 rounded-xl border border-gray-100 bg-gray-50 p-4 text-sm sm:grid-cols-2">
         {event.eventDate && (
           <div className="flex gap-2">

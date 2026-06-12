@@ -96,3 +96,29 @@ export async function releaseStock(
     data: { reserved: { decrement: Math.min(quantity, inv.reserved) } },
   });
 }
+
+/**
+ * イベントの「参加枠（定員）」残数を計算する。
+ * 同イベントに紐づく全商品のバリアントの reserved + sold の合計を
+ * Event.capacity から差し引く。capacity が null なら null（無制限）。
+ */
+export async function eventCapacityRemaining(
+  tx: Prisma.TransactionClient,
+  eventId: string,
+): Promise<number | null> {
+  const event = await tx.event.findUnique({
+    where: { id: eventId },
+    select: { capacity: true },
+  });
+  if (!event || event.capacity == null) return null;
+
+  const agg = await tx.$queryRaw<{ used: number }[]>`
+    SELECT COALESCE(SUM(i.reserved + i.sold), 0)::int AS used
+    FROM inventories i
+    JOIN product_variants pv ON pv.id = i."variantId"
+    JOIN products p ON p.id = pv."productId"
+    WHERE p."eventId" = ${eventId}
+  `;
+  const used = agg[0]?.used ?? 0;
+  return Math.max(0, event.capacity - used);
+}
