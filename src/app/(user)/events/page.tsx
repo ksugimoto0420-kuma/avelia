@@ -1,9 +1,10 @@
-import type { EventType } from "@prisma/client";
+import type { EventType, Prisma } from "@prisma/client";
 import Link from "next/link";
 import { EventCard, type EventCardData } from "@/components/user/EventCard";
 import { EVENT_TYPE_LABEL } from "@/lib/event-meta";
 import { cn } from "@/lib/utils";
 import { prisma } from "@/lib/prisma";
+import { eventStageOrderBy, eventStageWhere } from "@/lib/sale";
 
 export const dynamic = "force-dynamic";
 
@@ -38,30 +39,40 @@ export default async function EventsPage({
   const q = (sp.q ?? "").trim();
   const now = new Date();
 
-  const where: Record<string, unknown> = { isPublished: true };
-  if (type) where.eventType = type as EventType;
-  if (filter === "on_sale") {
-    where.AND = [
-      { OR: [{ saleStartAt: null }, { saleStartAt: { lte: now } }] },
-      { OR: [{ saleEndAt: null }, { saleEndAt: { gte: now } }] },
-    ];
-  } else if (filter === "upcoming") {
-    where.saleStartAt = { gt: now };
-  } else if (filter === "ended") {
-    where.saleEndAt = { lt: now };
-  }
+  // 共通 where（フィルタ・検索）
+  const baseWhere: Prisma.EventWhereInput = { isPublished: true };
+  if (type) baseWhere.eventType = type as EventType;
   if (q) {
-    where.OR = [
+    baseWhere.OR = [
       { title: { contains: q, mode: "insensitive" } },
       { artistName: { contains: q, mode: "insensitive" } },
       { description: { contains: q, mode: "insensitive" } },
     ];
   }
 
-  const events = await prisma.event.findMany({
-    where,
-    orderBy: { saleStartAt: "asc" },
-  });
+  // ステージ別取得 → 「すべて」は 販売中→販売予定→終了 で連結。
+  // 個別フィルタはそのステージのみ。
+  async function fetchStage(stage: "on_sale" | "upcoming" | "ended") {
+    return prisma.event.findMany({
+      where: { ...baseWhere, ...eventStageWhere(stage, now) },
+      orderBy: eventStageOrderBy[stage],
+    });
+  }
+  let events: Awaited<ReturnType<typeof fetchStage>>;
+  if (filter === "on_sale") {
+    events = await fetchStage("on_sale");
+  } else if (filter === "upcoming") {
+    events = await fetchStage("upcoming");
+  } else if (filter === "ended") {
+    events = await fetchStage("ended");
+  } else {
+    const [a, b, c] = await Promise.all([
+      fetchStage("on_sale"),
+      fetchStage("upcoming"),
+      fetchStage("ended"),
+    ]);
+    events = [...a, ...b, ...c];
+  }
 
   const cards: EventCardData[] = events.map((e) => ({
     id: e.id,

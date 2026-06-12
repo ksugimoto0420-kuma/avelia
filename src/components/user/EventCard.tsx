@@ -39,7 +39,7 @@ export function EventCard({ event }: { event: EventCardData }) {
       href={`/events/${event.id}`}
       className="group block overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
     >
-      <div className="relative aspect-[4/3] w-full overflow-hidden bg-gradient-to-br from-brand-100 to-brand-50">
+      <div className="relative aspect-[16/9] w-full overflow-hidden bg-gradient-to-br from-brand-100 to-brand-50">
         {event.coverImageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img

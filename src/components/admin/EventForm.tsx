@@ -135,6 +135,26 @@ export function EventForm({
               className={inputCls}
               placeholder="https://…"
             />
+            <p className="mt-1 text-xs text-gray-500">
+              推奨：<b>1200×675px（16:9 横長）</b> のJPEG/PNG。
+              一覧カードと詳細ヒーローで使われます。 人物や文字は
+              中央寄りに配置すると、端が切れにくくなります。
+            </p>
+            {event?.coverImageUrl && (
+              <div className="mt-2 overflow-hidden rounded-lg border border-gray-200">
+                <div className="aspect-[16/9] w-full bg-gray-50">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={event.coverImageUrl}
+                    alt="プレビュー"
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+                <p className="bg-gray-50 px-2 py-1 text-xs text-gray-500">
+                  プレビュー（16:9 でトリミングされます）
+                </p>
+              </div>
+            )}
           </div>
         </CardBody>
       </Card>

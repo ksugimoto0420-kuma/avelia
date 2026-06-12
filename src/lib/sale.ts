@@ -55,3 +55,32 @@ export const SALE_STATUS_COLOR: Record<
   ENDED: "gray",
   SOLD_OUT: "red",
 };
+
+import type { Prisma } from "@prisma/client";
+
+/** Eventを「販売中→販売予定→終了」に分類するためのwhere句 */
+export function eventStageWhere(
+  stage: "on_sale" | "upcoming" | "ended",
+  now: Date,
+): Prisma.EventWhereInput {
+  if (stage === "on_sale") {
+    return {
+      AND: [
+        { OR: [{ saleStartAt: null }, { saleStartAt: { lte: now } }] },
+        { OR: [{ saleEndAt: null }, { saleEndAt: { gte: now } }] },
+      ],
+    };
+  }
+  if (stage === "upcoming") {
+    return { saleStartAt: { gt: now } };
+  }
+  // ended
+  return { saleEndAt: { lt: now } };
+}
+
+/** 各ステージ内での並び順 */
+export const eventStageOrderBy = {
+  on_sale: [{ saleEndAt: "asc" as const }, { createdAt: "desc" as const }],
+  upcoming: [{ saleStartAt: "asc" as const }, { createdAt: "desc" as const }],
+  ended: [{ saleEndAt: "desc" as const }, { createdAt: "desc" as const }],
+};

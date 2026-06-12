@@ -3,18 +3,25 @@ import { EventCard, type EventCardData } from "@/components/user/EventCard";
 import { ProductCard } from "@/components/user/ProductCard";
 import { availableStock } from "@/lib/inventory";
 import { prisma } from "@/lib/prisma";
+import { eventStageOrderBy, eventStageWhere } from "@/lib/sale";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   const now = new Date();
 
-  const [events, products] = await Promise.all([
+  // 「販売中（終了が近い順）→ 販売予定（開始が近い順）→ 終了」の順で
+  // 合計6件取る。各ステージから最大6件ずつ取って必要なだけ連結。
+  const [onSale, upcoming, products] = await Promise.all([
     prisma.event.findMany({
-      where: { isPublished: true },
-      orderBy: { saleStartAt: "asc" },
+      where: { isPublished: true, ...eventStageWhere("on_sale", now) },
+      orderBy: eventStageOrderBy.on_sale,
       take: 6,
-      include: { _count: { select: { products: true } } },
+    }),
+    prisma.event.findMany({
+      where: { isPublished: true, ...eventStageWhere("upcoming", now) },
+      orderBy: eventStageOrderBy.upcoming,
+      take: 6,
     }),
     prisma.product.findMany({
       where: { isPublished: true, event: { isPublished: true } },
@@ -26,6 +33,7 @@ export default async function HomePage() {
       },
     }),
   ]);
+  const events = [...onSale, ...upcoming].slice(0, 6);
 
   const eventCards: EventCardData[] = events.map((e) => ({
     id: e.id,

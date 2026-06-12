@@ -193,7 +193,23 @@ export function ProductForm({
             label="商品画像URL"
             value={form.imageUrl}
             onChange={(e) => set("imageUrl", e.target.value)}
+            hint="推奨: 600×600px 以上の正方形（1:1）。商品カードと詳細ページで使われます。"
           />
+          {form.imageUrl && (
+            <div className="overflow-hidden rounded-lg border border-gray-200">
+              <div className="aspect-square w-32 bg-gray-50">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={form.imageUrl}
+                  alt="プレビュー"
+                  className="h-full w-full object-cover"
+                />
+              </div>
+              <p className="bg-gray-50 px-2 py-1 text-xs text-gray-500">
+                プレビュー（1:1 でトリミング）
+              </p>
+            </div>
+          )}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Input
               label="特典内容"

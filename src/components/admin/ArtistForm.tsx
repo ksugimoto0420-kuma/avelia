@@ -69,6 +69,26 @@ export function ArtistForm({ artist }: { artist?: ArtistFormData }) {
               className={inputCls}
               placeholder="https://…"
             />
+            <p className="mt-1 text-xs text-gray-500">
+              推奨：<b>500×500px 以上の正方形（1:1）</b> のJPEG/PNG。
+              プロフィールページでは円形に切り抜かれます。
+              <b>顔が中央に写る</b>ようにすると端が切れません。
+            </p>
+            {artist?.imageUrl && (
+              <div className="mt-2 flex items-center gap-3">
+                <div className="h-24 w-24 overflow-hidden rounded-full border border-gray-200 bg-gray-50">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={artist.imageUrl}
+                    alt="プレビュー"
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+                <p className="text-xs text-gray-500">
+                  円形プレビュー（1:1 でトリミング）
+                </p>
+              </div>
+            )}
           </div>
           <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
             <input

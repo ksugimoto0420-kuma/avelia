@@ -86,7 +86,7 @@ export default async function EventDetailPage({
     <div className="mx-auto max-w-6xl px-4 py-8">
       {/* カバー */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-100 to-brand-50">
-        <div className="aspect-[21/9] w-full">
+        <div className="aspect-[16/9] w-full">
           {event.coverImageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
