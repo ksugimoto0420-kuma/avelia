@@ -5,6 +5,7 @@ import { eventCapacityRemaining, reserveStock } from "@/lib/inventory";
 import { allUnitsFilled, normalizeUnitNicknames } from "@/lib/nickname";
 import { prisma } from "@/lib/prisma";
 import { isPurchasable } from "@/lib/sale";
+import { calculateShippingFee } from "@/lib/settings";
 import { generateOrderNumber } from "@/lib/utils";
 
 export type CheckoutItemInput = {
@@ -75,7 +76,6 @@ export async function createPendingOrder(params: {
 }) {
   const { userId, items, recipient } = params;
   const now = params.now ?? new Date();
-  const shippingFee = params.shippingFee ?? 0;
 
   if (items.length === 0) {
     throw new AppError("カートが空です", 400);
@@ -291,6 +291,32 @@ export async function createPendingOrder(params: {
       (s, r) => s + r.variant.price * r.input.quantity,
       0,
     );
+
+    // 物販小計と物販有無を判定して送料計算（明示引数があればそれを優先）
+    const variantIds = resolved.map((r) => r.variant.id);
+    const types = await tx.product.findMany({
+      where: {
+        variants: { some: { id: { in: variantIds } } },
+      },
+      select: {
+        type: true,
+        variants: { select: { id: true, price: true } },
+      },
+    });
+    let physicalSubtotal = 0;
+    let hasPhysical = false;
+    for (const p of types) {
+      if (p.type !== "PHYSICAL") continue;
+      hasPhysical = true;
+      for (const v of p.variants) {
+        const item = resolved.find((r) => r.variant.id === v.id);
+        if (!item) continue;
+        physicalSubtotal += v.price * item.input.quantity;
+      }
+    }
+    const shippingFee =
+      params.shippingFee ??
+      (await calculateShippingFee({ physicalSubtotal, hasPhysical }));
     const total = subtotal + shippingFee;
 
     // 注文・明細・仮確保レコード・決済(pending) を作成

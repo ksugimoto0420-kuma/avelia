@@ -16,16 +16,23 @@ export default async function EditEventPage({
 }) {
   await requireAdminPage("OPERATOR");
   const { eventId } = await params;
-  const event = await prisma.event.findUnique({
-    where: { id: eventId },
-    include: {
-      products: {
-        include: {
-          variants: { select: { _count: { select: { orderItems: true } } } },
+  const [event, artists] = await Promise.all([
+    prisma.event.findUnique({
+      where: { id: eventId },
+      include: {
+        products: {
+          include: {
+            variants: { select: { _count: { select: { orderItems: true } } } },
+          },
         },
       },
-    },
-  });
+    }),
+    prisma.artist.findMany({
+      where: { isPublished: true },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
+  ]);
   if (!event) notFound();
 
   const orderCount = event.products.reduce(
@@ -47,7 +54,7 @@ export default async function EditEventPage({
           商品を管理（{event.products.length}）
         </Button>
       </div>
-      <EventForm event={event} />
+      <EventForm event={event} artists={artists} />
       <p className="text-right text-sm">
         <Link href={`/events/${event.id}`} className="text-gray-400 hover:underline">
           公開ページを見る ↗

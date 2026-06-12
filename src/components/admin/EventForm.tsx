@@ -9,6 +9,7 @@ type EventData = {
   slug: string;
   description: string | null;
   coverImageUrl: string | null;
+  artistId: string | null;
   artistName: string | null;
   eventType: string;
   saleMethod: string;
@@ -22,13 +23,21 @@ type EventData = {
   notes: string | null;
 };
 
+type ArtistOption = { id: string; name: string };
+
 const dtLocal = (d: Date | null) => toJstDateTimeLocalString(d);
 
 const labelCls = "mb-1 block text-sm font-medium text-gray-700";
 const inputCls =
   "w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200";
 
-export function EventForm({ event }: { event?: EventData }) {
+export function EventForm({
+  event,
+  artists = [],
+}: {
+  event?: EventData;
+  artists?: ArtistOption[];
+}) {
   return (
     <form action={saveEvent} className="space-y-6">
       {event && <input type="hidden" name="id" value={event.id} />}
@@ -62,8 +71,28 @@ export function EventForm({ event }: { event?: EventData }) {
               </select>
             </div>
           </div>
+          {artists.length > 0 && (
+            <div>
+              <label className={labelCls}>アーティスト（マスタから選択）</label>
+              <select
+                name="artistId"
+                defaultValue={event?.artistId ?? ""}
+                className={inputCls}
+              >
+                <option value="">（マスタ未紐付け）</option>
+                {artists.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-gray-500">
+                マスタ未登録なら下の「アーティスト名（自由記入）」で表示します。
+              </p>
+            </div>
+          )}
           <div>
-            <label className={labelCls}>出演者・アーティスト名</label>
+            <label className={labelCls}>アーティスト名（自由記入・後方互換）</label>
             <input
               name="artistName"
               defaultValue={event?.artistName ?? ""}

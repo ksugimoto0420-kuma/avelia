@@ -29,7 +29,14 @@ type CartItem = {
   lineTotal: number;
 };
 
-type CartView = { items: CartItem[]; subtotal: number; purchasable: boolean };
+type CartView = {
+  items: CartItem[];
+  subtotal: number;
+  shippingFee: number;
+  shippingAmountForFree: number;
+  total: number;
+  purchasable: boolean;
+};
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -245,6 +252,8 @@ export default function CheckoutPage() {
         <div className="lg:col-span-1">
           <CartSummary
             subtotal={cart.subtotal}
+            shippingFee={cart.shippingFee}
+            shippingAmountForFree={cart.shippingAmountForFree}
             actionLabel={submitting ? "処理中…" : "決済に進む"}
             onAction={() => {}}
             disabled={submitting}

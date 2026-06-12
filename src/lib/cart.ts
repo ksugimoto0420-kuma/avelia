@@ -2,6 +2,10 @@ import { availableStock } from "@/lib/inventory";
 import { allUnitsFilled, normalizeUnitNicknames } from "@/lib/nickname";
 import { prisma } from "@/lib/prisma";
 import { getSaleStatus } from "@/lib/sale";
+import {
+  calculateShippingFee,
+  getSettingInt,
+} from "@/lib/settings";
 
 /** ユーザーのカートを取得（無ければ作成）。 */
 export async function getOrCreateCart(userId: string) {
@@ -75,11 +79,28 @@ export async function getCartView(userId: string) {
   });
 
   const subtotal = viewItems.reduce((s, i) => s + i.lineTotal, 0);
+  const physicalSubtotal = viewItems
+    .filter((i) => i.type === "PHYSICAL")
+    .reduce((s, i) => s + i.lineTotal, 0);
+  const hasPhysical = viewItems.some((i) => i.type === "PHYSICAL");
+  const shippingFee = await calculateShippingFee({
+    physicalSubtotal,
+    hasPhysical,
+  });
+  const shippingFreeThreshold = await getSettingInt("shippingFreeThreshold");
+  const shippingAmountForFree =
+    hasPhysical && shippingFreeThreshold > 0 && physicalSubtotal < shippingFreeThreshold
+      ? shippingFreeThreshold - physicalSubtotal
+      : 0;
+  const total = subtotal + shippingFee;
 
   return {
     cartId: cart.id,
     items: viewItems,
     subtotal,
+    shippingFee,
+    shippingAmountForFree,
+    total,
     purchasable:
       viewItems.length > 0 &&
       viewItems.every((i) => i.purchasable && i.nicknameSatisfied),

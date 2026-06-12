@@ -38,6 +38,7 @@ export async function saveEvent(formData: FormData) {
     slug,
     description: (formData.get("description") as string) || null,
     coverImageUrl: (formData.get("coverImageUrl") as string) || null,
+    artistId: (formData.get("artistId") as string) || null,
     artistName: (formData.get("artistName") as string) || null,
     eventType: eventType as "MEET_GREET" | "KUJI" | "TRADING_CARD" | "GOODS",
     saleMethod: saleMethod as "FIRST_COME" | "LOTTERY",

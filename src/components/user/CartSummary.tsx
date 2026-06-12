@@ -4,6 +4,7 @@ import { formatYen } from "@/lib/utils";
 export function CartSummary({
   subtotal,
   shippingFee = 0,
+  shippingAmountForFree = 0,
   actionLabel,
   actionHref,
   onAction,
@@ -11,6 +12,7 @@ export function CartSummary({
 }: {
   subtotal: number;
   shippingFee?: number;
+  shippingAmountForFree?: number;
   actionLabel: string;
   actionHref?: string;
   onAction?: () => void;
@@ -36,6 +38,11 @@ export function CartSummary({
           <dd className="font-extrabold text-brand-600">{formatYen(total)}</dd>
         </div>
       </dl>
+      {shippingAmountForFree > 0 && (
+        <div className="mt-2 rounded-md bg-brand-50 px-2 py-1.5 text-xs text-brand-700">
+          あと <b>{formatYen(shippingAmountForFree)}</b> で送料無料
+        </div>
+      )}
       <div className="mt-5">
         {actionHref ? (
           <Button href={actionHref} fullWidth size="lg" aria-disabled={disabled}>

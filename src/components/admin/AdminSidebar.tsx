@@ -13,6 +13,7 @@ const GROUPS: { title: string; items: { href: string; label: string; icon: strin
     {
       title: "販売管理",
       items: [
+        { href: "/admin/artists", label: "アーティスト", icon: "🎤" },
         { href: "/admin/events", label: "イベント", icon: "🎫" },
         { href: "/admin/products", label: "商品", icon: "🎁" },
         { href: "/admin/inventories", label: "在庫", icon: "📦" },
@@ -53,6 +54,7 @@ const GROUPS: { title: string; items: { href: string; label: string; icon: strin
       items: [
         { href: "/admin/users", label: "ユーザー", icon: "👥" },
         { href: "/admin/admins", label: "管理者", icon: "🔑" },
+        { href: "/admin/settings", label: "サイト設定", icon: "⚙️" },
         { href: "/admin/operation-logs", label: "操作ログ", icon: "📝" },
       ],
     },

@@ -174,7 +174,8 @@ model Event {
   description     String?
   coverImageUrl   String?
   // 特典会・サイン会向け項目
-  artistName      String? // 出演者・アーティスト名
+  artistId        String? // アーティストマスタ参照（任意。設定するとartistNameより優先）
+  artistName      String? // 出演者・アーティスト名（後方互換／自由入力フォールバック）
   eventType       EventType   @default(MEET_GREET) // 種別（オンライン特典会 / すきくじ / トレカ）
   saleMethod      SaleMethod  @default(FIRST_COME) // 販売方式（先着 / 抽選）
   eventDate       DateTime? // 開催日時
@@ -193,11 +194,13 @@ model Event {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
+  artist        Artist?        @relation(fields: [artistId], references: [id], onDelete: SetNull)
   products      Product[]
   lotteries     Lottery[]
   revenueShares RevenueShare[]
 
   @@index([isPublished, saleStartAt, saleEndAt])
+  @@index([artistId])
   @@map("events")
 }
 
@@ -681,4 +684,37 @@ model ContactMessage {
 
   @@index([status, createdAt])
   @@map("contact_messages")
+}
+
+// ---------------------------------------------------------------------------
+// アプリ全体設定（送料・サポートメール等）
+// ---------------------------------------------------------------------------
+
+model AppSetting {
+  key       String   @id // "shippingFlatRate", "shippingFreeThreshold", "supportEmail" 等
+  value     String   // 文字列で保持。数値は string→number 変換
+  updatedAt DateTime @updatedAt
+
+  @@map("app_settings")
+}
+
+// ---------------------------------------------------------------------------
+// アーティスト（出演者）マスタ
+// ---------------------------------------------------------------------------
+
+model Artist {
+  id           String   @id @default(cuid())
+  slug         String   @unique
+  name         String
+  nameKana     String?
+  profileText  String?
+  imageUrl     String?
+  isPublished  Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  events       Event[]
+
+  @@index([isPublished])
+  @@map("artists")
 }

@@ -37,6 +37,9 @@ type CartItem = {
 type CartView = {
   items: CartItem[];
   subtotal: number;
+  shippingFee: number;
+  shippingAmountForFree: number;
+  total: number;
   purchasable: boolean;
 };
 
@@ -163,22 +166,56 @@ export default function CartPage() {
   }
 
   const nicknameMissing = cart.items.some((i) => !i.nicknameSatisfied);
+  const blockedCount = cart.items.filter((i) => !i.purchasable).length;
   const canCheckout = cart.purchasable && !nicknameMissing;
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10">
       <h1 className="text-2xl font-bold text-gray-900">カート</h1>
 
+      {blockedCount > 0 && (
+        <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          ⚠ 購入できない商品が {blockedCount} 件あります。各商品の「カートから削除」を押してから「レジに進む」に進んでください。
+        </div>
+      )}
+
       <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
           {cart.items.map((item) => {
             const ds = drafts[item.id] ?? [];
             const missing = !item.nicknameSatisfied;
+            // 在庫切れ・販売終了など購入不可商品の理由メッセージ
+            const blockedReason = !item.purchasable
+              ? item.saleStatus === "SOLD_OUT" || item.available <= 0
+                ? "在庫切れ"
+                : item.saleStatus === "ENDED"
+                  ? "販売終了しました"
+                  : item.saleStatus === "BEFORE_SALE"
+                    ? "まだ販売開始されていません"
+                    : item.saleStatus === "UNPUBLISHED"
+                      ? "現在公開停止中です"
+                      : SALE_STATUS_LABEL[item.saleStatus]
+              : null;
             return (
               <div
                 key={item.id}
-                className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm"
+                className={`rounded-2xl border bg-white p-4 shadow-sm ${blockedReason ? "border-red-200" : "border-gray-100"}`}
               >
+                {blockedReason && (
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+                    <span>
+                      ⚠ <b>{blockedReason}</b>{" "}
+                      のためレジに進めません。カートから削除してください。
+                    </span>
+                    <button
+                      onClick={() => removeItem(item.id)}
+                      disabled={busyId === item.id}
+                      className="rounded-lg bg-red-600 px-3 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                    >
+                      カートから削除
+                    </button>
+                  </div>
+                )}
                 <div className="flex gap-4">
                   <Link
                     href={`/products/${item.productId}`}
@@ -328,6 +365,8 @@ export default function CartPage() {
         <div className="lg:col-span-1">
           <CartSummary
             subtotal={cart.subtotal}
+            shippingFee={cart.shippingFee}
+            shippingAmountForFree={cart.shippingAmountForFree}
             actionLabel="レジに進む"
             actionHref={canCheckout ? "/checkout" : undefined}
             onAction={

@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Badge } from "@/components/ui/Badge";
 import { ProductCard } from "@/components/user/ProductCard";
+import { getOptionalUser } from "@/lib/auth/guards";
 import {
   EVENT_TYPE_COLOR,
   EVENT_TYPE_LABEL,
@@ -26,6 +28,9 @@ async function getEvent(id: string) {
       products: {
         where: { isPublished: true },
         include: { variants: { include: { inventory: true } } },
+      },
+      artist: {
+        select: { id: true, slug: true, name: true, isPublished: true },
       },
     },
   });
@@ -58,6 +63,18 @@ export default async function EventDetailPage({
   const { eventId } = await params;
   const event = await getEvent(eventId);
   if (!event) notFound();
+
+  // 配信URL閲覧の権限：このイベントに紐づく商品をPAID注文しているユーザーのみ
+  const user = await getOptionalUser();
+  const hasPurchasedThisEvent = user
+    ? (await prisma.order.count({
+        where: {
+          userId: user.id,
+          status: "PAID",
+          items: { some: { variant: { product: { eventId } } } },
+        },
+      })) > 0
+    : false;
 
   const status = getSaleStatus({
     isPublished: event.isPublished,
@@ -97,9 +114,18 @@ export default async function EventDetailPage({
         </Badge>
       </div>
 
-      {event.artistName && (
+      {(event.artist?.isPublished || event.artistName) && (
         <p className="mt-4 text-sm font-bold text-brand-600">
-          {event.artistName}
+          {event.artist?.isPublished ? (
+            <Link
+              href={`/artists/${event.artist.slug}`}
+              className="hover:underline"
+            >
+              {event.artist.name}
+            </Link>
+          ) : (
+            event.artistName
+          )}
         </p>
       )}
       <h1 className="mt-1 text-3xl font-bold text-gray-900">{event.title}</h1>
@@ -158,26 +184,48 @@ export default async function EventDetailPage({
         </div>
       </dl>
 
-      {event.streamingUrl && (
-        <section className="mt-6 flex flex-col items-start gap-3 rounded-xl border border-brand-100 bg-brand-50/50 p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-sm font-bold text-brand-700">
-              当日のライブ配信
+      {event.streamingUrl &&
+        (hasPurchasedThisEvent ? (
+          <section className="mt-6 flex flex-col items-start gap-3 rounded-xl border border-brand-100 bg-brand-50/50 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-bold text-brand-700">
+                当日のライブ配信
+              </p>
+              <p className="mt-1 text-xs text-gray-600">
+                視聴は任意です。視聴されなくても、ご購入のサイン入り商品は後日発送いたします。
+              </p>
+            </div>
+            <a
+              href={event.streamingUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-bold text-white hover:bg-brand-700"
+            >
+              配信ページを開く ↗
+            </a>
+          </section>
+        ) : (
+          <section className="mt-6 rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
+            <p className="font-bold text-gray-700">
+              🔒 当日のライブ配信URLは購入者限定で表示されます
             </p>
-            <p className="mt-1 text-xs text-gray-600">
-              視聴は任意です。視聴されなくても、ご購入のサイン入り商品は後日発送いたします。
+            <p className="mt-1 text-xs text-gray-500">
+              配信視聴は任意ですが、商品を購入された方のみ視聴URLが表示されます。
+              {!user && (
+                <>
+                  {" "}
+                  <Link
+                    href={`/auth/login?callbackUrl=/events/${event.id}`}
+                    className="text-brand-600 underline"
+                  >
+                    ログイン
+                  </Link>
+                  もご確認ください。
+                </>
+              )}
             </p>
-          </div>
-          <a
-            href={event.streamingUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-bold text-white hover:bg-brand-700"
-          >
-            配信ページを開く ↗
-          </a>
-        </section>
-      )}
+          </section>
+        ))}
 
       {event.description && (
         <section className="mt-8">
