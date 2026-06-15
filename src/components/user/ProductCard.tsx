@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/Badge";
+import { MediaImage } from "@/components/ui/MediaImage";
 import {
   getSaleStatus,
   SALE_STATUS_COLOR,
@@ -27,20 +28,14 @@ export function ProductCard({ product }: { product: ProductCardData }) {
       href={`/products/${product.id}`}
       className="group block overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
     >
-      <div className="relative aspect-square w-full overflow-hidden bg-gray-50">
-        {product.imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={product.imageUrl}
-            alt={product.name}
-            className="h-full w-full object-cover transition group-hover:scale-105"
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center text-3xl text-gray-300">
-            🎤
-          </div>
-        )}
-        <div className="absolute left-2 top-2 flex flex-wrap gap-1">
+      <div className="relative">
+        <MediaImage
+          src={product.imageUrl}
+          alt={product.name}
+          aspect="1/1"
+          fallback="🎤"
+        />
+        <div className="absolute left-2 top-2 z-10 flex flex-wrap gap-1">
           <Badge color={SALE_STATUS_COLOR[status]}>
             {SALE_STATUS_LABEL[status]}
           </Badge>

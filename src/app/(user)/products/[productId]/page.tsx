@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Badge } from "@/components/ui/Badge";
+import { MediaImage } from "@/components/ui/MediaImage";
 import { AddToCart } from "@/components/user/AddToCart";
 import { SALE_METHOD_COLOR, SALE_METHOD_LABEL } from "@/lib/event-meta";
 import { availableStock } from "@/lib/inventory";
@@ -92,21 +93,8 @@ export default async function ProductDetailPage({
 
       <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
         {/* 画像 */}
-        <div className="overflow-hidden rounded-2xl border border-gray-100 bg-gray-50">
-          <div className="aspect-square w-full">
-            {p.imageUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={p.imageUrl}
-                alt={p.name}
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <div className="flex h-full items-center justify-center text-6xl text-gray-300">
-                🎁
-              </div>
-            )}
-          </div>
+        <div className="overflow-hidden rounded-2xl">
+          <MediaImage src={p.imageUrl} alt={p.name} aspect="1/1" fallback="🎁" />
         </div>
 
         {/* 情報 */}

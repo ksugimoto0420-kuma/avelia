@@ -1,6 +1,7 @@
 import type { EventType, SaleMethod } from "@prisma/client";
 import Link from "next/link";
 import { Badge } from "@/components/ui/Badge";
+import { MediaImage } from "@/components/ui/MediaImage";
 import {
   EVENT_TYPE_COLOR,
   EVENT_TYPE_LABEL,
@@ -39,20 +40,14 @@ export function EventCard({ event }: { event: EventCardData }) {
       href={`/events/${event.id}`}
       className="group block overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
     >
-      <div className="relative aspect-[16/9] w-full overflow-hidden bg-gradient-to-br from-brand-100 to-brand-50">
-        {event.coverImageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={event.coverImageUrl}
-            alt={event.title}
-            className="h-full w-full object-cover transition group-hover:scale-105"
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center text-4xl font-black text-brand-300">
-            {(event.artistName ?? event.title).slice(0, 2)}
-          </div>
-        )}
-        <div className="absolute left-3 top-3 flex gap-1.5">
+      <div className="relative">
+        <MediaImage
+          src={event.coverImageUrl}
+          alt={event.title}
+          aspect="16/9"
+          fallback={(event.artistName ?? event.title).slice(0, 2)}
+        />
+        <div className="absolute left-3 top-3 z-10 flex gap-1.5">
           <Badge color={SALE_STATUS_COLOR[status]}>
             {SALE_STATUS_LABEL[status]}
           </Badge>

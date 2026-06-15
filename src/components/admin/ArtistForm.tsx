@@ -71,21 +71,22 @@ export function ArtistForm({ artist }: { artist?: ArtistFormData }) {
             />
             <p className="mt-1 text-xs text-gray-500">
               推奨：<b>500×500px 以上の正方形（1:1）</b> のJPEG/PNG。
-              プロフィールページでは円形に切り抜かれます。
-              <b>顔が中央に写る</b>ようにすると端が切れません。
+              プロフィールページでは角丸の正方形枠で表示され、
+              上側を優先（<code>object-top</code>）して切り取られます。
+              <b>顔が画像の上半分に写る</b>ように構図を取ると切れません。
             </p>
             {artist?.imageUrl && (
               <div className="mt-2 flex items-center gap-3">
-                <div className="h-24 w-24 overflow-hidden rounded-full border border-gray-200 bg-gray-50">
+                <div className="h-28 w-28 overflow-hidden rounded-2xl border border-gray-200 bg-gray-50">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={artist.imageUrl}
                     alt="プレビュー"
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-cover object-top"
                   />
                 </div>
                 <p className="text-xs text-gray-500">
-                  円形プレビュー（1:1 でトリミング）
+                  表示プレビュー（上側優先で切り取り）
                 </p>
               </div>
             )}

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardBody } from "@/components/ui/Card";
+import { MediaImage } from "@/components/ui/MediaImage";
 import { getOptionalUser } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { formatDateTime } from "@/lib/utils";
@@ -62,20 +63,12 @@ export default async function LotteriesListPage() {
             return (
               <Card key={l.id} className="overflow-hidden">
                 <Link href={`/lotteries/${l.id}`} className="block">
-                  <div className="aspect-[16/9] w-full bg-gradient-to-br from-brand-100 to-brand-50">
-                    {imageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={imageUrl}
-                        alt={l.title}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-full items-center justify-center text-3xl font-black text-brand-300">
-                        {l.title}
-                      </div>
-                    )}
-                  </div>
+                  <MediaImage
+                    src={imageUrl}
+                    alt={l.title}
+                    aspect="16/9"
+                    fallback={l.title.slice(0, 2)}
+                  />
                 </Link>
                 <CardBody className="space-y-3">
                   <div className="flex flex-wrap items-center gap-2">

@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Badge } from "@/components/ui/Badge";
+import { MediaImage } from "@/components/ui/MediaImage";
 import { ProductCard } from "@/components/user/ProductCard";
 import { getOptionalUser } from "@/lib/auth/guards";
 import {
@@ -85,21 +86,13 @@ export default async function EventDetailPage({
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
       {/* カバー */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-100 to-brand-50">
-        <div className="aspect-[16/9] w-full">
-          {event.coverImageUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={event.coverImageUrl}
-              alt={event.title}
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <div className="flex h-full items-center justify-center text-5xl font-black text-brand-300">
-              {event.title}
-            </div>
-          )}
-        </div>
+      <div className="overflow-hidden rounded-3xl">
+        <MediaImage
+          src={event.coverImageUrl}
+          alt={event.title}
+          aspect="16/9"
+          fallback={event.title}
+        />
       </div>
 
       <div className="mt-6 flex flex-wrap items-center gap-2">

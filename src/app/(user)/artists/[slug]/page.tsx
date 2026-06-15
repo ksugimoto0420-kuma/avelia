@@ -68,12 +68,12 @@ export default async function ArtistDetailPage({
 
       <div className="mt-6 flex flex-col items-center gap-6 sm:flex-row sm:items-start">
         {artist.imageUrl && (
-          <div className="h-32 w-32 shrink-0 overflow-hidden rounded-full bg-gray-100">
+          <div className="h-40 w-40 shrink-0 overflow-hidden rounded-2xl bg-gray-100">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={artist.imageUrl}
               alt={artist.name}
-              className="h-full w-full object-cover"
+              className="h-full w-full object-cover object-top"
             />
           </div>
         )}

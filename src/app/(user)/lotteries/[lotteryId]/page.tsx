@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
+import { MediaImage } from "@/components/ui/MediaImage";
 import { getOptionalUser } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { formatDateTime, formatYen } from "@/lib/utils";
@@ -74,15 +75,8 @@ export default async function LotteryDetailPage({
       )}
 
       {heroImage && (
-        <div className="overflow-hidden rounded-2xl bg-gradient-to-br from-brand-100 to-brand-50">
-          <div className="aspect-[16/9] w-full">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={heroImage}
-              alt={lottery.title}
-              className="h-full w-full object-cover"
-            />
-          </div>
+        <div className="overflow-hidden rounded-2xl">
+          <MediaImage src={heroImage} alt={lottery.title} aspect="16/9" />
         </div>
       )}
 
