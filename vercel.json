@@ -1,6 +1,5 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "npm install --include=optional --no-audit --no-fund && npm install --cpu=x64 --os=linux sharp",
   "crons": [
     {
       "path": "/api/cron/release-reservations",

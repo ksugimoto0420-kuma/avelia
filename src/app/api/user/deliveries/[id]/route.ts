@@ -3,17 +3,19 @@ import path from "node:path";
 import { requireUser } from "@/lib/auth/guards";
 import { contentTypeFor } from "@/lib/mime";
 import { prisma } from "@/lib/prisma";
-import { generateSignedImage } from "@/lib/signed-image";
 import { localFilePath } from "@/lib/storage";
 
 export const runtime = "nodejs";
 
 /**
- * 個別サイン納品の認可付き配信。ログインユーザー本人の READY 納品のみDL可。
- * ファイル名は宛名ベース。期限・DL回数も検証する（仕様書 8/15）。
+ * 個別サイン納品の認可付き配信。
+ *
+ * 配信パターン2種：
+ * - fileKey = "signature:<id>" → クライアント合成方式（/mypage/digital-contents/signed/[deliveryId] へリダイレクト）
+ * - 通常ファイルキー → ローカルストレージから直接配信
  */
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
@@ -44,43 +46,32 @@ export async function GET(
       });
     }
 
-    // ---------- 配信ロジック分岐 ----------
-    // (A) fileKey が "signature:<sigId>" → 原本+サインをサーバー側で合成して返す（モック）
-    // (B) 通常のローカルファイル
-    let buffer: Buffer;
-    let contentType: string;
-    let downloadFilename: string;
-
+    // サイン入り合成型：クライアント合成ページへリダイレクト
     if (delivery.fileKey.startsWith("signature:")) {
-      const composed = await generateSignedImage(id);
-      if (!composed) {
-        return new Response("サイン入り画像を生成できません", { status: 500 });
-      }
-      buffer = composed;
-      contentType = "image/png";
-      downloadFilename = `${delivery.nickname ?? "signed"}_${delivery.order.orderNumber}.png`;
-    } else {
-      buffer = await readFile(localFilePath(delivery.fileKey));
-      contentType = contentTypeFor(delivery.fileKey);
-      const ext = path.extname(delivery.fileKey) || "";
-      downloadFilename = `${delivery.nickname ?? "signed"}_${delivery.order.orderNumber}${ext}`;
+      const origin = new URL(req.url).origin;
+      return Response.redirect(
+        `${origin}/mypage/digital-contents/signed/${delivery.id}`,
+        302,
+      );
     }
 
+    // 通常ファイル配信
+    const buffer = await readFile(localFilePath(delivery.fileKey));
     await prisma.digitalDelivery.update({
       where: { id },
       data: { downloadCount: { increment: 1 } },
     });
-
+    const ext = path.extname(delivery.fileKey) || "";
+    const downloadFilename = `${delivery.nickname ?? "signed"}_${delivery.order.orderNumber}${ext}`;
     return new Response(new Uint8Array(buffer), {
       status: 200,
       headers: {
-        "Content-Type": contentType,
+        "Content-Type": contentTypeFor(delivery.fileKey),
         "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(downloadFilename)}`,
         "Cache-Control": "private, no-store",
       },
     });
   } catch (err) {
-    // AuthError は401、それ以外は本物の500（ログは残す）
     if (
       err &&
       typeof err === "object" &&
@@ -89,7 +80,7 @@ export async function GET(
     ) {
       return new Response("Unauthorized", { status: 401 });
     }
-    console.error("[user/deliveries] 配信処理エラー", err);
-    return new Response("配信処理でエラーが発生しました", { status: 500 });
+    console.error("[user/deliveries] エラー", err);
+    return new Response("エラーが発生しました", { status: 500 });
   }
 }

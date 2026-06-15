@@ -196,22 +196,14 @@ export default async function AdminDigitalDeliveriesPage({
                         </td>
                         <td className="px-4 py-3 align-top">
                           {d.signature?.status === "WRITTEN" ? (
-                            // 主導線：サインが書かれている → 合成プレビュー + 承認/却下
-                            <div className="flex items-center justify-end gap-3">
-                              <a
-                                href={`/api/admin/deliveries/${d.id}/preview`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="block h-16 w-12 shrink-0 overflow-hidden rounded border border-gray-200 bg-white"
-                                title="クリックで合成済み画像を拡大表示"
+                            // 主導線：サインが書かれている → プレビューページ + 承認/却下
+                            <div className="flex items-center justify-end gap-2">
+                              <Link
+                                href={`/admin/digital-deliveries/${d.id}/preview`}
+                                className="whitespace-nowrap rounded-lg border border-gray-300 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
                               >
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img
-                                  src={`/api/admin/deliveries/${d.id}/preview`}
-                                  alt="サイン入り合成プレビュー"
-                                  className="h-full w-full object-cover"
-                                />
-                              </a>
+                                プレビュー
+                              </Link>
                               <div className="flex flex-col gap-1">
                                 <form action={approveSignature}>
                                   <input type="hidden" name="deliveryId" value={d.id} />
@@ -228,28 +220,20 @@ export default async function AdminDigitalDeliveriesPage({
                                     type="submit"
                                     className="whitespace-nowrap rounded-lg border border-red-300 px-3 py-1 text-xs text-red-600 hover:bg-red-50"
                                   >
-                                    書き直し依頼
+                                    書き直し
                                   </button>
                                 </form>
                               </div>
                             </div>
                           ) : d.status === "READY" && d.fileKey?.startsWith("signature:") ? (
-                            // 納品済み（サイン経由） → 確認用プレビュー
-                            <div className="flex items-center justify-end gap-3">
-                              <a
-                                href={`/api/admin/deliveries/${d.id}/preview`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="block h-16 w-12 shrink-0 overflow-hidden rounded border border-gray-200 bg-white"
-                                title="納品済み合成画像を表示"
+                            // 納品済み（サイン経由） → プレビューページ
+                            <div className="flex items-center justify-end gap-2">
+                              <Link
+                                href={`/admin/digital-deliveries/${d.id}/preview`}
+                                className="whitespace-nowrap rounded-lg border border-gray-300 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
                               >
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img
-                                  src={`/api/admin/deliveries/${d.id}/preview`}
-                                  alt="納品済みプレビュー"
-                                  className="h-full w-full object-cover"
-                                />
-                              </a>
+                                プレビュー
+                              </Link>
                               <span className="text-xs text-gray-500 whitespace-nowrap">納品済み</span>
                             </div>
                           ) : (
