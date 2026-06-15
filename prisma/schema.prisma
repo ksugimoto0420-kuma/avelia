@@ -529,12 +529,39 @@ model DigitalDelivery {
   order          Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
   orderItem      OrderItem      @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
   user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  signature      Signature?
 
   @@unique([orderItemId, digitalContentId, unitIndex])
   @@index([userId, status])
   @@index([status])
   @@index([orderId])
   @@map("digital_deliveries")
+}
+
+enum SignatureStatus {
+  WRITTEN   // 出演者が書いた、管理者の確認待ち
+  COMPLETED // 管理者承認＋合成完了（DigitalDelivery.READY と同期）
+  REJECTED  // 管理者却下、出演者に書き直し依頼
+}
+
+// 出演者が原本の上に書いた透過サイン画像。
+// MVPでは imageData に直接 Bytes（PNG）を保存し、本番運用時に
+// imageKey + 外部ストレージへの参照に切り替える前提。
+model Signature {
+  id           String          @id @default(cuid())
+  deliveryId   String          @unique
+  imageData    Bytes? // MVP: PNGバイナリ直接保存（〜200KB目安）
+  imageKey     String? // 本番: ストレージのキー（imageDataと両用可）
+  status       SignatureStatus @default(WRITTEN)
+  rejectReason String?
+  writtenAt    DateTime        @default(now())
+  composedAt   DateTime?
+  rejectedAt   DateTime?
+
+  delivery DigitalDelivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@map("signatures")
 }
 
 model UserDigitalContent {

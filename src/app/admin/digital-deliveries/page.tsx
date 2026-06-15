@@ -3,11 +3,13 @@ import Link from "next/link";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { FilterBar, FilterField, FilterSelect, FilterText } from "@/components/admin/Filters";
 import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Pagination } from "@/components/ui/Pagination";
 import { requireAdminPage } from "@/lib/auth/admin-page";
 import { prisma } from "@/lib/prisma";
 import { formatDateTime } from "@/lib/utils";
+import { approveSignature, rejectSignature } from "./actions";
 import { DeliveryUploadRow } from "./DeliveryUploadRow";
 
 export const dynamic = "force-dynamic";
@@ -47,6 +49,7 @@ export default async function AdminDigitalDeliveriesPage({
         user: { select: { email: true } },
         orderItem: { select: { productName: true, variantName: true, quantity: true } },
         digitalContent: { select: { title: true, baseImageKey: true } },
+        signature: { select: { id: true, status: true, writtenAt: true } },
       },
     }),
     prisma.digitalDelivery.count({ where }),
@@ -69,14 +72,20 @@ export default async function AdminDigitalDeliveriesPage({
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-gray-900">サイン納品</h1>
-        <Badge color={pendingCount > 0 ? "yellow" : "green"}>
-          制作待ち {pendingCount} 件
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Badge color={pendingCount > 0 ? "yellow" : "green"}>
+            制作待ち {pendingCount} 件
+          </Badge>
+          <Button href="/admin/sign-session" size="sm">
+            ✍ サイン記入セッション
+          </Button>
+        </div>
       </div>
       <p className="text-sm text-gray-500">
-        各行の宛名でサイン画像を制作し、<b>その行にアップロード</b>すると購入者へ自動通知され、マイページからダウンロード可能になります。
+        出演者がタブレットで直接サインを書く <b>「サイン記入セッション」</b> を使うか、
+        従来通り <b>サイン入りファイルをアップロード</b> してください。 サイン記入セッションのサインは、運営側で確認・承認すると購入者に納品されます。
       </p>
 
       <FilterBar action="/admin/digital-deliveries" clearHref="/admin/digital-deliveries">
@@ -169,6 +178,16 @@ export default async function AdminDigitalDeliveriesPage({
                         </td>
                         <td className="px-4 py-3">
                           <StatusBadge kind="delivery" status={d.status} />
+                          {d.signature?.status === "WRITTEN" && (
+                            <span className="ml-1 inline-block rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700">
+                              サイン記入済み
+                            </span>
+                          )}
+                          {d.signature?.status === "REJECTED" && (
+                            <span className="ml-1 inline-block rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+                              書き直し依頼中
+                            </span>
+                          )}
                           {d.deliveredAt && (
                             <p className="mt-0.5 text-xs text-gray-400">
                               {formatDateTime(d.deliveredAt)}
@@ -176,21 +195,63 @@ export default async function AdminDigitalDeliveriesPage({
                           )}
                         </td>
                         <td className="px-4 py-3">
-                          <div className="flex items-center justify-end gap-2">
-                            {d.digitalContent.baseImageKey ? (
-                              <a
-                                href={`/api/admin/deliveries/base-image/${encodeURIComponent(d.digitalContent.baseImageKey)}`}
-                                className="rounded-lg border border-gray-300 px-2.5 py-1 text-xs text-gray-600 hover:bg-gray-50"
-                              >
-                                原本DL
-                              </a>
-                            ) : (
-                              <span className="text-xs text-amber-600">原本未登録</span>
+                          <div className="flex flex-col items-end gap-2">
+                            {/* サイン記入セッションで書かれている場合：プレビュー＋承認/却下 */}
+                            {d.signature?.status === "WRITTEN" && (
+                              <div className="flex items-end gap-2">
+                                <a
+                                  href={`/api/admin/signatures/${d.signature.id}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="block h-14 w-20 overflow-hidden rounded border border-gray-200 bg-white"
+                                  title="クリックで拡大表示"
+                                >
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img
+                                    src={`/api/admin/signatures/${d.signature.id}`}
+                                    alt="サインプレビュー"
+                                    className="h-full w-full object-contain"
+                                  />
+                                </a>
+                                <div className="flex flex-col gap-1">
+                                  <form action={approveSignature}>
+                                    <input type="hidden" name="deliveryId" value={d.id} />
+                                    <button
+                                      type="submit"
+                                      className="rounded-lg bg-brand-600 px-3 py-1 text-xs font-medium text-white hover:bg-brand-700"
+                                    >
+                                      承認して納品
+                                    </button>
+                                  </form>
+                                  <form action={rejectSignature}>
+                                    <input type="hidden" name="deliveryId" value={d.id} />
+                                    <button
+                                      type="submit"
+                                      className="rounded-lg border border-red-300 px-3 py-1 text-xs text-red-600 hover:bg-red-50"
+                                    >
+                                      書き直し
+                                    </button>
+                                  </form>
+                                </div>
+                              </div>
                             )}
-                            <DeliveryUploadRow
-                              deliveryId={d.id}
-                              isReady={d.status === "READY"}
-                            />
+                            {/* 既存：原本DL + ファイルアップロード（手動納品） */}
+                            <div className="flex items-center gap-2">
+                              {d.digitalContent.baseImageKey ? (
+                                <a
+                                  href={`/api/admin/deliveries/base-image/${encodeURIComponent(d.digitalContent.baseImageKey)}`}
+                                  className="rounded-lg border border-gray-300 px-2.5 py-1 text-xs text-gray-600 hover:bg-gray-50"
+                                >
+                                  原本DL
+                                </a>
+                              ) : (
+                                <span className="text-xs text-amber-600">原本未登録</span>
+                              )}
+                              <DeliveryUploadRow
+                                deliveryId={d.id}
+                                isReady={d.status === "READY"}
+                              />
+                            </div>
                           </div>
                         </td>
                       </tr>

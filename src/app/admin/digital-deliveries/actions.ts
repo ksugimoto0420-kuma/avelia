@@ -70,6 +70,106 @@ export async function markDeliveryReady(formData: FormData) {
   revalidatePath("/admin/digital-deliveries");
 }
 
+/**
+ * サインを承認して納品確定。
+ * モックでは合成は表示時に行うため、fileKey に `signature:<sigId>` を入れて
+ * DigitalDelivery.READY 化し、Signature.status を COMPLETED に。
+ */
+export async function approveSignature(formData: FormData) {
+  const admin = await requireAdmin("OPERATOR");
+  const deliveryId = formData.get("deliveryId") as string;
+  if (!deliveryId) throw new AppError("入力が不正です", 400);
+
+  const delivery = await prisma.digitalDelivery.findUnique({
+    where: { id: deliveryId },
+    include: {
+      signature: true,
+      user: { select: { email: true, name: true } },
+      order: { select: { orderNumber: true } },
+      digitalContent: { select: { title: true, viewLimitDays: true } },
+    },
+  });
+  if (!delivery) throw new AppError("納品が見つかりません", 404);
+  if (!delivery.signature || delivery.signature.status !== "WRITTEN") {
+    throw new AppError("承認可能なサインがありません", 409);
+  }
+
+  const now = new Date();
+  const expiresAt = delivery.digitalContent.viewLimitDays
+    ? new Date(
+        now.getTime() +
+          delivery.digitalContent.viewLimitDays * 24 * 60 * 60 * 1000,
+      )
+    : null;
+  const fileKey = `signature:${delivery.signature.id}`;
+
+  await prisma.$transaction([
+    prisma.signature.update({
+      where: { id: delivery.signature.id },
+      data: { status: "COMPLETED", composedAt: now },
+    }),
+    prisma.digitalDelivery.update({
+      where: { id: deliveryId },
+      data: {
+        fileKey,
+        originalFilename: `${delivery.order.orderNumber}_${delivery.nickname ?? "宛名なし"}.png`,
+        status: "READY",
+        deliveredAt: now,
+        expiresAt,
+        downloadCount: 0,
+      },
+    }),
+  ]);
+
+  await logOperation({
+    adminUserId: admin.id,
+    action: "signature.approve",
+    targetType: "DigitalDelivery",
+    targetId: deliveryId,
+  });
+
+  await sendMail({
+    to: delivery.user.email,
+    subject: "【Avelia FunClub】サイン入りコンテンツの準備ができました",
+    text: `${delivery.user.name ?? "お客"}様\n\nご注文 ${delivery.order.orderNumber} の「${delivery.digitalContent.title}」（宛名: ${delivery.nickname ?? "-"}）のサイン入りコンテンツの準備ができました。\n\nマイページの「デジタルコンテンツ」からダウンロードいただけます。\n${env.appUrl}/mypage/digital-contents`,
+  });
+
+  revalidatePath("/admin/digital-deliveries");
+}
+
+/** サインを却下＝書き直し依頼。Signature を REJECTED に。 */
+export async function rejectSignature(formData: FormData) {
+  const admin = await requireAdmin("OPERATOR");
+  const deliveryId = formData.get("deliveryId") as string;
+  const reason = (formData.get("reason") as string | null)?.trim() || null;
+  if (!deliveryId) throw new AppError("入力が不正です", 400);
+
+  const delivery = await prisma.digitalDelivery.findUnique({
+    where: { id: deliveryId },
+    include: { signature: true },
+  });
+  if (!delivery?.signature) throw new AppError("サインがありません", 404);
+
+  await prisma.signature.update({
+    where: { id: delivery.signature.id },
+    data: {
+      status: "REJECTED",
+      rejectedAt: new Date(),
+      rejectReason: reason,
+    },
+  });
+
+  await logOperation({
+    adminUserId: admin.id,
+    action: "signature.reject",
+    targetType: "DigitalDelivery",
+    targetId: deliveryId,
+    detail: { reason },
+  });
+
+  revalidatePath("/admin/digital-deliveries");
+}
+
 /** 納品を取消し PENDING に戻す（差し替え準備）。成果物キーをクリア。 */
 export async function cancelDelivery(formData: FormData) {
   const admin = await requireAdmin("OPERATOR");
