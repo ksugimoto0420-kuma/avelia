@@ -13,15 +13,22 @@ const schema = z
     deliveryType: z.enum(["SHARED", "PERSONALIZED"]).default("SHARED"),
     fileKey: z.string().optional().nullable(),
     baseImageKey: z.string().optional().nullable(),
+    baseImageUrl: z.string().url().optional().nullable().or(z.literal("")),
     publishAt: z.string().datetime().optional().nullable(),
     viewLimitDays: z.number().int().min(1).optional().nullable(),
     downloadLimit: z.number().int().min(1).optional().nullable(),
   })
-  .refine((d) => (d.deliveryType === "SHARED" ? !!d.fileKey : !!d.baseImageKey), {
-    message:
-      "SHAREDは配信ファイル、PERSONALIZEDはベース画像(原本)をアップロードしてください",
-    path: ["fileKey"],
-  });
+  .refine(
+    (d) =>
+      d.deliveryType === "SHARED"
+        ? !!d.fileKey
+        : !!d.baseImageKey || !!d.baseImageUrl,
+    {
+      message:
+        "SHAREDは配信ファイル、PERSONALIZEDは原本（アップロード or URL）が必要です",
+      path: ["fileKey"],
+    },
+  );
 
 export async function POST(req: Request) {
   try {
@@ -37,6 +44,7 @@ export async function POST(req: Request) {
         deliveryType: input.deliveryType,
         fileKey: input.fileKey ?? null,
         baseImageKey: input.baseImageKey ?? null,
+        baseImageUrl: input.baseImageUrl || null,
         publishAt: input.publishAt ? new Date(input.publishAt) : null,
         viewLimitDays: input.viewLimitDays ?? null,
         downloadLimit: input.downloadLimit ?? null,

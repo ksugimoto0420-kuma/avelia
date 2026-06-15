@@ -488,7 +488,8 @@ model DigitalContent {
   // 配信方式（SHARED=共通即DL / PERSONALIZED=個別サイン納品）
   deliveryType   DigitalDeliveryType @default(SHARED)
   fileKey        String? // SHARED時の配信ファイルキー
-  baseImageKey   String? // PERSONALIZED時のサイン用ベース画像（原本）キー
+  baseImageKey   String? // PERSONALIZED時の原本画像キー（ローカルストレージ）
+  baseImageUrl   String? // PERSONALIZED時の原本画像URL（外部CDN等。MVP・モック向け）
   publishAt      DateTime? // 公開開始日時
   viewLimitDays  Int? // 付与/納品から閲覧可能な日数
   downloadLimit  Int? // ダウンロード回数上限

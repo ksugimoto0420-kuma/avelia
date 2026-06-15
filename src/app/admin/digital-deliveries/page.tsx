@@ -171,8 +171,8 @@ export default async function AdminDigitalDeliveriesPage({
                             </span>
                           )}
                         </td>
-                        <td className="px-4 py-3">
-                          <code className="text-xs text-gray-500">
+                        <td className="px-4 py-3 align-top">
+                          <code className="block max-w-[14rem] truncate text-xs text-gray-500" title={suggestedName}>
                             {suggestedName}
                           </code>
                         </td>
@@ -194,49 +194,48 @@ export default async function AdminDigitalDeliveriesPage({
                             </p>
                           )}
                         </td>
-                        <td className="px-4 py-3">
-                          <div className="flex flex-col items-end gap-2">
-                            {/* サイン記入セッションで書かれている場合：プレビュー＋承認/却下 */}
-                            {d.signature?.status === "WRITTEN" && (
-                              <div className="flex items-end gap-2">
-                                <a
-                                  href={`/api/admin/signatures/${d.signature.id}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="block h-14 w-20 overflow-hidden rounded border border-gray-200 bg-white"
-                                  title="クリックで拡大表示"
-                                >
-                                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                                  <img
-                                    src={`/api/admin/signatures/${d.signature.id}`}
-                                    alt="サインプレビュー"
-                                    className="h-full w-full object-contain"
-                                  />
-                                </a>
-                                <div className="flex flex-col gap-1">
-                                  <form action={approveSignature}>
-                                    <input type="hidden" name="deliveryId" value={d.id} />
-                                    <button
-                                      type="submit"
-                                      className="rounded-lg bg-brand-600 px-3 py-1 text-xs font-medium text-white hover:bg-brand-700"
-                                    >
-                                      承認して納品
-                                    </button>
-                                  </form>
-                                  <form action={rejectSignature}>
-                                    <input type="hidden" name="deliveryId" value={d.id} />
-                                    <button
-                                      type="submit"
-                                      className="rounded-lg border border-red-300 px-3 py-1 text-xs text-red-600 hover:bg-red-50"
-                                    >
-                                      書き直し
-                                    </button>
-                                  </form>
-                                </div>
+                        <td className="px-4 py-3 align-top">
+                          {d.signature?.status === "WRITTEN" ? (
+                            // 主導線：サインが書かれている → プレビュー + 承認/却下
+                            <div className="flex items-center justify-end gap-3">
+                              <a
+                                href={`/api/admin/signatures/${d.signature.id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="block h-12 w-16 shrink-0 overflow-hidden rounded border border-gray-200 bg-white"
+                                title="クリックで拡大表示"
+                              >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={`/api/admin/signatures/${d.signature.id}`}
+                                  alt="サインプレビュー"
+                                  className="h-full w-full object-contain"
+                                />
+                              </a>
+                              <div className="flex flex-col gap-1">
+                                <form action={approveSignature}>
+                                  <input type="hidden" name="deliveryId" value={d.id} />
+                                  <button
+                                    type="submit"
+                                    className="whitespace-nowrap rounded-lg bg-brand-600 px-3 py-1 text-xs font-medium text-white hover:bg-brand-700"
+                                  >
+                                    承認して納品
+                                  </button>
+                                </form>
+                                <form action={rejectSignature}>
+                                  <input type="hidden" name="deliveryId" value={d.id} />
+                                  <button
+                                    type="submit"
+                                    className="whitespace-nowrap rounded-lg border border-red-300 px-3 py-1 text-xs text-red-600 hover:bg-red-50"
+                                  >
+                                    書き直し依頼
+                                  </button>
+                                </form>
                               </div>
-                            )}
-                            {/* 既存：原本DL + ファイルアップロード（手動納品） */}
-                            <div className="flex items-center gap-2">
+                            </div>
+                          ) : (
+                            // 代替導線：サイン未記入 → 原本DL + 手動アップロード（小さく）
+                            <div className="flex items-center justify-end gap-2 whitespace-nowrap">
                               {d.digitalContent.baseImageKey ? (
                                 <a
                                   href={`/api/admin/deliveries/base-image/${encodeURIComponent(d.digitalContent.baseImageKey)}`}
@@ -252,7 +251,7 @@ export default async function AdminDigitalDeliveriesPage({
                                 isReady={d.status === "READY"}
                               />
                             </div>
-                          </div>
+                          )}
                         </td>
                       </tr>
                     );

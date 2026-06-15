@@ -24,7 +24,12 @@ export async function GET(
       where: { id },
       include: {
         digitalContent: {
-          select: { downloadLimit: true, baseImageKey: true, productId: true },
+          select: {
+            downloadLimit: true,
+            baseImageKey: true,
+            baseImageUrl: true,
+            productId: true,
+          },
         },
         order: { select: { orderNumber: true } },
         signature: { select: { id: true, imageData: true } },
@@ -63,13 +68,24 @@ export async function GET(
       if (!delivery.signature?.imageData) {
         return new Response("サイン画像が見つかりません", { status: 404 });
       }
-      // 原本画像を取得：baseImageKey があればローカル、無ければ商品imageUrlをfetch
+      // 原本画像を取得：
+      // 1. baseImageKey（ローカルストレージ）
+      // 2. baseImageUrl（外部CDN、モック向け）
+      // 3. orderItem.variant.product.imageUrl（最終フォールバック）
       let originalBuf: Buffer | null = null;
       if (delivery.digitalContent.baseImageKey) {
         try {
           originalBuf = await readFile(
             localFilePath(delivery.digitalContent.baseImageKey),
           );
+        } catch {
+          originalBuf = null;
+        }
+      }
+      if (!originalBuf && delivery.digitalContent.baseImageUrl) {
+        try {
+          const res = await fetch(delivery.digitalContent.baseImageUrl);
+          if (res.ok) originalBuf = Buffer.from(await res.arrayBuffer());
         } catch {
           originalBuf = null;
         }

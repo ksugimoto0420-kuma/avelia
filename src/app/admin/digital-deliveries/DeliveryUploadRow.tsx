@@ -53,15 +53,15 @@ export function DeliveryUploadRow({
     <>
       <Button
         size="sm"
-        variant={isReady ? "outline" : "primary"}
+        variant="outline"
         disabled={uploading}
         onClick={() => inputRef.current?.click()}
       >
         {uploading
-          ? "アップロード中…"
+          ? "送信中…"
           : isReady
-            ? "サイン画像を差し替え"
-            : "サイン画像をアップロード"}
+            ? "差し替え"
+            : "ファイル納品"}
       </Button>
       <input
         ref={inputRef}

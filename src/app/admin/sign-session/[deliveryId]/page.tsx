@@ -18,17 +18,34 @@ export default async function SignSessionPage({
   const delivery = await prisma.digitalDelivery.findUnique({
     where: { id: deliveryId },
     include: {
-      digitalContent: { select: { title: true, baseImageKey: true, productId: true } },
-      orderItem: { select: { productName: true, quantity: true } },
-      order: {
+      digitalContent: {
         select: {
-          items: {
+          title: true,
+          baseImageKey: true,
+          baseImageUrl: true,
+          // DigitalContent 自身が紐づく商品（PERSONALIZED 配信元）
+          product: {
             select: {
-              variant: {
-                select: { product: { select: { imageUrl: true, event: { select: { id: true, title: true } } } } },
+              imageUrl: true,
+              event: { select: { id: true, title: true } },
+            },
+          },
+        },
+      },
+      // 注文明細から実際に購入された商品（フォールバック用）
+      orderItem: {
+        select: {
+          productName: true,
+          quantity: true,
+          variant: {
+            select: {
+              product: {
+                select: {
+                  imageUrl: true,
+                  event: { select: { id: true, title: true } },
+                },
               },
             },
-            take: 1,
           },
         },
       },
@@ -46,7 +63,9 @@ export default async function SignSessionPage({
   }
 
   // 次の未記入納品（同じイベント内、Signatureなし or REJECTEDなもの）
-  const productEventId = delivery.order.items[0]?.variant.product.event.id;
+  const productEventId =
+    delivery.digitalContent.product?.event.id ??
+    delivery.orderItem.variant.product.event.id;
   const next = await prisma.digitalDelivery.findFirst({
     where: {
       status: "PENDING",
@@ -77,16 +96,24 @@ export default async function SignSessionPage({
     },
   });
 
-  // 背景に出す原本画像URL（baseImageKey があれば管理API、なければProduct.imageUrlフォールバック）
+  // 背景に出す原本画像URL（優先順位）：
+  // 1. DigitalContent.baseImageUrl （外部URL・MVPモック・運用での明示指定）
+  // 2. DigitalContent.baseImageKey （ローカルストレージ）
+  // 3. DigitalContent.product.imageUrl （DigitalContentが紐づく商品）
+  // 4. orderItem.variant.product.imageUrl （実際に購入された商品）
   const baseImageUrl =
+    delivery.digitalContent.baseImageUrl ??
     (delivery.digitalContent.baseImageKey
       ? `/api/admin/deliveries/base-image/${encodeURIComponent(delivery.digitalContent.baseImageKey)}`
       : null) ??
-    delivery.order.items[0]?.variant.product.imageUrl ??
+    delivery.digitalContent.product?.imageUrl ??
+    delivery.orderItem.variant.product.imageUrl ??
     null;
 
   const eventTitle =
-    delivery.order.items[0]?.variant.product.event.title ?? "イベント";
+    delivery.digitalContent.product?.event.title ??
+    delivery.orderItem.variant.product.event.title ??
+    "イベント";
   const unitLabel =
     delivery.orderItem.quantity >= 2
       ? `${delivery.unitIndex + 1}/${delivery.orderItem.quantity}個目`

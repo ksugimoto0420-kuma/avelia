@@ -24,6 +24,7 @@ export function DigitalContentForm({
     deliveryType: "SHARED" as "SHARED" | "PERSONALIZED",
     fileKey: "",
     baseImageKey: "",
+    baseImageUrl: "",
     viewLimitDays: "",
     downloadLimit: "",
   });
@@ -34,10 +35,14 @@ export function DigitalContentForm({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (personalized ? !form.baseImageKey : !form.fileKey) {
+    if (
+      personalized
+        ? !form.baseImageKey && !form.baseImageUrl
+        : !form.fileKey
+    ) {
       setError(
         personalized
-          ? "サイン用のベース画像（原本）をアップロードしてください"
+          ? "原本画像をアップロードするか、外部URLを指定してください"
           : "配信ファイルをアップロードしてください",
       );
       return;
@@ -56,6 +61,7 @@ export function DigitalContentForm({
           deliveryType: form.deliveryType,
           fileKey: form.fileKey || null,
           baseImageKey: form.baseImageKey || null,
+          baseImageUrl: form.baseImageUrl || null,
           viewLimitDays: form.viewLimitDays ? Number(form.viewLimitDays) : null,
           downloadLimit: form.downloadLimit ? Number(form.downloadLimit) : null,
         }),
@@ -132,24 +138,42 @@ export function DigitalContentForm({
             }
           />
           {personalized ? (
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+            <div className="space-y-3">
+              <label className="block text-sm font-medium text-gray-700">
                 サイン用ベース画像（原本）
               </label>
-              <p className="mb-2 text-xs text-gray-500">
-                この原本を複製してタレントがサインします。購入後、注文ごとに
-                「サイン納品」画面から成果物をアップロードします。
+              <p className="text-xs text-gray-500">
+                出演者がこの原本の上に直接サインを書きます。<b>下のどちらか</b>
+                を指定してください（外部URL指定が一番楽です）。
               </p>
-              <FileUploader
-                onUploaded={(r) =>
-                  setForm((f) => ({ ...f, baseImageKey: r.key }))
-                }
-              />
-              {form.baseImageKey && (
-                <p className="mt-1 text-xs text-green-600">
-                  原本アップロード済: {form.baseImageKey}
+              <div>
+                <p className="mb-1 text-xs font-medium text-gray-600">
+                  ① 外部画像URL（MVP / モック向け）
                 </p>
-              )}
+                <Input
+                  value={form.baseImageUrl}
+                  placeholder="https://… 例: 写真集の表紙画像URL"
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, baseImageUrl: e.target.value }))
+                  }
+                  hint="picsum.photos などのテスト用URLでも、本物のCDN URLでもOK"
+                />
+              </div>
+              <div>
+                <p className="mb-1 text-xs font-medium text-gray-600">
+                  ② ファイルアップロード（ローカル保存・本番想定）
+                </p>
+                <FileUploader
+                  onUploaded={(r) =>
+                    setForm((f) => ({ ...f, baseImageKey: r.key }))
+                  }
+                />
+                {form.baseImageKey && (
+                  <p className="mt-1 text-xs text-green-600">
+                    原本アップロード済: {form.baseImageKey}
+                  </p>
+                )}
+              </div>
             </div>
           ) : (
             <div>
