@@ -196,20 +196,20 @@ export default async function AdminDigitalDeliveriesPage({
                         </td>
                         <td className="px-4 py-3 align-top">
                           {d.signature?.status === "WRITTEN" ? (
-                            // 主導線：サインが書かれている → プレビュー + 承認/却下
+                            // 主導線：サインが書かれている → 合成プレビュー + 承認/却下
                             <div className="flex items-center justify-end gap-3">
                               <a
-                                href={`/api/admin/signatures/${d.signature.id}`}
+                                href={`/api/admin/deliveries/${d.id}/preview`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="block h-12 w-16 shrink-0 overflow-hidden rounded border border-gray-200 bg-white"
-                                title="クリックで拡大表示"
+                                className="block h-16 w-12 shrink-0 overflow-hidden rounded border border-gray-200 bg-white"
+                                title="クリックで合成済み画像を拡大表示"
                               >
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img
-                                  src={`/api/admin/signatures/${d.signature.id}`}
-                                  alt="サインプレビュー"
-                                  className="h-full w-full object-contain"
+                                  src={`/api/admin/deliveries/${d.id}/preview`}
+                                  alt="サイン入り合成プレビュー"
+                                  className="h-full w-full object-cover"
                                 />
                               </a>
                               <div className="flex flex-col gap-1">
@@ -232,6 +232,25 @@ export default async function AdminDigitalDeliveriesPage({
                                   </button>
                                 </form>
                               </div>
+                            </div>
+                          ) : d.status === "READY" && d.fileKey?.startsWith("signature:") ? (
+                            // 納品済み（サイン経由） → 確認用プレビュー
+                            <div className="flex items-center justify-end gap-3">
+                              <a
+                                href={`/api/admin/deliveries/${d.id}/preview`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="block h-16 w-12 shrink-0 overflow-hidden rounded border border-gray-200 bg-white"
+                                title="納品済み合成画像を表示"
+                              >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={`/api/admin/deliveries/${d.id}/preview`}
+                                  alt="納品済みプレビュー"
+                                  className="h-full w-full object-cover"
+                                />
+                              </a>
+                              <span className="text-xs text-gray-500 whitespace-nowrap">納品済み</span>
                             </div>
                           ) : (
                             // 代替導線：サイン未記入 → 原本DL + 手動アップロード（小さく）

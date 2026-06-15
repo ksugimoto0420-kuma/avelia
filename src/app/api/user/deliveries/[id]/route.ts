@@ -1,9 +1,9 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import sharp from "sharp";
 import { requireUser } from "@/lib/auth/guards";
 import { contentTypeFor } from "@/lib/mime";
 import { prisma } from "@/lib/prisma";
+import { generateSignedImage } from "@/lib/signed-image";
 import { localFilePath } from "@/lib/storage";
 
 export const runtime = "nodejs";
@@ -23,21 +23,8 @@ export async function GET(
     const delivery = await prisma.digitalDelivery.findUnique({
       where: { id },
       include: {
-        digitalContent: {
-          select: {
-            downloadLimit: true,
-            baseImageKey: true,
-            baseImageUrl: true,
-            productId: true,
-          },
-        },
+        digitalContent: { select: { downloadLimit: true } },
         order: { select: { orderNumber: true } },
-        signature: { select: { id: true, imageData: true } },
-        orderItem: {
-          select: {
-            variant: { select: { product: { select: { imageUrl: true } } } },
-          },
-        },
       },
     });
     if (!delivery || delivery.userId !== user.id) {
@@ -65,58 +52,11 @@ export async function GET(
     let downloadFilename: string;
 
     if (delivery.fileKey.startsWith("signature:")) {
-      if (!delivery.signature?.imageData) {
-        return new Response("サイン画像が見つかりません", { status: 404 });
+      const composed = await generateSignedImage(id);
+      if (!composed) {
+        return new Response("サイン入り画像を生成できません", { status: 500 });
       }
-      // 原本画像を取得：
-      // 1. baseImageKey（ローカルストレージ）
-      // 2. baseImageUrl（外部CDN、モック向け）
-      // 3. orderItem.variant.product.imageUrl（最終フォールバック）
-      let originalBuf: Buffer | null = null;
-      if (delivery.digitalContent.baseImageKey) {
-        try {
-          originalBuf = await readFile(
-            localFilePath(delivery.digitalContent.baseImageKey),
-          );
-        } catch {
-          originalBuf = null;
-        }
-      }
-      if (!originalBuf && delivery.digitalContent.baseImageUrl) {
-        try {
-          const res = await fetch(delivery.digitalContent.baseImageUrl);
-          if (res.ok) originalBuf = Buffer.from(await res.arrayBuffer());
-        } catch {
-          originalBuf = null;
-        }
-      }
-      if (!originalBuf) {
-        const url = delivery.orderItem.variant.product.imageUrl;
-        if (url) {
-          const res = await fetch(url);
-          if (res.ok) {
-            originalBuf = Buffer.from(await res.arrayBuffer());
-          }
-        }
-      }
-      if (!originalBuf) {
-        return new Response("原本画像が取得できません", { status: 500 });
-      }
-
-      // サインPNGを原本サイズにリサイズ→重ねる
-      const meta = await sharp(originalBuf).metadata();
-      const sigResized = await sharp(Buffer.from(delivery.signature.imageData))
-        .resize({
-          width: meta.width,
-          height: meta.height,
-          fit: "contain",
-          background: { r: 0, g: 0, b: 0, alpha: 0 },
-        })
-        .toBuffer();
-      buffer = await sharp(originalBuf)
-        .composite([{ input: sigResized, blend: "over" }])
-        .png()
-        .toBuffer();
+      buffer = composed;
       contentType = "image/png";
       downloadFilename = `${delivery.nickname ?? "signed"}_${delivery.order.orderNumber}.png`;
     } else {
@@ -139,7 +79,17 @@ export async function GET(
         "Cache-Control": "private, no-store",
       },
     });
-  } catch {
-    return new Response("Unauthorized", { status: 401 });
+  } catch (err) {
+    // AuthError は401、それ以外は本物の500（ログは残す）
+    if (
+      err &&
+      typeof err === "object" &&
+      "status" in err &&
+      (err as { status?: number }).status === 401
+    ) {
+      return new Response("Unauthorized", { status: 401 });
+    }
+    console.error("[user/deliveries] 配信処理エラー", err);
+    return new Response("配信処理でエラーが発生しました", { status: 500 });
   }
 }
