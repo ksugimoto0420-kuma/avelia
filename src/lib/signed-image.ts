@@ -62,19 +62,47 @@ export async function generateSignedImage(
   }
   if (!originalBuf) return null;
 
-  // サインPNGを原本サイズにリサイズ→重ねる
-  const meta = await sharp(originalBuf).metadata();
-  const sigResized = await sharp(Buffer.from(delivery.signature.imageData))
-    .resize({
-      width: meta.width,
-      height: meta.height,
-      fit: "contain",
-      background: { r: 0, g: 0, b: 0, alpha: 0 },
-    })
-    .toBuffer();
-  const composed = await sharp(originalBuf)
-    .composite([{ input: sigResized, blend: "over" }])
-    .png()
-    .toBuffer();
-  return composed;
+  // Prismaのドライバによってはbase64文字列で返るケースを吸収
+  function toBuffer(v: unknown): Buffer {
+    if (Buffer.isBuffer(v)) return v;
+    if (v instanceof Uint8Array) return Buffer.from(v);
+    if (typeof v === "string") return Buffer.from(v, "base64");
+    return Buffer.from(v as ArrayBuffer);
+  }
+
+  try {
+    const signatureBuf = toBuffer(delivery.signature.imageData);
+
+    // サインPNGを原本サイズにリサイズ→重ねる
+    const meta = await sharp(originalBuf).metadata();
+    if (!meta.width || !meta.height) {
+      console.error("[signed-image] 原本のサイズが取得できません", {
+        deliveryId,
+        meta,
+        originalBytes: originalBuf.byteLength,
+      });
+      return null;
+    }
+    const sigResized = await sharp(signatureBuf)
+      .resize({
+        width: meta.width,
+        height: meta.height,
+        fit: "contain",
+        background: { r: 0, g: 0, b: 0, alpha: 0 },
+      })
+      .toBuffer();
+    const composed = await sharp(originalBuf)
+      .composite([{ input: sigResized, blend: "over" }])
+      .png()
+      .toBuffer();
+    return composed;
+  } catch (err) {
+    console.error("[signed-image] sharp 処理失敗", {
+      deliveryId,
+      originalBytes: originalBuf.byteLength,
+      signatureType: typeof delivery.signature.imageData,
+      err: err instanceof Error ? `${err.name}: ${err.message}` : String(err),
+    });
+    return null;
+  }
 }
