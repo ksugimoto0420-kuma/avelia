@@ -16,6 +16,18 @@ const PEN_COLORS: { label: string; value: string }[] = [
   { label: "ピンク", value: "#DB2777" },
 ];
 
+const PEN_SIZES: {
+  label: string;
+  minWidth: number;
+  maxWidth: number;
+  preview: number;
+}[] = [
+  { label: "細", minWidth: 0.6, maxWidth: 1.8, preview: 2 },
+  { label: "標準", minWidth: 1.2, maxWidth: 3.0, preview: 4 },
+  { label: "太", minWidth: 2.0, maxWidth: 4.8, preview: 7 },
+  { label: "極太", minWidth: 3.2, maxWidth: 7.2, preview: 10 },
+];
+
 const DEMO_NICKNAMES = [
   "ひな",
   "ゆい",
@@ -56,6 +68,7 @@ export function DemoSignSession() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const padRef = useRef<SignaturePad | null>(null);
   const [penColor, setPenColor] = useState<string>(PEN_COLORS[0].value);
+  const [penSizeIndex, setPenSizeIndex] = useState<number>(1);
   const [bgUrl, setBgUrl] = useState<string>(randomBgUrl());
   const [nickname, setNickname] = useState<string>(pick(DEMO_NICKNAMES));
   const [productName, setProductName] = useState<string>(pick(DEMO_PRODUCTS));
@@ -79,10 +92,11 @@ export function DemoSignSession() {
       padRef.current?.clear();
     };
     resize();
+    const initialSize = PEN_SIZES[penSizeIndex];
     const pad = new SignaturePad(canvas, {
       penColor,
-      minWidth: 1.2,
-      maxWidth: 3.0,
+      minWidth: initialSize.minWidth,
+      maxWidth: initialSize.maxWidth,
       throttle: 8,
       backgroundColor: "rgba(0,0,0,0)",
     });
@@ -99,6 +113,15 @@ export function DemoSignSession() {
   useEffect(() => {
     if (padRef.current) padRef.current.penColor = penColor;
   }, [penColor]);
+
+  // ペン太さも即時反映
+  useEffect(() => {
+    const pad = padRef.current;
+    if (!pad) return;
+    const s = PEN_SIZES[penSizeIndex];
+    pad.minWidth = s.minWidth;
+    pad.maxWidth = s.maxWidth;
+  }, [penSizeIndex]);
 
   const clear = useCallback(() => {
     padRef.current?.clear();
@@ -246,6 +269,34 @@ export function DemoSignSession() {
         })}
       </div>
 
+      {/* 太さセレクタ */}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <span className="text-xs font-medium text-gray-500">太さ</span>
+        {PEN_SIZES.map((s, i) => {
+          const active = penSizeIndex === i;
+          return (
+            <button
+              key={s.label}
+              type="button"
+              onClick={() => setPenSizeIndex(i)}
+              aria-label={`ペン太さ ${s.label}`}
+              aria-pressed={active ? "true" : "false"}
+              className={`inline-flex h-9 min-w-16 items-center justify-center gap-2 rounded-lg border-2 px-3 text-xs font-semibold transition ${
+                active
+                  ? "border-brand-600 bg-brand-50 text-brand-700"
+                  : "border-gray-300 bg-white text-gray-600 hover:border-gray-500"
+              }`}
+            >
+              <span
+                className="block rounded-full bg-current"
+                style={{ width: s.preview, height: s.preview }}
+              />
+              {s.label}
+            </button>
+          );
+        })}
+      </div>
+
       {error && (
         <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
           {error}
@@ -254,24 +305,28 @@ export function DemoSignSession() {
 
       <div className="mt-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:justify-between">
         <button
+          type="button"
           onClick={clear}
           className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
         >
           書き直す
         </button>
         <button
+          type="button"
           onClick={newScene}
           className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
         >
           🎲 新しいシーン
         </button>
         <button
+          type="button"
           onClick={showPreview}
           className="rounded-lg border border-brand-300 bg-white px-4 py-2 text-sm font-bold text-brand-700 hover:bg-brand-50"
         >
           プレビュー表示
         </button>
         <button
+          type="button"
           onClick={downloadPng}
           className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-bold text-white hover:bg-brand-700"
         >

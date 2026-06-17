@@ -28,6 +28,18 @@ const PEN_COLORS: { label: string; value: string }[] = [
   { label: "ピンク", value: "#DB2777" },
 ];
 
+const PEN_SIZES: {
+  label: string;
+  minWidth: number;
+  maxWidth: number;
+  preview: number;
+}[] = [
+  { label: "細", minWidth: 0.6, maxWidth: 1.8, preview: 2 },
+  { label: "標準", minWidth: 1.2, maxWidth: 3.0, preview: 4 },
+  { label: "太", minWidth: 2.0, maxWidth: 4.8, preview: 7 },
+  { label: "極太", minWidth: 3.2, maxWidth: 7.2, preview: 10 },
+];
+
 export function SignSession({
   deliveryId,
   nickname,
@@ -45,6 +57,8 @@ export function SignSession({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [penColor, setPenColor] = useState<string>(PEN_COLORS[0].value);
+  // 1 = 標準 (PEN_SIZES のインデックス)
+  const [penSizeIndex, setPenSizeIndex] = useState<number>(1);
 
   // 描画キャンバスを「原本画像のサイズに合わせる」（CSS は親に追従、内部解像度は固定）
   useEffect(() => {
@@ -63,10 +77,11 @@ export function SignSession({
       padRef.current?.clear();
     };
     resize();
+    const initialSize = PEN_SIZES[penSizeIndex];
     const pad = new SignaturePad(canvas, {
       penColor,
-      minWidth: 1.2,
-      maxWidth: 3.0,
+      minWidth: initialSize.minWidth,
+      maxWidth: initialSize.maxWidth,
       throttle: 8,
       backgroundColor: "rgba(0,0,0,0)", // 透過
     });
@@ -84,6 +99,15 @@ export function SignSession({
   useEffect(() => {
     if (padRef.current) padRef.current.penColor = penColor;
   }, [penColor]);
+
+  // ペン太さも同様に即時反映
+  useEffect(() => {
+    const pad = padRef.current;
+    if (!pad) return;
+    const s = PEN_SIZES[penSizeIndex];
+    pad.minWidth = s.minWidth;
+    pad.maxWidth = s.maxWidth;
+  }, [penSizeIndex]);
 
   function clear() {
     padRef.current?.clear();
@@ -185,6 +209,34 @@ export function SignSession({
               style={{ backgroundColor: c.value }}
             >
               <span className="sr-only">{c.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* 太さセレクタ */}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <span className="text-xs font-medium text-gray-500">太さ</span>
+        {PEN_SIZES.map((s, i) => {
+          const active = penSizeIndex === i;
+          return (
+            <button
+              key={s.label}
+              type="button"
+              onClick={() => setPenSizeIndex(i)}
+              aria-label={`ペン太さ ${s.label}`}
+              aria-pressed={active ? "true" : "false"}
+              className={`inline-flex h-9 min-w-16 items-center justify-center gap-2 rounded-lg border-2 px-3 text-xs font-semibold transition ${
+                active
+                  ? "border-brand-600 bg-brand-50 text-brand-700"
+                  : "border-gray-300 bg-white text-gray-600 hover:border-gray-500"
+              }`}
+            >
+              <span
+                className="block rounded-full bg-current"
+                style={{ width: s.preview, height: s.preview }}
+              />
+              {s.label}
             </button>
           );
         })}
