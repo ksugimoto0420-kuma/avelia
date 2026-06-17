@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { drawLottery } from "@/app/admin/lotteries/actions";
@@ -22,6 +23,24 @@ export function DrawButton({
   disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+  const router = useRouter();
+
+  const handleDraw = () => {
+    setError(null);
+    const fd = new FormData();
+    fd.set("lotteryId", lotteryId);
+    startTransition(async () => {
+      try {
+        await drawLottery(fd);
+        setOpen(false);
+        router.refresh();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "抽選の実行に失敗しました");
+      }
+    });
+  };
 
   return (
     <>
@@ -35,19 +54,25 @@ export function DrawButton({
       </Button>
       <Modal
         open={open}
-        onClose={() => setOpen(false)}
+        onClose={() => !pending && setOpen(false)}
         title="抽選を実行しますか？"
         footer={
           <>
-            <Button variant="outline" onClick={() => setOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setOpen(false)}
+              disabled={pending}
+            >
               キャンセル
             </Button>
-            <form action={drawLottery}>
-              <input type="hidden" name="lotteryId" value={lotteryId} />
-              <Button type="submit" variant="danger">
-                実行する
-              </Button>
-            </form>
+            <Button
+              type="button"
+              variant="danger"
+              onClick={handleDraw}
+              disabled={pending}
+            >
+              {pending ? "実行中..." : "実行する"}
+            </Button>
           </>
         }
       >
@@ -58,6 +83,11 @@ export function DrawButton({
           <li>応募者数: <b>{entryCount}</b> 名</li>
           <li>当選者数: <b>{winnersCount}</b> 名</li>
         </ul>
+        {error && (
+          <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {error}
+          </p>
+        )}
       </Modal>
     </>
   );
