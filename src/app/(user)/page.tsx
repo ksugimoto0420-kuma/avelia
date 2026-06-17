@@ -4,7 +4,7 @@ import { ProductCard } from "@/components/user/ProductCard";
 import { getOptionalUser } from "@/lib/auth/guards";
 import { availableStock } from "@/lib/inventory";
 import { prisma } from "@/lib/prisma";
-import { eventStageOrderBy, eventStageWhere } from "@/lib/sale";
+import { eventStageOrderBy, eventStageWhere, getSaleStatus } from "@/lib/sale";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +14,7 @@ export default async function HomePage() {
 
   // 「販売中（終了が近い順）→ 販売予定（開始が近い順）→ 終了」の順で
   // 合計6件取る。各ステージから最大6件ずつ取って必要なだけ連結。
-  const [onSale, upcoming, products] = await Promise.all([
+  const [onSale, upcoming, rawProducts] = await Promise.all([
     prisma.event.findMany({
       where: { isPublished: true, ...eventStageWhere("on_sale", now) },
       orderBy: eventStageOrderBy.on_sale,
@@ -26,9 +26,34 @@ export default async function HomePage() {
       take: 6,
     }),
     prisma.product.findMany({
-      where: { isPublished: true, event: { isPublished: true } },
-      orderBy: { createdAt: "desc" },
-      take: 8,
+      where: {
+        isPublished: true,
+        event: { isPublished: true },
+        // 商品の saleStartAt が指定されていればそれを優先、null ならイベントの開始日を使う
+        AND: [
+          {
+            OR: [
+              { saleStartAt: { lte: now } },
+              {
+                saleStartAt: null,
+                event: { saleStartAt: { lte: now } },
+              },
+            ],
+          },
+          {
+            OR: [
+              { saleEndAt: { gte: now } },
+              {
+                saleEndAt: null,
+                event: { saleEndAt: { gte: now } },
+              },
+            ],
+          },
+        ],
+      },
+      // 販売終了が近い順 → 同じなら新しい順
+      orderBy: [{ createdAt: "desc" }],
+      take: 24,
       include: {
         event: true,
         variants: { include: { inventory: true } },
@@ -37,10 +62,40 @@ export default async function HomePage() {
   ]);
   const events = [...onSale, ...upcoming].slice(0, 6);
 
+  // 取得した候補から「現在ON_SALE」のみを残し、販売終了の近い順に並べて8件に絞る。
+  // SQL の OR/AND と null 継承の組合せが複雑になりやすいため、最終判定は
+  // 既存の getSaleStatus に揃えて一貫性を確保している。
+  const products = rawProducts
+    .map((p) => {
+      const available = p.variants.reduce(
+        (s, v) => s + (v.inventory ? availableStock(v.inventory) : 0),
+        0,
+      );
+      const saleStartAt = p.saleStartAt ?? p.event.saleStartAt;
+      const saleEndAt = p.saleEndAt ?? p.event.saleEndAt;
+      const status = getSaleStatus({
+        isPublished: p.isPublished && p.event.isPublished,
+        saleStartAt,
+        saleEndAt,
+        available,
+      });
+      return { p, available, saleStartAt, saleEndAt, status };
+    })
+    .filter((x) => x.status === "ON_SALE")
+    .sort((a, b) => {
+      // 販売終了が早い順
+      const ae = a.saleEndAt ? a.saleEndAt.getTime() : Infinity;
+      const be = b.saleEndAt ? b.saleEndAt.getTime() : Infinity;
+      if (ae !== be) return ae - be;
+      // 終了が同じなら新しい順
+      return b.p.createdAt.getTime() - a.p.createdAt.getTime();
+    })
+    .slice(0, 8);
+
   // トップに出す商品のうち、抽選販売のものを判定するためのproductIds集合
   const productLotteries = await prisma.lottery.findMany({
     where: {
-      productId: { in: products.map((p) => p.id) },
+      productId: { in: products.map((x) => x.p.id) },
       status: { in: ["OPEN", "CLOSED", "DRAWN"] },
     },
     select: { productId: true },
@@ -156,13 +211,7 @@ export default async function HomePage() {
             </p>
           ) : (
             <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-              {products.map((p) => {
-                const available = p.variants.reduce(
-                  (s, v) => s + (v.inventory ? availableStock(v.inventory) : 0),
-                  0,
-                );
-                const saleStartAt = p.saleStartAt ?? p.event.saleStartAt;
-                const saleEndAt = p.saleEndAt ?? p.event.saleEndAt;
+              {products.map(({ p, available, saleStartAt, saleEndAt }) => {
                 const isLottery =
                   p.lotteryOnly || lotteryProductIds.has(p.id);
                 return (
