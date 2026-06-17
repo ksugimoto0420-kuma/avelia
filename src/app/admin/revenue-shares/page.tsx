@@ -25,6 +25,7 @@ export default async function AdminRevenueSharesPage() {
     take: 200,
     include: { event: { select: { title: true } } },
   });
+  const currentPeriod = shares[0]?.period ?? null;
 
   type Row = (typeof shares)[number];
   const columns: Column<Row>[] = [
@@ -71,9 +72,20 @@ export default async function AdminRevenueSharesPage() {
       </Card>
 
       <Card>
-        <CardHeader title="集計結果" />
+        <CardHeader
+          title="集計結果"
+          subtitle={
+            currentPeriod
+              ? `${currentPeriod} の集計結果を表示しています（実行ごとに上書きされます）`
+              : "まだ集計が実行されていません"
+          }
+        />
         <CardBody>
-          <DataTable columns={columns} rows={shares} emptyMessage="集計結果がありません" />
+          <DataTable
+            columns={columns}
+            rows={shares}
+            emptyMessage="集計結果がありません。上のフォームから集計を実行してください。"
+          />
         </CardBody>
       </Card>
     </div>

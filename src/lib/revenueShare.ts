@@ -17,7 +17,8 @@ function periodRange(period: string): { start: Date; end: Date } {
 
 /**
  * 指定月のイベント別 R/S を再計算して revenue_shares に保存する。
- * 既存の同一(event, period) レコードは置き換える。
+ * 集計は年月単位の使い捨て。実行ごとに既存レコードを全削除してから
+ * 指定月の集計結果のみを保存する（履歴は持たない）。
  */
 export async function computeRevenueSharesForPeriod(
   period: string,
@@ -41,32 +42,34 @@ export async function computeRevenueSharesForPeriod(
       AND o."paidAt" < ${end}
     GROUP BY p."eventId"`;
 
-  const results = [];
-  for (const r of rows) {
-    const grossSales = Number(r.gross ?? 0);
-    const ourAmount = Math.round(grossSales * ourShareRate);
-    const aveliaAmount = grossSales - ourAmount;
+  return await prisma.$transaction(async (tx) => {
+    // 履歴は持たず、毎回まっさらにしてから当月分だけ書き直す
+    await tx.revenueShare.deleteMany({});
 
-    // 同一 (event, period) を置き換え
-    await prisma.revenueShare.deleteMany({
-      where: { eventId: r.eventId, productId: null, period },
-    });
-    const created = await prisma.revenueShare.create({
-      data: {
-        eventId: r.eventId,
-        period,
-        grossSales,
-        paymentFee: 0,
-        shippingFee: Number(r.shipping ?? 0),
-        refunds: 0,
-        externalCost: 0,
-        ourShareRate,
-        ourAmount,
-        aveliaAmount,
-        conditions: { ourShareRate, note: "自動集計（手数料・外部費は未反映）" },
-      },
-    });
-    results.push(created);
-  }
-  return results;
+    const created = [];
+    for (const r of rows) {
+      const grossSales = Number(r.gross ?? 0);
+      const ourAmount = Math.round(grossSales * ourShareRate);
+      const aveliaAmount = grossSales - ourAmount;
+
+      created.push(
+        await tx.revenueShare.create({
+          data: {
+            eventId: r.eventId,
+            period,
+            grossSales,
+            paymentFee: 0,
+            shippingFee: Number(r.shipping ?? 0),
+            refunds: 0,
+            externalCost: 0,
+            ourShareRate,
+            ourAmount,
+            aveliaAmount,
+            conditions: { ourShareRate, note: "自動集計（手数料・外部費は未反映）" },
+          },
+        }),
+      );
+    }
+    return created;
+  });
 }
