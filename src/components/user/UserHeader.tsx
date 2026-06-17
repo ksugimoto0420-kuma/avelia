@@ -1,12 +1,23 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
+import { Drawer } from "@/components/ui/Drawer";
+
+const NAV_LINKS: { href: string; label: string }[] = [
+  { href: "/events?type=MEET_GREET", label: "オンライン特典会" },
+  { href: "/lotteries", label: "すきくじ" },
+  { href: "/events?type=TRADING_CARD", label: "トレカ" },
+  { href: "/faq", label: "よくある質問" },
+];
 
 export function UserHeader() {
   const { data: session } = useSession();
+  const pathname = usePathname();
   const [cartCount, setCartCount] = useState(0);
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
     if (session?.user?.kind !== "user") {
@@ -26,37 +37,48 @@ export function UserHeader() {
       .catch(() => {});
   }, [session]);
 
+  // ページ遷移したらドロワーを閉じる
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
+
   const isUser = session?.user?.kind === "user";
 
   return (
     <header className="sticky top-0 z-40 border-b border-gray-100 bg-white/90 backdrop-blur">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
-        <Link href="/" className="flex items-center gap-2">
-          <span className="text-xl font-extrabold tracking-tight text-brand-600">
-            Avelia
-          </span>
-          <span className="text-sm font-semibold text-gray-400">FunClub</span>
-        </Link>
+      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-2 px-4">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="-ml-2 inline-flex h-10 w-10 items-center justify-center rounded-lg text-gray-700 hover:bg-gray-100 md:hidden"
+            aria-label="メニューを開く"
+          >
+            <HamburgerIcon />
+          </button>
+          <Link href="/" className="flex items-center gap-2">
+            <span className="text-xl font-extrabold tracking-tight text-brand-600">
+              Avelia
+            </span>
+            <span className="hidden text-sm font-semibold text-gray-400 sm:inline">
+              FunClub
+            </span>
+          </Link>
+        </div>
 
         <nav className="hidden items-center gap-6 text-sm font-medium text-gray-600 md:flex">
-          <Link href="/events?type=MEET_GREET" className="hover:text-brand-600">
-            オンライン特典会
-          </Link>
-          <Link href="/lotteries" className="hover:text-brand-600">
-            すきくじ
-          </Link>
-          <Link href="/events?type=TRADING_CARD" className="hover:text-brand-600">
-            トレカ
-          </Link>
-          <Link href="/faq" className="hover:text-brand-600">
-            よくある質問
-          </Link>
+          {NAV_LINKS.map((l) => (
+            <Link key={l.href} href={l.href} className="hover:text-brand-600">
+              {l.label}
+            </Link>
+          ))}
         </nav>
 
-        <div className="flex items-center gap-3 text-sm">
+        <div className="flex items-center gap-1 text-sm sm:gap-3">
           <Link
             href="/cart"
             className="relative rounded-lg px-3 py-2 text-gray-700 hover:bg-gray-100"
+            aria-label="カート"
           >
             🛒
             {cartCount > 0 && (
@@ -69,13 +91,13 @@ export function UserHeader() {
             <>
               <Link
                 href="/mypage"
-                className="rounded-lg px-3 py-2 text-gray-700 hover:bg-gray-100"
+                className="hidden rounded-lg px-3 py-2 text-gray-700 hover:bg-gray-100 sm:inline-block"
               >
                 マイページ
               </Link>
               <button
                 onClick={() => signOut({ callbackUrl: "/" })}
-                className="rounded-lg px-3 py-2 text-gray-500 hover:bg-gray-100"
+                className="hidden rounded-lg px-3 py-2 text-gray-500 hover:bg-gray-100 sm:inline-block"
               >
                 ログアウト
               </button>
@@ -83,13 +105,134 @@ export function UserHeader() {
           ) : (
             <Link
               href="/auth/login"
-              className="rounded-lg bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700"
+              className="rounded-lg bg-brand-600 px-3 py-2 font-medium text-white hover:bg-brand-700 sm:px-4"
             >
               ログイン
             </Link>
           )}
         </div>
       </div>
+
+      <Drawer
+        open={open}
+        onClose={() => setOpen(false)}
+        side="left"
+        title={
+          <Link href="/" className="flex items-center gap-2">
+            <span className="text-lg font-extrabold text-brand-600">Avelia</span>
+            <span className="text-sm font-semibold text-gray-400">FunClub</span>
+          </Link>
+        }
+      >
+        <nav className="flex flex-col p-2 text-sm">
+          <p className="px-3 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide text-gray-400">
+            探す
+          </p>
+          {NAV_LINKS.map((l) => (
+            <Link
+              key={l.href}
+              href={l.href}
+              className="rounded-lg px-3 py-2.5 font-medium text-gray-700 hover:bg-brand-50 hover:text-brand-700"
+            >
+              {l.label}
+            </Link>
+          ))}
+
+          <p className="px-3 pb-1 pt-5 text-xs font-semibold uppercase tracking-wide text-gray-400">
+            アカウント
+          </p>
+          <Link
+            href="/cart"
+            className="rounded-lg px-3 py-2.5 font-medium text-gray-700 hover:bg-brand-50 hover:text-brand-700"
+          >
+            カート{cartCount > 0 ? `（${cartCount}）` : ""}
+          </Link>
+          {isUser ? (
+            <>
+              <Link
+                href="/mypage"
+                className="rounded-lg px-3 py-2.5 font-medium text-gray-700 hover:bg-brand-50 hover:text-brand-700"
+              >
+                マイページ
+              </Link>
+              <Link
+                href="/mypage/orders"
+                className="rounded-lg px-3 py-2.5 font-medium text-gray-700 hover:bg-brand-50 hover:text-brand-700"
+              >
+                注文履歴
+              </Link>
+              <Link
+                href="/mypage/lottery-results"
+                className="rounded-lg px-3 py-2.5 font-medium text-gray-700 hover:bg-brand-50 hover:text-brand-700"
+              >
+                抽選結果
+              </Link>
+              <Link
+                href="/mypage/digital-contents"
+                className="rounded-lg px-3 py-2.5 font-medium text-gray-700 hover:bg-brand-50 hover:text-brand-700"
+              >
+                デジタルコンテンツ
+              </Link>
+              <Link
+                href="/mypage/profile"
+                className="rounded-lg px-3 py-2.5 font-medium text-gray-700 hover:bg-brand-50 hover:text-brand-700"
+              >
+                プロフィール
+              </Link>
+              <button
+                onClick={() => signOut({ callbackUrl: "/" })}
+                className="mt-1 rounded-lg px-3 py-2.5 text-left font-medium text-gray-500 hover:bg-gray-100"
+              >
+                ログアウト
+              </button>
+            </>
+          ) : (
+            <>
+              <Link
+                href="/auth/login"
+                className="mt-1 rounded-lg bg-brand-600 px-3 py-2.5 text-center font-medium text-white hover:bg-brand-700"
+              >
+                ログイン
+              </Link>
+              <Link
+                href="/auth/register"
+                className="mt-2 rounded-lg border border-gray-300 px-3 py-2.5 text-center font-medium text-gray-700 hover:bg-gray-50"
+              >
+                新規登録
+              </Link>
+            </>
+          )}
+
+          <p className="px-3 pb-1 pt-5 text-xs font-semibold uppercase tracking-wide text-gray-400">
+            サポート
+          </p>
+          <Link
+            href="/contact"
+            className="rounded-lg px-3 py-2.5 font-medium text-gray-700 hover:bg-brand-50 hover:text-brand-700"
+          >
+            お問い合わせ
+          </Link>
+        </nav>
+      </Drawer>
     </header>
+  );
+}
+
+function HamburgerIcon() {
+  return (
+    <svg
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <line x1="3" y1="6" x2="21" y2="6" />
+      <line x1="3" y1="12" x2="21" y2="12" />
+      <line x1="3" y1="18" x2="21" y2="18" />
+    </svg>
   );
 }

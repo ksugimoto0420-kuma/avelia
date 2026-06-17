@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "@/styles/globals.css";
 
 export const metadata: Metadata = {
@@ -8,6 +8,12 @@ export const metadata: Metadata = {
   },
   description:
     "アイドル・アーティストのオンライン特典会・サイン会、直筆サイン入りグッズ・すきくじ・トレカのファン向けショップ",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
 };
 
 export default function RootLayout({
