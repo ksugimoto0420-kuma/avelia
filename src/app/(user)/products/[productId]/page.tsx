@@ -77,21 +77,34 @@ export default async function ProductDetailPage({
   // いずれかのSKUがニックネーム必須なら案内セクションを表示
   const anyNickname = p.variants.some((v) => v.requiresNickname);
 
-  // 抽選フロー：
-  // 1. lotteryOnly=true → 必ず抽選経由（当選しないと買えない）
-  // 2. event.saleMethod=LOTTERY → 抽選イベント。抽選があれば応募導線を出す
-  const isLotteryFlow =
-    p.lotteryOnly || p.event.saleMethod === "LOTTERY";
+  // 抽選フロー（商品単位）：
+  // - 「この商品ID」に紐づく抽選を探す（最優先）
+  // - lotteryOnly=true なのに商品単位の抽選がなければ、イベント全体抽選にフォールバック
+  //   （ほぼレアケースだが念のため）
+  // - lotteryOnly=false かつ商品単位の抽選もない → 通常販売（カート追加可）
   const now = new Date();
-  const lottery = isLotteryFlow
-    ? await prisma.lottery.findFirst({
-        where: {
-          OR: [{ productId: p.id }, { eventId: p.eventId }],
-          status: { in: ["OPEN", "CLOSED", "DRAWN"] },
-        },
-        orderBy: [{ status: "asc" }, { entryEndAt: "desc" }],
-      })
-    : null;
+  const productLottery = await prisma.lottery.findFirst({
+    where: {
+      productId: p.id,
+      status: { in: ["OPEN", "CLOSED", "DRAWN"] },
+    },
+    orderBy: [{ status: "asc" }, { entryEndAt: "desc" }],
+  });
+  const eventLevelLottery =
+    !productLottery && p.lotteryOnly
+      ? await prisma.lottery.findFirst({
+          where: {
+            eventId: p.eventId,
+            productId: null,
+            status: { in: ["OPEN", "CLOSED", "DRAWN"] },
+          },
+          orderBy: [{ status: "asc" }, { entryEndAt: "desc" }],
+        })
+      : null;
+  const lottery = productLottery ?? eventLevelLottery;
+
+  // 抽選フローかどうか：商品が lotteryOnly か、商品単位の抽選が存在するか
+  const isLotteryFlow = p.lotteryOnly || !!productLottery;
 
   const user = await getOptionalUser();
   const myEntry =

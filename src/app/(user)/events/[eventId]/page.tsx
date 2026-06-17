@@ -36,7 +36,6 @@ async function getEvent(id: string) {
       lotteries: {
         where: { status: { in: ["OPEN", "CLOSED", "DRAWN"] } },
         orderBy: [{ status: "asc" }, { entryEndAt: "desc" }],
-        take: 1,
       },
     },
   });
@@ -182,40 +181,67 @@ export default async function EventDetailPage({
         </div>
       </dl>
 
-      {/* 抽選イベントのCTA */}
-      {event.saleMethod === "LOTTERY" && event.lotteries[0] && (() => {
-        const lot = event.lotteries[0];
+      {/* 抽選CTA */}
+      {(() => {
         const now2 = new Date();
-        const openNow =
-          lot.status === "OPEN" &&
-          lot.entryStartAt <= now2 &&
-          lot.entryEndAt >= now2;
-        return (
-          <section className="mt-6 rounded-xl border-2 border-brand-300 bg-brand-50 p-5 text-center">
-            <p className="text-sm font-bold text-brand-700">
-              このイベントは抽選販売です
-            </p>
-            <p className="mt-1 text-xs text-gray-600">
-              当選された方のみ、対象商品を購入いただけます。
-              <br />
-              応募締切：<b>{formatDateTime(lot.entryEndAt)}</b>
-            </p>
-            {openNow ? (
-              <Link
-                href={`/lotteries/${lot.id}`}
-                className="mt-3 inline-flex items-center gap-2 rounded-lg bg-brand-600 px-6 py-3 text-sm font-bold text-white hover:bg-brand-700"
-              >
-                抽選詳細を見る →
-              </Link>
-            ) : (
-              <p className="mt-2 text-xs text-gray-500">
-                {lot.status === "DRAWN"
-                  ? "抽選は完了しました。マイページの「抽選結果」をご確認ください"
-                  : "応募期間外です"}
+        // イベント全体抽選（productId=null かつ eventId一致）
+        const eventLevelLottery = event.lotteries.find((l) => !l.productId);
+        // 商品ごとの抽選
+        const productLevelLotteries = event.lotteries.filter((l) => l.productId);
+
+        if (eventLevelLottery) {
+          // イベント全体で1つの抽選があるパターン
+          const openNow =
+            eventLevelLottery.status === "OPEN" &&
+            eventLevelLottery.entryStartAt <= now2 &&
+            eventLevelLottery.entryEndAt >= now2;
+          return (
+            <section className="mt-6 rounded-xl border-2 border-brand-300 bg-brand-50 p-5 text-center">
+              <p className="text-sm font-bold text-brand-700">
+                このイベントは抽選販売です
               </p>
-            )}
-          </section>
-        );
+              <p className="mt-1 text-xs text-gray-600">
+                当選された方のみ、対象商品を購入いただけます。
+                <br />
+                応募締切：<b>{formatDateTime(eventLevelLottery.entryEndAt)}</b>
+              </p>
+              {openNow ? (
+                <Link
+                  href={`/lotteries/${eventLevelLottery.id}`}
+                  className="mt-3 inline-flex items-center gap-2 rounded-lg bg-brand-600 px-6 py-3 text-sm font-bold text-white hover:bg-brand-700"
+                >
+                  抽選詳細を見る →
+                </Link>
+              ) : (
+                <p className="mt-2 text-xs text-gray-500">
+                  {eventLevelLottery.status === "DRAWN"
+                    ? "抽選は完了しました。マイページの「抽選結果」をご確認ください"
+                    : "応募期間外です"}
+                </p>
+              )}
+            </section>
+          );
+        }
+
+        if (productLevelLotteries.length > 0) {
+          // 商品ごとに別々の抽選があるパターン（sukisuki型）
+          return (
+            <section className="mt-6 rounded-xl border-2 border-brand-300 bg-brand-50 p-5">
+              <p className="text-center text-sm font-bold text-brand-700">
+                このイベントは商品ごとの抽選販売です
+              </p>
+              <p className="mt-2 text-center text-xs text-gray-600">
+                ご希望の商品の <b>各商品ページ</b> から抽選にご応募ください。
+                商品ごとに当選者のみがその商品を購入できます。
+              </p>
+              <p className="mt-1 text-center text-xs text-gray-500">
+                抽選数：{productLevelLotteries.length} 件
+              </p>
+            </section>
+          );
+        }
+
+        return null;
       })()}
 
       {event.streamingUrl &&
