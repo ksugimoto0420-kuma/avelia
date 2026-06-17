@@ -54,12 +54,23 @@ export default async function SignSessionEntryPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">サイン記入セッション</h1>
-        <p className="text-sm text-gray-500">
-          出演者がタブレットで直接サインを書く画面に進みます。
-          イベント単位で順次サイン待ちの宛先が表示されます。
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">
+            サイン記入セッション
+          </h1>
+          <p className="text-sm text-gray-500">
+            出演者がタブレットで直接サインを書く画面に進みます。
+            イベント単位で順次サイン待ちの宛先が表示されます。
+          </p>
+        </div>
+        <Button
+          href="/admin/sign-session/demo"
+          variant="outline"
+          size="sm"
+        >
+          🎨 デモを試す
+        </Button>
       </div>
 
       {groups.length === 0 ? (

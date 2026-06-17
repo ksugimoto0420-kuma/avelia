@@ -16,6 +16,18 @@ type Props = {
   nextDeliveryId: string | null;
 };
 
+const PEN_COLORS: { label: string; value: string }[] = [
+  { label: "黒", value: "#111111" },
+  { label: "白", value: "#FFFFFF" },
+  { label: "赤", value: "#DC2626" },
+  { label: "青", value: "#1D4ED8" },
+  { label: "緑", value: "#059669" },
+  { label: "金", value: "#D4A017" },
+  { label: "銀", value: "#9CA3AF" },
+  { label: "紫", value: "#7C3AED" },
+  { label: "ピンク", value: "#DB2777" },
+];
+
 export function SignSession({
   deliveryId,
   nickname,
@@ -32,6 +44,7 @@ export function SignSession({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [penColor, setPenColor] = useState<string>(PEN_COLORS[0].value);
 
   // 描画キャンバスを「原本画像のサイズに合わせる」（CSS は親に追従、内部解像度は固定）
   useEffect(() => {
@@ -51,7 +64,7 @@ export function SignSession({
     };
     resize();
     const pad = new SignaturePad(canvas, {
-      penColor: "#111",
+      penColor,
       minWidth: 1.2,
       maxWidth: 3.0,
       throttle: 8,
@@ -63,7 +76,14 @@ export function SignSession({
       window.removeEventListener("resize", resize);
       pad.off();
     };
+    // 色変更時に再初期化すると描画中の線が消えるので、色だけは別の effect で更新する
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deliveryId]);
+
+  // ペン色を即時反映（描画済みの線はそのまま、これから引く線に適用）
+  useEffect(() => {
+    if (padRef.current) padRef.current.penColor = penColor;
+  }, [penColor]);
 
   function clear() {
     padRef.current?.clear();
@@ -143,6 +163,31 @@ export function SignSession({
           className="absolute inset-0 h-full w-full touch-none"
           style={{ touchAction: "none" }}
         />
+      </div>
+
+      {/* カラーパレット */}
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <span className="text-xs font-medium text-gray-500">ペン色</span>
+        {PEN_COLORS.map((c) => {
+          const active = penColor === c.value;
+          return (
+            <button
+              key={c.value}
+              type="button"
+              onClick={() => setPenColor(c.value)}
+              aria-label={`ペン色 ${c.label}`}
+              aria-pressed={active ? "true" : "false"}
+              className={`relative h-9 w-9 rounded-full border-2 transition ${
+                active
+                  ? "border-brand-600 ring-2 ring-brand-200"
+                  : "border-gray-300 hover:border-gray-500"
+              }`}
+              style={{ backgroundColor: c.value }}
+            >
+              <span className="sr-only">{c.label}</span>
+            </button>
+          );
+        })}
       </div>
 
       {error && (
