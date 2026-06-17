@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/Badge";
 import { MediaImage } from "@/components/ui/MediaImage";
 import { AddToCart } from "@/components/user/AddToCart";
+import { getOptionalUser } from "@/lib/auth/guards";
 import { SALE_METHOD_COLOR, SALE_METHOD_LABEL } from "@/lib/event-meta";
 import { availableStock } from "@/lib/inventory";
 import { prisma } from "@/lib/prisma";
@@ -75,6 +76,38 @@ export default async function ProductDetailPage({
   }));
   // いずれかのSKUがニックネーム必須なら案内セクションを表示
   const anyNickname = p.variants.some((v) => v.requiresNickname);
+
+  // 抽選フロー：
+  // 1. lotteryOnly=true → 必ず抽選経由（当選しないと買えない）
+  // 2. event.saleMethod=LOTTERY → 抽選イベント。抽選があれば応募導線を出す
+  const isLotteryFlow =
+    p.lotteryOnly || p.event.saleMethod === "LOTTERY";
+  const now = new Date();
+  const lottery = isLotteryFlow
+    ? await prisma.lottery.findFirst({
+        where: {
+          OR: [{ productId: p.id }, { eventId: p.eventId }],
+          status: { in: ["OPEN", "CLOSED", "DRAWN"] },
+        },
+        orderBy: [{ status: "asc" }, { entryEndAt: "desc" }],
+      })
+    : null;
+
+  const user = await getOptionalUser();
+  const myEntry =
+    user && lottery
+      ? await prisma.lotteryEntry.findUnique({
+          where: { lotteryId_userId: { lotteryId: lottery.id, userId: user.id } },
+        })
+      : null;
+
+  const lotteryOpen =
+    lottery?.status === "OPEN" &&
+    lottery.entryStartAt <= now &&
+    lottery.entryEndAt >= now;
+  const canPurchaseAsWinner =
+    myEntry?.status === "WON" &&
+    (!myEntry.purchaseDeadlineAt || myEntry.purchaseDeadlineAt >= now);
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8">
@@ -149,16 +182,32 @@ export default async function ProductDetailPage({
           </dl>
 
           <div className="mt-6">
-            <AddToCart
-              variants={variantOptions}
-              purchasable={status === "ON_SALE"}
-              maxPerOrder={p.maxPerOrder}
-              nicknameNote={p.nicknameNote}
-            />
-            <p className="mt-2 text-center text-xs text-gray-400">
-              {p.lotteryOnly ? "抽選当選者のみ購入可" : "誰でも購入可"} ／
-              ※購入にはログインが必要です
-            </p>
+            {isLotteryFlow && !canPurchaseAsWinner ? (
+              // 抽選フロー：抽選への応募 or 当選通知 or 終了案内
+              <LotteryCTA
+                lottery={lottery}
+                myEntryStatus={myEntry?.status ?? null}
+                lotteryOpen={lotteryOpen}
+                productId={p.id}
+                user={user}
+                now={now}
+              />
+            ) : (
+              <>
+                <AddToCart
+                  variants={variantOptions}
+                  purchasable={status === "ON_SALE"}
+                  maxPerOrder={p.maxPerOrder}
+                  nicknameNote={p.nicknameNote}
+                />
+                <p className="mt-2 text-center text-xs text-gray-400">
+                  {canPurchaseAsWinner
+                    ? "🎉 抽選に当選しました。購入期限内にご購入ください"
+                    : "誰でも購入可"}{" "}
+                  ／ ※購入にはログインが必要です
+                </p>
+              </>
+            )}
           </div>
 
           {p.maxPerUser != null && (
@@ -218,6 +267,116 @@ export default async function ProductDetailPage({
           </section>
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * 抽選フロー用のCTA。
+ * - 抽選未開催：「抽選募集は未開催です」
+ * - 抽選開催中・未応募：「抽選に応募する」
+ * - 応募済み：「応募済み 結果をお待ちください」
+ * - 落選：「残念ながら落選」
+ * - 締切後：「応募期間は終了しました」
+ */
+function LotteryCTA({
+  lottery,
+  myEntryStatus,
+  lotteryOpen,
+  productId,
+  user,
+  now,
+}: {
+  lottery: { id: string; title: string; entryStartAt: Date; entryEndAt: Date; status: string } | null;
+  myEntryStatus: "ENTERED" | "WON" | "LOST" | "PURCHASED" | "EXPIRED" | null;
+  lotteryOpen: boolean;
+  productId: string;
+  user: { id: string } | null;
+  now: Date;
+}) {
+  if (!lottery) {
+    return (
+      <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-center text-sm text-gray-600">
+        この商品は抽選販売です。現在、抽選募集はありません。
+      </div>
+    );
+  }
+
+  // 応募済み（落選・購入済み・期限切れ含む）
+  if (myEntryStatus) {
+    return (
+      <div className="space-y-3 rounded-xl border border-brand-100 bg-brand-50 p-4 text-center text-sm">
+        {myEntryStatus === "ENTERED" && (
+          <>
+            <p className="font-bold text-brand-700">この抽選に応募済みです</p>
+            <p className="text-xs text-gray-600">
+              抽選結果はマイページの「抽選結果」からご確認いただけます。
+            </p>
+          </>
+        )}
+        {myEntryStatus === "LOST" && (
+          <p className="font-bold text-gray-600">
+            残念ながら落選となりました
+          </p>
+        )}
+        {myEntryStatus === "PURCHASED" && (
+          <p className="font-bold text-green-700">
+            ✓ 既にご購入済みです
+          </p>
+        )}
+        {myEntryStatus === "EXPIRED" && (
+          <p className="font-bold text-gray-600">
+            購入期限が過ぎました
+          </p>
+        )}
+        <Link
+          href="/mypage/lottery-results"
+          className="inline-block text-xs text-brand-600 underline"
+        >
+          マイページで詳細を見る
+        </Link>
+      </div>
+    );
+  }
+
+  // 未応募
+  if (!lotteryOpen) {
+    const beforeStart = lottery.entryStartAt > now;
+    return (
+      <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-center text-sm text-gray-600">
+        {beforeStart
+          ? `応募は ${formatDateTime(lottery.entryStartAt)} から開始します`
+          : "応募期間は終了しました"}
+      </div>
+    );
+  }
+
+  // 応募可能
+  return (
+    <div className="space-y-3 rounded-xl border-2 border-brand-300 bg-brand-50 p-5 text-center">
+      <p className="text-sm font-bold text-brand-700">
+        この商品は抽選販売です
+      </p>
+      <p className="text-xs text-gray-600">
+        当選された方のみ購入期限内にご購入いただけます。
+        <br />
+        応募締切：<b>{formatDateTime(lottery.entryEndAt)}</b>
+      </p>
+      {user ? (
+        <Link
+          href={`/lotteries/${lottery.id}`}
+          className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-6 py-3 text-sm font-bold text-white hover:bg-brand-700"
+        >
+          抽選に応募する →
+        </Link>
+      ) : (
+        <Link
+          href={`/auth/login?callbackUrl=/products/${productId}`}
+          className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-6 py-3 text-sm font-bold text-white hover:bg-brand-700"
+        >
+          ログインして抽選応募 →
+        </Link>
+      )}
     </div>
   );
 }

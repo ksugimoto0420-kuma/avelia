@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody } from "@/components/ui/Card";
@@ -46,7 +47,12 @@ export default async function MypageLotteryResults() {
           <Card key={e.id}>
             <CardBody className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="font-semibold text-gray-900">{e.lottery.title}</p>
+                <Link
+                  href={`/lotteries/${e.lottery.id}`}
+                  className="font-semibold text-gray-900 hover:text-brand-600"
+                >
+                  {e.lottery.title}
+                </Link>
                 {e.purchaseDeadlineAt && (
                   <p className="text-xs text-gray-400">
                     購入期限: {formatDateTime(e.purchaseDeadlineAt)}

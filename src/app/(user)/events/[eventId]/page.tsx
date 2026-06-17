@@ -33,6 +33,11 @@ async function getEvent(id: string) {
       artist: {
         select: { id: true, slug: true, name: true, isPublished: true },
       },
+      lotteries: {
+        where: { status: { in: ["OPEN", "CLOSED", "DRAWN"] } },
+        orderBy: [{ status: "asc" }, { entryEndAt: "desc" }],
+        take: 1,
+      },
     },
   });
 }
@@ -176,6 +181,42 @@ export default async function EventDetailPage({
           </dd>
         </div>
       </dl>
+
+      {/* 抽選イベントのCTA */}
+      {event.saleMethod === "LOTTERY" && event.lotteries[0] && (() => {
+        const lot = event.lotteries[0];
+        const now2 = new Date();
+        const openNow =
+          lot.status === "OPEN" &&
+          lot.entryStartAt <= now2 &&
+          lot.entryEndAt >= now2;
+        return (
+          <section className="mt-6 rounded-xl border-2 border-brand-300 bg-brand-50 p-5 text-center">
+            <p className="text-sm font-bold text-brand-700">
+              このイベントは抽選販売です
+            </p>
+            <p className="mt-1 text-xs text-gray-600">
+              当選された方のみ、対象商品を購入いただけます。
+              <br />
+              応募締切：<b>{formatDateTime(lot.entryEndAt)}</b>
+            </p>
+            {openNow ? (
+              <Link
+                href={`/lotteries/${lot.id}`}
+                className="mt-3 inline-flex items-center gap-2 rounded-lg bg-brand-600 px-6 py-3 text-sm font-bold text-white hover:bg-brand-700"
+              >
+                抽選詳細を見る →
+              </Link>
+            ) : (
+              <p className="mt-2 text-xs text-gray-500">
+                {lot.status === "DRAWN"
+                  ? "抽選は完了しました。マイページの「抽選結果」をご確認ください"
+                  : "応募期間外です"}
+              </p>
+            )}
+          </section>
+        );
+      })()}
 
       {event.streamingUrl &&
         (hasPurchasedThisEvent ? (
