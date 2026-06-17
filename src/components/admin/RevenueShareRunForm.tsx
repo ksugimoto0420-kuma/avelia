@@ -1,12 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
 import { runRevenueShare } from "@/app/admin/revenue-shares/actions";
 
 export function RevenueShareRunForm({ defaultPeriod }: { defaultPeriod: string }) {
-  const router = useRouter();
   const { show } = useToast();
   const [period, setPeriod] = useState(defaultPeriod);
   const [error, setError] = useState<string | null>(null);
@@ -30,9 +28,10 @@ export function RevenueShareRunForm({ defaultPeriod }: { defaultPeriod: string }
     fd.set("period", value);
     startTransition(async () => {
       try {
-        await runRevenueShare(fd);
-        show(`${value} の集計を実行しました`);
-        router.refresh();
+        const res = await runRevenueShare(fd);
+        show(`${res.period} の集計を実行しました（${res.count}件）`);
+        // 旧結果が残って見える事を避けるためページをハードリロード
+        window.location.reload();
       } catch (e) {
         setError(e instanceof Error ? e.message : "集計の実行に失敗しました");
       }

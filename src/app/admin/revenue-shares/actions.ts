@@ -5,7 +5,9 @@ import { requireAdmin } from "@/lib/auth/guards";
 import { logOperation } from "@/lib/operation-log";
 import { computeRevenueSharesForPeriod } from "@/lib/revenueShare";
 
-export async function runRevenueShare(formData: FormData) {
+export async function runRevenueShare(
+  formData: FormData,
+): Promise<{ period: string; count: number }> {
   const admin = await requireAdmin("MANAGER");
   const period = (formData.get("period") as string | null)?.trim() ?? "";
   if (!period) {
@@ -24,4 +26,5 @@ export async function runRevenueShare(formData: FormData) {
   });
 
   revalidatePath("/admin/revenue-shares");
+  return { period, count: results.length };
 }
