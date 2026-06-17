@@ -7,9 +7,12 @@ import { computeRevenueSharesForPeriod } from "@/lib/revenueShare";
 
 export async function runRevenueShare(formData: FormData) {
   const admin = await requireAdmin("MANAGER");
-  const period = (formData.get("period") as string)?.trim();
-  if (!/^\d{4}-\d{2}$/.test(period)) {
-    throw new Error("期間は YYYY-MM 形式で入力してください");
+  const period = (formData.get("period") as string | null)?.trim() ?? "";
+  if (!period) {
+    throw new Error("対象期間を入力してください（例: 2026-06）");
+  }
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) {
+    throw new Error("対象期間は YYYY-MM 形式で入力してください（例: 2026-06）");
   }
 
   const results = await computeRevenueSharesForPeriod(period);
