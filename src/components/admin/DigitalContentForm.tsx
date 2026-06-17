@@ -9,24 +9,43 @@ import { FileUploader } from "@/components/ui/FileUploader";
 import { Input, Select, Textarea } from "@/components/ui/Input";
 import { useToast } from "@/components/ui/Toast";
 
+export type DigitalContentInitial = {
+  id: string;
+  productId: string | null;
+  title: string;
+  description: string | null;
+  type: "IMAGE" | "VIDEO" | "AUDIO" | "FILE";
+  deliveryType: "SHARED" | "PERSONALIZED";
+  fileKey: string | null;
+  baseImageKey: string | null;
+  baseImageUrl: string | null;
+  viewLimitDays: number | null;
+  downloadLimit: number | null;
+};
+
 export function DigitalContentForm({
   products,
+  initial,
 }: {
   products: { id: string; name: string }[];
+  initial?: DigitalContentInitial;
 }) {
   const router = useRouter();
   const { show } = useToast();
+  const isEdit = !!initial;
   const [form, setForm] = useState({
-    productId: "",
-    title: "",
-    description: "",
-    type: "IMAGE" as "IMAGE" | "VIDEO" | "AUDIO" | "FILE",
-    deliveryType: "SHARED" as "SHARED" | "PERSONALIZED",
-    fileKey: "",
-    baseImageKey: "",
-    baseImageUrl: "",
-    viewLimitDays: "",
-    downloadLimit: "",
+    productId: initial?.productId ?? "",
+    title: initial?.title ?? "",
+    description: initial?.description ?? "",
+    type: (initial?.type ?? "IMAGE") as "IMAGE" | "VIDEO" | "AUDIO" | "FILE",
+    deliveryType: (initial?.deliveryType ?? "SHARED") as "SHARED" | "PERSONALIZED",
+    fileKey: initial?.fileKey ?? "",
+    baseImageKey: initial?.baseImageKey ?? "",
+    baseImageUrl: initial?.baseImageUrl ?? "",
+    viewLimitDays:
+      initial?.viewLimitDays != null ? String(initial.viewLimitDays) : "",
+    downloadLimit:
+      initial?.downloadLimit != null ? String(initial.downloadLimit) : "",
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,8 +69,11 @@ export function DigitalContentForm({
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch("/api/admin/digital-contents", {
-        method: "POST",
+      const url = isEdit
+        ? `/api/admin/digital-contents/${initial!.id}`
+        : "/api/admin/digital-contents";
+      const res = await fetch(url, {
+        method: isEdit ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           productId: form.productId || null,
@@ -68,7 +90,7 @@ export function DigitalContentForm({
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json?.error?.message ?? "保存に失敗しました");
-      show("登録しました");
+      show(isEdit ? "更新しました" : "登録しました");
       router.push("/admin/digital-contents");
       router.refresh();
     } catch (err) {
@@ -81,7 +103,7 @@ export function DigitalContentForm({
     <form onSubmit={submit} className="space-y-6">
       {error && <Alert tone="error">{error}</Alert>}
       <Card>
-        <CardHeader title="デジタルコンテンツ登録" />
+        <CardHeader title={isEdit ? "デジタルコンテンツ編集" : "デジタルコンテンツ登録"} />
         <CardBody className="space-y-4">
           <Input
             label="タイトル"
@@ -215,7 +237,7 @@ export function DigitalContentForm({
           キャンセル
         </Button>
         <Button type="submit" disabled={saving}>
-          {saving ? "保存中…" : "登録する"}
+          {saving ? "保存中…" : isEdit ? "更新する" : "登録する"}
         </Button>
       </div>
     </form>

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody } from "@/components/ui/Card";
@@ -28,7 +29,18 @@ export default async function AdminDigitalContentsPage() {
 
   type Row = (typeof contents)[number];
   const columns: Column<Row>[] = [
-    { key: "title", header: "タイトル", cell: (c) => c.title },
+    {
+      key: "title",
+      header: "タイトル",
+      cell: (c) => (
+        <Link
+          href={`/admin/digital-contents/${c.id}`}
+          className="font-medium text-brand-600 hover:underline"
+        >
+          {c.title}
+        </Link>
+      ),
+    },
     {
       key: "type",
       header: "種別",
