@@ -94,13 +94,13 @@ export function UserHeader() {
         <div className="flex items-center gap-1 text-sm sm:gap-3">
           <Link
             href="/cart"
-            className="relative rounded-lg px-3 py-2 text-gray-700 hover:bg-gray-100"
+            className="relative inline-flex h-11 w-11 items-center justify-center rounded-lg text-gray-700 hover:bg-gray-100"
             aria-label="カート"
           >
-            🛒
+            <CartIcon />
             {cartCount > 0 && (
-              <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-brand-600 px-1 text-xs font-bold text-white">
-                {cartCount}
+              <span className="absolute right-0 top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-brand-600 px-1 text-[11px] font-bold leading-none text-white shadow">
+                {cartCount > 99 ? "99+" : cartCount}
               </span>
             )}
           </Link>
@@ -250,6 +250,25 @@ function HamburgerIcon() {
       <line x1="3" y1="6" x2="21" y2="6" />
       <line x1="3" y1="12" x2="21" y2="12" />
       <line x1="3" y1="18" x2="21" y2="18" />
+    </svg>
+  );
+}
+
+function CartIcon() {
+  return (
+    <svg
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M3 3h2l2.4 12.2a2 2 0 0 0 2 1.6h8.2a2 2 0 0 0 2-1.5L21 8H6" />
+      <circle cx="10" cy="20" r="1.4" />
+      <circle cx="17" cy="20" r="1.4" />
     </svg>
   );
 }

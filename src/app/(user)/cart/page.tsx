@@ -218,10 +218,10 @@ export default function CartPage() {
                     </button>
                   </div>
                 )}
-                <div className="flex gap-4">
+                <div className="flex gap-3 sm:gap-4">
                   <Link
                     href={`/products/${item.productId}`}
-                    className="h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-gray-50"
+                    className="h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-gray-50 sm:h-24 sm:w-24"
                   >
                     {item.imageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -237,17 +237,20 @@ export default function CartPage() {
                     )}
                   </Link>
 
-                  <div className="flex flex-1 flex-col">
+                  <div className="flex min-w-0 flex-1 flex-col gap-3">
                     <div className="flex items-start justify-between gap-2">
-                      <div>
+                      <div className="min-w-0">
                         <Link
                           href={`/products/${item.productId}`}
-                          className="font-semibold text-gray-900 hover:text-brand-600"
+                          className="block break-words font-semibold text-gray-900 hover:text-brand-600"
                         >
                           {item.productName}
                         </Link>
                         <p className="text-xs text-gray-500">
                           {item.variantName}
+                        </p>
+                        <p className="mt-1 text-sm font-bold text-gray-900 sm:hidden">
+                          {formatYen(item.lineTotal)}
                         </p>
                       </div>
                       {!item.purchasable && (
@@ -257,8 +260,11 @@ export default function CartPage() {
                       )}
                     </div>
 
-                    <div className="mt-auto flex items-end justify-between">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
                       <div className="flex items-center gap-2">
+                        <label className="text-xs font-medium text-gray-500">
+                          数量
+                        </label>
                         <select
                           value={item.quantity}
                           disabled={busyId === item.id}
@@ -267,7 +273,7 @@ export default function CartPage() {
                               quantity: Number(e.target.value),
                             })
                           }
-                          className="rounded-lg border border-gray-300 px-2 py-1 text-sm"
+                          className="h-10 rounded-lg border border-gray-300 px-3 text-base focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200 sm:h-9 sm:text-sm"
                         >
                           {Array.from(
                             {
@@ -285,14 +291,17 @@ export default function CartPage() {
                           ))}
                         </select>
                         <button
+                          type="button"
                           onClick={() => removeItem(item.id)}
                           disabled={busyId === item.id}
-                          className="text-xs text-gray-400 hover:text-red-600"
+                          className="inline-flex h-10 items-center gap-1 rounded-lg border border-gray-200 px-3 text-sm font-medium text-gray-600 hover:border-red-300 hover:bg-red-50 hover:text-red-600 disabled:opacity-50 sm:h-9"
+                          aria-label="この商品をカートから削除"
                         >
+                          <TrashIcon />
                           削除
                         </button>
                       </div>
-                      <p className="font-bold text-gray-900">
+                      <p className="hidden font-bold text-gray-900 sm:block">
                         {formatYen(item.lineTotal)}
                       </p>
                     </div>
@@ -322,23 +331,26 @@ export default function CartPage() {
                     </p>
                     <div className="space-y-2">
                       {ds.map((d, idx) => (
-                        <div key={idx} className="flex items-center gap-2">
+                        <div
+                          key={idx}
+                          className="flex flex-wrap items-center gap-2"
+                        >
                           {item.quantity >= 2 && (
-                            <span className="w-12 shrink-0 text-xs font-medium text-gray-500">
+                            <span className="w-full shrink-0 text-xs font-medium text-gray-500 sm:w-12">
                               {idx + 1}個目
                             </span>
                           )}
                           <input
                             type="text"
                             maxLength={10}
-                            placeholder="ニックネーム（10文字以内）"
+                            placeholder="ニックネーム"
                             value={d.nickname}
                             disabled={busyId === item.id}
                             onChange={(e) =>
                               setDraft(item.id, idx, { nickname: e.target.value })
                             }
                             onBlur={() => saveNicknames(item)}
-                            className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+                            className="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-2 text-base focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200 sm:text-sm"
                           />
                           <input
                             type="text"
@@ -352,7 +364,7 @@ export default function CartPage() {
                               })
                             }
                             onBlur={() => saveNicknames(item)}
-                            className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+                            className="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-2 text-base focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200 sm:text-sm"
                           />
                         </div>
                       ))}
@@ -401,5 +413,27 @@ export default function CartPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M3 6h18" />
+      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+      <line x1="10" y1="11" x2="10" y2="17" />
+      <line x1="14" y1="11" x2="14" y2="17" />
+    </svg>
   );
 }
