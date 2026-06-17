@@ -18,6 +18,8 @@ export type ProductCardData = {
   benefit: string | null;
   deliveryDate: Date | string | null;
   sale: SaleWindowInput;
+  /** 抽選販売（lotteryOnly=true or 商品単位の抽選あり） */
+  isLottery?: boolean;
 };
 
 export function ProductCard({ product }: { product: ProductCardData }) {
@@ -39,6 +41,7 @@ export function ProductCard({ product }: { product: ProductCardData }) {
           <Badge color={SALE_STATUS_COLOR[status]}>
             {SALE_STATUS_LABEL[status]}
           </Badge>
+          {product.isLottery && <Badge color="pink">抽選販売</Badge>}
           {product.type === "DIGITAL" && <Badge color="purple">デジタル</Badge>}
         </div>
       </div>

@@ -35,6 +35,20 @@ export default async function HomePage() {
   ]);
   const events = [...onSale, ...upcoming].slice(0, 6);
 
+  // トップに出す商品のうち、抽選販売のものを判定するためのproductIds集合
+  const productLotteries = await prisma.lottery.findMany({
+    where: {
+      productId: { in: products.map((p) => p.id) },
+      status: { in: ["OPEN", "CLOSED", "DRAWN"] },
+    },
+    select: { productId: true },
+  });
+  const lotteryProductIds = new Set(
+    productLotteries
+      .map((l) => l.productId)
+      .filter((id): id is string => !!id),
+  );
+
   const eventCards: EventCardData[] = events.map((e) => ({
     id: e.id,
     title: e.title,
@@ -145,6 +159,8 @@ export default async function HomePage() {
                 );
                 const saleStartAt = p.saleStartAt ?? p.event.saleStartAt;
                 const saleEndAt = p.saleEndAt ?? p.event.saleEndAt;
+                const isLottery =
+                  p.lotteryOnly || lotteryProductIds.has(p.id);
                 return (
                   <ProductCard
                     key={p.id}
@@ -162,6 +178,7 @@ export default async function HomePage() {
                         saleEndAt,
                         available,
                       },
+                      isLottery,
                     }}
                   />
                 );
