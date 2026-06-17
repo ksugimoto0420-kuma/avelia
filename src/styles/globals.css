@@ -35,6 +35,17 @@ body {
   box-sizing: border-box;
 }
 
+/* 日本語の縦割れ抑止：ラベル・短い見出し要素は途中で改行しない。
+   どうしても収まらない時は単語境界（句読点や括弧）で折り返す。 */
+label,
+dt,
+th,
+button,
+.no-break {
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
 /* スクロールバー控えめに */
 ::-webkit-scrollbar {
   width: 10px;

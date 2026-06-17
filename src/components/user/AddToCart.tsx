@@ -104,12 +104,14 @@ export function AddToCart({
         </Select>
       )}
 
-      <div className="flex items-center gap-3">
-        <label className="text-sm font-medium text-gray-700">数量</label>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <label className="shrink-0 whitespace-nowrap text-sm font-medium text-gray-700">
+          数量
+        </label>
         <Select
           value={quantity}
           onChange={(e) => setQuantity(Number(e.target.value))}
-          className="w-24"
+          className="w-24 shrink-0"
         >
           {Array.from({ length: Math.max(1, Math.min(maxQty, 20)) }, (_, i) => (
             <option key={i + 1} value={i + 1}>
@@ -117,7 +119,7 @@ export function AddToCart({
             </option>
           ))}
         </Select>
-        <span className="text-xs text-gray-400">
+        <span className="whitespace-nowrap text-xs text-gray-400">
           （在庫 {selected?.available ?? 0}）
         </span>
       </div>
@@ -130,9 +132,9 @@ export function AddToCart({
             <br />
             ここで入力するか、カートページで商品ごとに入力できます。
           </p>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Input
-              label="ニックネーム（10文字以内・任意）"
+              label="ニックネーム（任意・10文字以内）"
               maxLength={10}
               value={nickname}
               onChange={(e) => setNickname(e.target.value)}

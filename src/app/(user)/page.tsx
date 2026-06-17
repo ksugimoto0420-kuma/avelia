@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { EventCard, type EventCardData } from "@/components/user/EventCard";
 import { ProductCard } from "@/components/user/ProductCard";
+import { getOptionalUser } from "@/lib/auth/guards";
 import { availableStock } from "@/lib/inventory";
 import { prisma } from "@/lib/prisma";
 import { eventStageOrderBy, eventStageWhere } from "@/lib/sale";
@@ -9,6 +10,7 @@ export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   const now = new Date();
+  const currentUser = await getOptionalUser();
 
   // 「販売中（終了が近い順）→ 販売予定（開始が近い順）→ 終了」の順で
   // 合計6件取る。各ステージから最大6件ずつ取って必要なだけ連結。
@@ -104,12 +106,14 @@ export default async function HomePage() {
             >
               特典会・サイン会を見る
             </Link>
-            <Link
-              href="/auth/register"
-              className="inline-flex h-12 items-center rounded-lg border-2 border-white bg-white/10 px-6 text-base font-medium text-white backdrop-blur hover:bg-white hover:text-brand-600"
-            >
-              新規登録
-            </Link>
+            {!currentUser && (
+              <Link
+                href="/auth/register"
+                className="inline-flex h-12 items-center rounded-lg border-2 border-white bg-white/10 px-6 text-base font-medium text-white backdrop-blur hover:bg-white hover:text-brand-600"
+              >
+                新規登録
+              </Link>
+            )}
           </div>
         </div>
       </section>
