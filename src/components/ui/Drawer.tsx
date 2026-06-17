@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 
 /**
  * 画面端からスライドインするドロワー。モバイルナビゲーション等に利用。
+ * sticky/backdrop-blur など stacking context を作る親の中にあっても前面に
+ * 出せるよう、body 直下に Portal でレンダリングする。
  */
 export function Drawer({
   open,
@@ -21,6 +24,12 @@ export function Drawer({
   children: React.ReactNode;
   widthClassName?: string;
 }) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -34,13 +43,15 @@ export function Drawer({
     };
   }, [open, onClose]);
 
-  return (
+  if (!mounted) return null;
+
+  const content = (
     <div
       className={cn(
-        "fixed inset-0 z-50",
+        "fixed inset-0 z-[100]",
         open ? "pointer-events-auto" : "pointer-events-none",
       )}
-      aria-hidden={!open}
+      aria-hidden={open ? undefined : true}
     >
       <div
         className={cn(
@@ -78,4 +89,6 @@ export function Drawer({
       </aside>
     </div>
   );
+
+  return createPortal(content, document.body);
 }
