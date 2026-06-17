@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Drawer } from "@/components/ui/Drawer";
 
 const NAV_LINKS: { href: string; label: string }[] = [
@@ -19,7 +19,7 @@ export function UserHeader() {
   const [cartCount, setCartCount] = useState(0);
   const [open, setOpen] = useState(false);
 
-  useEffect(() => {
+  const refreshCart = useCallback(() => {
     if (session?.user?.kind !== "user") {
       setCartCount(0);
       return;
@@ -36,6 +36,23 @@ export function UserHeader() {
       })
       .catch(() => {});
   }, [session]);
+
+  useEffect(() => {
+    refreshCart();
+  }, [refreshCart]);
+
+  // 他コンポーネントからの「カート更新通知」を受け取って再取得
+  useEffect(() => {
+    const onUpdated = () => refreshCart();
+    window.addEventListener("cart:updated", onUpdated);
+    // 別タブでカートが更新された時にも反映（戻ってきた時の整合性）
+    const onFocus = () => refreshCart();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      window.removeEventListener("cart:updated", onUpdated);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [refreshCart]);
 
   // ページ遷移したらドロワーを閉じる
   useEffect(() => {

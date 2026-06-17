@@ -94,6 +94,7 @@ export default function CartPage() {
       if (!res.ok) throw new Error(json?.error?.message);
       setCart(json.data);
       syncDrafts(json.data);
+      window.dispatchEvent(new Event("cart:updated"));
       return true;
     } catch (err) {
       show(err instanceof Error ? err.message : "更新失敗", "error");
@@ -137,6 +138,7 @@ export default function CartPage() {
       if (!res.ok) throw new Error(json?.error?.message);
       setCart(json.data);
       syncDrafts(json.data);
+      window.dispatchEvent(new Event("cart:updated"));
       show("削除しました");
     } catch (err) {
       show(err instanceof Error ? err.message : "削除失敗", "error");

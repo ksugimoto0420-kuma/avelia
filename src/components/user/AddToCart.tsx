@@ -71,6 +71,8 @@ export function AddToCart({
       show("カートに追加しました");
       setNickname("");
       setNicknameKana("");
+      // ヘッダーのカート件数バッジを即時更新する
+      window.dispatchEvent(new Event("cart:updated"));
       router.refresh();
     } catch (err) {
       show(err instanceof Error ? err.message : "エラー", "error");
