@@ -27,6 +27,15 @@ enum ProductType {
   DIGITAL // デジタルコンテンツ
 }
 
+// 物販の発送元区分。CSV 出力時にどちらに含めるかを分けるために利用する。
+// IN_HOUSE  : 手元出荷（ポストカード等、社内で印字して発送）
+// WAREHOUSE : 倉庫出荷（写真集等、新潟倉庫から佐川急便で発送）
+// DIGITAL タイプの商品は無視する（NULL のままで構わない）。
+enum FulfillmentSource {
+  IN_HOUSE
+  WAREHOUSE
+}
+
 enum DigitalDeliveryType {
   SHARED // 共通即DL（購入時に全員へ同一ファイルを付与）
   PERSONALIZED // 個別サイン納品（決済後に購入者ごとのサイン画像を制作・納品）
@@ -211,6 +220,8 @@ model Product {
   name         String
   description  String?
   type         ProductType @default(PHYSICAL)
+  // 物販の発送元（type=PHYSICAL 時のみ参照）。デフォルトは IN_HOUSE。
+  fulfillmentSource FulfillmentSource @default(IN_HOUSE)
   basePrice    Int // 表示用基準価格（円）。実価格は variant.price
   imageUrl     String?
   // 特典会向け項目

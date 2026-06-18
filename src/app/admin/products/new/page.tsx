@@ -23,6 +23,7 @@ export default async function NewProductPage({
     name: "",
     description: "",
     type: "PHYSICAL",
+    fulfillmentSource: "IN_HOUSE",
     basePrice: 0,
     imageUrl: "",
     benefit: "",

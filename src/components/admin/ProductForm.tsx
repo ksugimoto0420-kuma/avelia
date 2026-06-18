@@ -25,6 +25,7 @@ export type ProductFormData = {
   name: string;
   description: string;
   type: "PHYSICAL" | "DIGITAL";
+  fulfillmentSource: "IN_HOUSE" | "WAREHOUSE";
   basePrice: number;
   imageUrl: string;
   benefit: string;
@@ -104,6 +105,7 @@ export function ProductForm({
           : null,
         notes: form.notes || null,
         nicknameNote: form.nicknameNote || null,
+        fulfillmentSource: form.fulfillmentSource,
         isPublished: form.isPublished,
         saleStartAt: form.saleStartAt
           ? new Date(form.saleStartAt).toISOString()
@@ -189,6 +191,22 @@ export function ProductForm({
               onChange={(e) => set("basePrice", Number(e.target.value))}
             />
           </div>
+          {form.type === "PHYSICAL" && (
+            <Select
+              label="発送元（CSV出力時に振り分けられます）"
+              value={form.fulfillmentSource}
+              onChange={(e) =>
+                set(
+                  "fulfillmentSource",
+                  e.target.value as "IN_HOUSE" | "WAREHOUSE",
+                )
+              }
+              hint="手元出荷=ポストカード等、社内で印字して発送。倉庫出荷=新潟倉庫から佐川急便で発送（写真集等）"
+            >
+              <option value="IN_HOUSE">手元出荷</option>
+              <option value="WAREHOUSE">倉庫出荷（新潟・佐川）</option>
+            </Select>
+          )}
           <Input
             label="商品画像URL"
             value={form.imageUrl}

@@ -51,6 +51,7 @@ export default async function EditProductPage({
     name: product.name,
     description: product.description ?? "",
     type: product.type,
+    fulfillmentSource: product.fulfillmentSource,
     basePrice: product.basePrice,
     imageUrl: product.imageUrl ?? "",
     benefit: product.benefit ?? "",

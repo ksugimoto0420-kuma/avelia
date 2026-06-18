@@ -26,6 +26,7 @@ export async function PATCH(
           name: input.name,
           description: input.description ?? null,
           type: input.type,
+          fulfillmentSource: input.fulfillmentSource ?? "IN_HOUSE",
           basePrice: input.basePrice,
           imageUrl: input.imageUrl ?? null,
           benefit: input.benefit ?? null,

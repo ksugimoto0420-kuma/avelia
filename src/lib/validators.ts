@@ -87,6 +87,7 @@ export const productInputSchema = z.object({
   name: z.string().min(1),
   description: z.string().optional().nullable(),
   type: z.enum(["PHYSICAL", "DIGITAL"]),
+  fulfillmentSource: z.enum(["IN_HOUSE", "WAREHOUSE"]).optional(),
   basePrice: z.number().int().min(0),
   imageUrl: z.string().optional().nullable(),
   benefit: z.string().optional().nullable(),

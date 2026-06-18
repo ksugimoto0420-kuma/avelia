@@ -3,7 +3,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Badge } from "@/components/ui/Badge";
 import { MediaImage } from "@/components/ui/MediaImage";
-import { ProductCard } from "@/components/user/ProductCard";
+import {
+  EventProductGrid,
+  type EventProductRow,
+} from "@/components/user/EventProductGrid";
 import { getOptionalUser } from "@/lib/auth/guards";
 import {
   EVENT_TYPE_COLOR,
@@ -306,44 +309,41 @@ export default async function EventDetailPage({
           販売中の商品はまだありません
         </p>
       ) : (
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-          {(() => {
-            // 商品単位の抽選対象 productId 集合
-            const lotteryProductIds = new Set(
-              event.lotteries
-                .map((l) => l.productId)
-                .filter((id): id is string => !!id),
+        (() => {
+          // 商品単位の抽選対象 productId 集合
+          const lotteryProductIds = new Set(
+            event.lotteries
+              .map((l) => l.productId)
+              .filter((id): id is string => !!id),
+          );
+          const rows: EventProductRow[] = event.products.map((p) => {
+            const available = p.variants.reduce(
+              (s, v) => s + (v.inventory ? availableStock(v.inventory) : 0),
+              0,
             );
-            return event.products.map((p) => {
-              const available = p.variants.reduce(
-                (s, v) => s + (v.inventory ? availableStock(v.inventory) : 0),
-                0,
-              );
-              const isLottery = p.lotteryOnly || lotteryProductIds.has(p.id);
-              return (
-                <ProductCard
-                  key={p.id}
-                  product={{
-                    id: p.id,
-                    name: p.name,
-                    imageUrl: p.imageUrl,
-                    basePrice: p.basePrice,
-                    type: p.type,
-                    benefit: p.benefit,
-                    deliveryDate: p.deliveryDate,
-                    sale: {
-                      isPublished: p.isPublished && event.isPublished,
-                      saleStartAt: p.saleStartAt ?? event.saleStartAt,
-                      saleEndAt: p.saleEndAt ?? event.saleEndAt,
-                      available,
-                    },
-                    isLottery,
-                  }}
-                />
-              );
-            });
-          })()}
-        </div>
+            const isLottery = p.lotteryOnly || lotteryProductIds.has(p.id);
+            return {
+              card: {
+                id: p.id,
+                name: p.name,
+                imageUrl: p.imageUrl,
+                basePrice: p.basePrice,
+                type: p.type,
+                benefit: p.benefit,
+                deliveryDate: p.deliveryDate,
+                sale: {
+                  isPublished: p.isPublished && event.isPublished,
+                  saleStartAt: p.saleStartAt ?? event.saleStartAt,
+                  saleEndAt: p.saleEndAt ?? event.saleEndAt,
+                  available,
+                },
+                isLottery,
+              },
+              variantNames: p.variants.map((v) => v.name),
+            };
+          });
+          return <EventProductGrid products={rows} />;
+        })()
       )}
 
       {event.notes && (

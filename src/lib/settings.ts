@@ -6,13 +6,25 @@ export type SettingKey =
   | "shippingFlatRate" // 全国一律送料（円）。0以上の整数。
   | "shippingFreeThreshold" // この金額以上で送料無料（円）。0で「無料閾値なし」。
   | "supportEmail" // サポート連絡先（特商法ページ等で利用）
-  | "siteName"; // サイト表示名（将来用）
+  | "siteName" // サイト表示名
+  | "paymentFeeRate" // 決済手数料率（小数。例: 0.029 = 2.9%）。SoftBank/Stripe等。
+  | "rsTier1Threshold" // R/S 階段制 第1閾値（円）。月次グロス売上のしきい値。
+  | "rsTier1Rate" // 第1階段の弊社取り分率（小数。例: 0.03）
+  | "rsTier2Threshold" // 第2閾値（円）。これ以上は Tier3 レートに切り替わる
+  | "rsTier2Rate" // 第2階段の弊社取り分率
+  | "rsTier3Rate"; // 第3階段の弊社取り分率
 
 const DEFAULTS: Record<SettingKey, string> = {
   shippingFlatRate: "500",
   shippingFreeThreshold: "5000",
   supportEmail: "support@example.com",
   siteName: "Avelia FunClub",
+  paymentFeeRate: "0.029",
+  rsTier1Threshold: "1000000",
+  rsTier1Rate: "0.03",
+  rsTier2Threshold: "5000000",
+  rsTier2Rate: "0.05",
+  rsTier3Rate: "0.1",
 };
 
 export async function getSetting(key: SettingKey): Promise<string> {
@@ -24,6 +36,12 @@ export async function getSettingInt(key: SettingKey): Promise<number> {
   const v = await getSetting(key);
   const n = Number(v);
   return Number.isFinite(n) ? Math.trunc(n) : Number(DEFAULTS[key]);
+}
+
+export async function getSettingFloat(key: SettingKey): Promise<number> {
+  const v = await getSetting(key);
+  const n = Number(v);
+  return Number.isFinite(n) ? n : Number(DEFAULTS[key]);
 }
 
 export async function getAllSettings(): Promise<Record<SettingKey, string>> {

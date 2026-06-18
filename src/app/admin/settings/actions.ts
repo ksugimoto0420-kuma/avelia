@@ -6,19 +6,39 @@ import { logOperation } from "@/lib/operation-log";
 import { prisma } from "@/lib/prisma";
 import { setSetting, type SettingKey } from "@/lib/settings";
 
-const NUMBER_KEYS: SettingKey[] = ["shippingFlatRate", "shippingFreeThreshold"];
+const INTEGER_KEYS: SettingKey[] = [
+  "shippingFlatRate",
+  "shippingFreeThreshold",
+  "rsTier1Threshold",
+  "rsTier2Threshold",
+];
+const RATE_KEYS: SettingKey[] = [
+  "paymentFeeRate",
+  "rsTier1Rate",
+  "rsTier2Rate",
+  "rsTier3Rate",
+];
 const STRING_KEYS: SettingKey[] = ["supportEmail", "siteName"];
 
 export async function saveSettings(formData: FormData) {
   const admin = await requireAdmin("MANAGER");
 
   const changes: Record<string, string> = {};
-  for (const k of NUMBER_KEYS) {
+  for (const k of INTEGER_KEYS) {
     const raw = (formData.get(k) as string | null)?.trim() ?? "";
     if (raw === "") continue;
     const n = Number(raw);
     if (!Number.isFinite(n) || n < 0 || !Number.isInteger(n)) {
       throw new Error(`${k} は0以上の整数で入力してください`);
+    }
+    changes[k] = String(n);
+  }
+  for (const k of RATE_KEYS) {
+    const raw = (formData.get(k) as string | null)?.trim() ?? "";
+    if (raw === "") continue;
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n < 0 || n > 1) {
+      throw new Error(`${k} は 0〜1 の小数で入力してください（例: 0.029）`);
     }
     changes[k] = String(n);
   }
