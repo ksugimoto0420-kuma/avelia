@@ -82,6 +82,15 @@ export function toJstDateTimeLocalString(date: Date | null | undefined): string 
   return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}`;
 }
 
+/** JST 基準の現在年月を "YYYY-MM" 形式で返す（R/S 集計やフィルタのデフォルト用） */
+export function currentJstPeriod(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+  }).format(new Date());
+}
+
 /** ランダムな注文番号を生成（年月 + ランダム英数字） */
 export function generateOrderNumber(now: Date = new Date()): string {
   const y = now.getFullYear();

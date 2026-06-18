@@ -1,18 +1,13 @@
 import type { Prisma } from "@prisma/client";
 import Link from "next/link";
-import {
-  FilterBar,
-  FilterField,
-  FilterSelect,
-  FilterText,
-} from "@/components/admin/Filters";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Column, DataTable } from "@/components/ui/DataTable";
 import { Pagination } from "@/components/ui/Pagination";
 import { requireAdminPage } from "@/lib/auth/admin-page";
 import { prisma } from "@/lib/prisma";
-import { formatDateTime, formatYen } from "@/lib/utils";
+import { currentJstPeriod, formatDateTime, formatYen } from "@/lib/utils";
+import { PaymentsFilterControls } from "./PaymentsFilterControls";
 
 export const dynamic = "force-dynamic";
 
@@ -28,8 +23,10 @@ export default async function AdminPaymentsPage({
   const q = sp.q?.trim() ?? "";
   const status = sp.status ?? "";
   const provider = sp.provider ?? "";
-  // 支払い年月 (YYYY-MM)。paidAt で絞る。
-  const month = sp.month ?? "";
+  // 支払い年月: "YYYY-MM" / "all" / 未指定 のいずれか。paidAt で絞る。
+  const rawMonth = sp.month ?? "";
+  const month = rawMonth === "all" ? "" : rawMonth;
+  const defaultMonth = currentJstPeriod();
   const page = Math.max(1, Number(sp.page ?? "1"));
 
   const where: Prisma.PaymentWhereInput = {};
@@ -66,7 +63,7 @@ export default async function AdminPaymentsPage({
 
   const qs = (overrides: Record<string, string>) => {
     const p = new URLSearchParams();
-    const merged = { q, status, provider, month, ...overrides };
+    const merged = { q, status, provider, month: rawMonth, ...overrides };
     for (const [k, v] of Object.entries(merged)) if (v) p.set(k, v);
     const s = p.toString();
     return s ? `/admin/payments?${s}` : "/admin/payments";
@@ -124,54 +121,13 @@ export default async function AdminPaymentsPage({
         </p>
       </div>
 
-      <FilterBar action="/admin/payments" clearHref="/admin/payments">
-        <FilterField label="キーワード">
-          <FilterText
-            name="q"
-            defaultValue={q}
-            placeholder="注文番号・メール・外部決済ID"
-          />
-        </FilterField>
-        <FilterField label="状態">
-          <FilterSelect
-            name="status"
-            defaultValue={status}
-            className="w-36"
-            options={[
-              { value: "", label: "すべて" },
-              { value: "PENDING", label: "未決済" },
-              { value: "AUTHORIZED", label: "与信済" },
-              { value: "PAID", label: "決済完了" },
-              { value: "FAILED", label: "失敗" },
-              { value: "CANCELLED", label: "キャンセル" },
-              { value: "REFUNDED", label: "返金済" },
-            ]}
-          />
-        </FilterField>
-        <FilterField label="プロバイダ">
-          <FilterSelect
-            name="provider"
-            defaultValue={provider}
-            className="w-32"
-            options={[
-              { value: "", label: "すべて" },
-              { value: "STRIPE", label: "Stripe" },
-              { value: "PAYJP", label: "Pay.JP" },
-            ]}
-          />
-        </FilterField>
-        <FilterField label="支払年月">
-          <input
-            type="month"
-            name="month"
-            defaultValue={month}
-            placeholder="例: 2026-06"
-            pattern="\d{4}-(0[1-9]|1[0-2])"
-            title="YYYY-MM 形式（例: 2026-06）"
-            className="h-9 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-800 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
-          />
-        </FilterField>
-      </FilterBar>
+      <PaymentsFilterControls
+        defaultMonth={defaultMonth}
+        currentMonth={rawMonth}
+        currentStatus={status}
+        currentProvider={provider}
+        currentQ={q}
+      />
 
       <Card>
         <CardBody className="space-y-4">

@@ -4,10 +4,15 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Column, DataTable } from "@/components/ui/DataTable";
 import { Pagination } from "@/components/ui/Pagination";
-import { cn } from "@/lib/utils";
 import { requireAdminPage } from "@/lib/auth/admin-page";
 import { prisma } from "@/lib/prisma";
-import { formatDateTime, formatYen } from "@/lib/utils";
+import {
+  cn,
+  currentJstPeriod,
+  formatDateTime,
+  formatYen,
+} from "@/lib/utils";
+import { OrdersFilterControls } from "./OrdersFilterControls";
 
 export const dynamic = "force-dynamic";
 
@@ -36,8 +41,11 @@ export default async function AdminOrdersPage({
   const sp = await searchParams;
   const status = sp.status ?? "";
   const q = sp.q ?? "";
-  // 年月絞り込み: "YYYY-MM" 形式。空欄なら絞らない。
-  const month = sp.month ?? "";
+  // 注文年月: "YYYY-MM" 形式。"all" や空欄なら絞り込まない。
+  // URL に month が無い場合（初回訪問）は JS 側で現在年月を埋めて遷移する。
+  const rawMonth = sp.month ?? "";
+  const month = rawMonth === "all" ? "" : rawMonth;
+  const defaultMonth = currentJstPeriod();
   const page = Math.max(1, Number(sp.page ?? "1"));
 
   const where: Record<string, unknown> = {};
@@ -150,36 +158,11 @@ export default async function AdminOrdersPage({
                 {STATUS_LABEL[s]}
               </Link>
             ))}
-            <form
-              className="ml-auto flex flex-wrap items-center gap-2"
-              action="/admin/orders"
-              method="get"
-            >
-              {status && <input type="hidden" name="status" value={status} />}
-              <label
-                htmlFor="orders-month"
-                className="text-xs font-medium text-gray-600"
-              >
-                注文年月
-              </label>
-              <input
-                id="orders-month"
-                type="month"
-                name="month"
-                defaultValue={month}
-                placeholder="例: 2026-06"
-                pattern="\d{4}-(0[1-9]|1[0-2])"
-                title="YYYY-MM 形式（例: 2026-06）"
-                className="h-9 rounded-lg border border-gray-300 px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
-              />
-              <input
-                type="search"
-                name="q"
-                defaultValue={q}
-                placeholder="注文番号・メール検索"
-                className="w-56 rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
-              />
-            </form>
+            <OrdersFilterControls
+              defaultMonth={defaultMonth}
+              currentMonth={rawMonth}
+              currentQ={q}
+            />
           </div>
 
           <DataTable columns={columns} rows={orders} emptyMessage="注文がありません" />

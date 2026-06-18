@@ -3,17 +3,9 @@ import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Column, DataTable } from "@/components/ui/DataTable";
 import { requireAdminPage } from "@/lib/auth/admin-page";
 import { prisma } from "@/lib/prisma";
-import { formatYen } from "@/lib/utils";
+import { currentJstPeriod, formatYen } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
-
-function currentJstPeriod(): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Tokyo",
-    year: "numeric",
-    month: "2-digit",
-  }).format(new Date());
-}
 
 export default async function AdminRevenueSharesPage() {
   await requireAdminPage("MANAGER");
