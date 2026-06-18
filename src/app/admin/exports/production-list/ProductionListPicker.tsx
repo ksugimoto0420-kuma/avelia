@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
 
 export type EventWithMembers = {
   id: string;
@@ -70,19 +71,21 @@ export function ProductionListPicker({ events }: { events: EventWithMembers[] })
         >
           イベント
         </label>
-        <select
+        <SearchableSelect
           id="prod-event"
           value={eventId}
-          onChange={(e) => onEventChange(e.target.value)}
-          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
-        >
-          <option value="">すべてのイベント</option>
-          {events.map((e) => (
-            <option key={e.id} value={e.id}>
-              {e.artistName ? `${e.artistName} / ${e.title}` : e.title}
-            </option>
-          ))}
-        </select>
+          onChange={onEventChange}
+          allowEmpty
+          emptyLabel="すべてのイベント"
+          emptyValue=""
+          placeholder="イベントを選択"
+          searchPlaceholder="アーティスト名やイベント名で検索…"
+          options={events.map((e) => ({
+            value: e.id,
+            label: e.artistName ? `${e.artistName} / ${e.title}` : e.title,
+            hint: e.artistName ?? undefined,
+          }))}
+        />
       </div>
 
       {eventId && (
@@ -118,17 +121,23 @@ export function ProductionListPicker({ events }: { events: EventWithMembers[] })
             <div className="flex flex-wrap gap-2">
               {memberOptions.map((name) => {
                 const active = selectedMembers.has(name);
-                return (
+                return active ? (
                   <button
                     key={name}
                     type="button"
                     onClick={() => toggleMember(name)}
-                    aria-pressed={active ? "true" : "false"}
-                    className={
-                      active
-                        ? "rounded-full border-2 border-brand-600 bg-brand-600 px-3 py-1 text-xs font-semibold text-white"
-                        : "rounded-full border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:border-brand-400 hover:text-brand-600"
-                    }
+                    aria-pressed="true"
+                    className="rounded-full border-2 border-brand-600 bg-brand-600 px-3 py-1 text-xs font-semibold text-white"
+                  >
+                    {name}
+                  </button>
+                ) : (
+                  <button
+                    key={name}
+                    type="button"
+                    onClick={() => toggleMember(name)}
+                    aria-pressed="false"
+                    className="rounded-full border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:border-brand-400 hover:text-brand-600"
                   >
                     {name}
                   </button>

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { FileUploader } from "@/components/ui/FileUploader";
 import { Input, Select, Textarea } from "@/components/ui/Input";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { useToast } from "@/components/ui/Toast";
 
 export type DigitalContentInitial = {
@@ -111,20 +112,28 @@ export function DigitalContentForm({
             value={form.title}
             onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
           />
-          <Select
-            label="紐づける商品（購入者に自動付与）"
-            value={form.productId}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, productId: e.target.value }))
-            }
-          >
-            <option value="">（紐づけなし）</option>
-            {products.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </Select>
+          <div>
+            <label
+              htmlFor="dc-productId"
+              className="mb-1 block text-sm font-medium text-gray-700"
+            >
+              紐づける商品（購入者に自動付与）
+            </label>
+            <SearchableSelect
+              id="dc-productId"
+              value={form.productId}
+              onChange={(v) => setForm((f) => ({ ...f, productId: v }))}
+              allowEmpty
+              emptyLabel="（紐づけなし）"
+              emptyValue=""
+              placeholder="商品を選択"
+              searchPlaceholder="商品名で検索…"
+              options={products.map((p) => ({
+                value: p.id,
+                label: p.name,
+              }))}
+            />
+          </div>
           <div className="grid grid-cols-2 gap-4">
             <Select
               label="種別"

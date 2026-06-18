@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
+import { SearchableSelectField } from "@/components/ui/SearchableSelectField";
 import { saveLottery } from "@/app/admin/lotteries/actions";
 import { toJstDateTimeLocalString } from "@/lib/utils";
 
@@ -41,8 +42,11 @@ export function LotteryForm({
         <CardHeader title="基本情報" />
         <CardBody className="space-y-4">
           <div>
-            <label className={labelCls}>タイトル *</label>
+            <label htmlFor="lottery-title" className={labelCls}>
+              タイトル *
+            </label>
             <input
+              id="lottery-title"
               name="title"
               required
               defaultValue={initial?.title ?? ""}
@@ -51,8 +55,11 @@ export function LotteryForm({
             />
           </div>
           <div>
-            <label className={labelCls}>説明</label>
+            <label htmlFor="lottery-description" className={labelCls}>
+              説明
+            </label>
             <textarea
+              id="lottery-description"
               name="description"
               defaultValue={initial?.description ?? ""}
               className={`${inputCls} min-h-24`}
@@ -61,34 +68,39 @@ export function LotteryForm({
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className={labelCls}>対象イベント</label>
-              <select
+              <label htmlFor="lottery-eventId" className={labelCls}>
+                対象イベント
+              </label>
+              <SearchableSelectField
+                id="lottery-eventId"
                 name="eventId"
                 defaultValue={initial?.eventId ?? ""}
-                className={inputCls}
-              >
-                <option value="">（指定なし）</option>
-                {events.map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {e.label}
-                  </option>
-                ))}
-              </select>
+                allowEmpty
+                emptyLabel="（指定なし）"
+                emptyValue=""
+                placeholder="イベントを選択"
+                searchPlaceholder="アーティスト名やイベント名で検索…"
+                options={events.map((e) => ({ value: e.id, label: e.label }))}
+              />
             </div>
             <div>
-              <label className={labelCls}>当選者が購入できる商品</label>
-              <select
+              <label htmlFor="lottery-productId" className={labelCls}>
+                当選者が購入できる商品
+              </label>
+              <SearchableSelectField
+                id="lottery-productId"
                 name="productId"
                 defaultValue={initial?.productId ?? ""}
-                className={inputCls}
-              >
-                <option value="">（指定なし）</option>
-                {products.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.label}
-                  </option>
-                ))}
-              </select>
+                allowEmpty
+                emptyLabel="（指定なし）"
+                emptyValue=""
+                placeholder="商品を選択"
+                searchPlaceholder="イベント名や商品名で検索…"
+                options={products.map((p) => ({
+                  value: p.id,
+                  label: p.label,
+                }))}
+              />
             </div>
           </div>
         </CardBody>
@@ -99,8 +111,11 @@ export function LotteryForm({
         <CardBody className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className={labelCls}>応募開始日時 *</label>
+              <label htmlFor="lottery-entryStartAt" className={labelCls}>
+                応募開始日時 *
+              </label>
               <input
+                id="lottery-entryStartAt"
                 type="datetime-local"
                 name="entryStartAt"
                 required
@@ -109,8 +124,11 @@ export function LotteryForm({
               />
             </div>
             <div>
-              <label className={labelCls}>応募終了日時 *</label>
+              <label htmlFor="lottery-entryEndAt" className={labelCls}>
+                応募終了日時 *
+              </label>
               <input
+                id="lottery-entryEndAt"
                 type="datetime-local"
                 name="entryEndAt"
                 required
@@ -121,8 +139,11 @@ export function LotteryForm({
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className={labelCls}>当選者数（人）</label>
+              <label htmlFor="lottery-winnersCount" className={labelCls}>
+                当選者数(人)
+              </label>
               <input
+                id="lottery-winnersCount"
                 type="number"
                 name="winnersCount"
                 min={0}
@@ -131,8 +152,11 @@ export function LotteryForm({
               />
             </div>
             <div>
-              <label className={labelCls}>当選者の購入期限</label>
+              <label htmlFor="lottery-purchaseDeadlineAt" className={labelCls}>
+                当選者の購入期限
+              </label>
               <input
+                id="lottery-purchaseDeadlineAt"
                 type="datetime-local"
                 name="purchaseDeadlineAt"
                 defaultValue={dtLocal(initial?.purchaseDeadlineAt ?? null)}
@@ -141,8 +165,11 @@ export function LotteryForm({
             </div>
           </div>
           <div>
-            <label className={labelCls}>状態</label>
+            <label htmlFor="lottery-status" className={labelCls}>
+              状態
+            </label>
             <select
+              id="lottery-status"
               name="status"
               defaultValue={initial?.status ?? "DRAFT"}
               className={inputCls}

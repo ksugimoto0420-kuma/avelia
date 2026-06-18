@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
+import { SearchableSelectField } from "@/components/ui/SearchableSelectField";
 import { saveEvent } from "@/app/admin/events/actions";
 import { toJstDateTimeLocalString } from "@/lib/utils";
 
@@ -73,19 +74,20 @@ export function EventForm({
           </div>
           {artists.length > 0 && (
             <div>
-              <label className={labelCls}>アーティスト（マスタから選択）</label>
-              <select
+              <label htmlFor="event-artistId" className={labelCls}>
+                アーティスト（マスタから選択）
+              </label>
+              <SearchableSelectField
+                id="event-artistId"
                 name="artistId"
                 defaultValue={event?.artistId ?? ""}
-                className={inputCls}
-              >
-                <option value="">（マスタ未紐付け）</option>
-                {artists.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name}
-                  </option>
-                ))}
-              </select>
+                allowEmpty
+                emptyLabel="（マスタ未紐付け）"
+                emptyValue=""
+                placeholder="アーティストを選択"
+                searchPlaceholder="アーティスト名で検索…"
+                options={artists.map((a) => ({ value: a.id, label: a.name }))}
+              />
               <p className="mt-1 text-xs text-gray-500">
                 マスタ未登録なら下の「アーティスト名（自由記入）」で表示します。
               </p>

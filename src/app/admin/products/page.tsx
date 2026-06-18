@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Column, DataTable } from "@/components/ui/DataTable";
 import { Pagination } from "@/components/ui/Pagination";
+import { SearchableSelectField } from "@/components/ui/SearchableSelectField";
 import { requireAdminPage } from "@/lib/auth/admin-page";
 import { EVENT_TYPE_LABEL } from "@/lib/event-meta";
 import { availableStock } from "@/lib/inventory";
@@ -130,15 +131,18 @@ export default async function AdminProductsPage({
           <FilterText name="q" defaultValue={q} placeholder="商品名" />
         </FilterField>
         <FilterField label="イベント">
-          <FilterSelect
-            name="eventId"
-            defaultValue={eventId}
-            className="w-56"
-            options={[
-              { value: "", label: "すべて" },
-              ...events.map((e) => ({ value: e.id, label: e.title })),
-            ]}
-          />
+          <div className="w-64">
+            <SearchableSelectField
+              name="eventId"
+              defaultValue={eventId}
+              allowEmpty
+              emptyLabel="すべて"
+              emptyValue=""
+              placeholder="イベントを選択"
+              searchPlaceholder="イベント名で検索…"
+              options={events.map((e) => ({ value: e.id, label: e.title }))}
+            />
+          </div>
         </FilterField>
         <FilterField label="種別">
           <FilterSelect

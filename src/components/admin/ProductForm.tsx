@@ -6,6 +6,7 @@ import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Input, Select, Textarea } from "@/components/ui/Input";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { useToast } from "@/components/ui/Toast";
 
 type VariantRow = {
@@ -154,19 +155,26 @@ export function ProductForm({
       <Card>
         <CardHeader title="基本情報" />
         <CardBody className="space-y-4">
-          <Select
-            label="対象イベント"
-            required
-            value={form.eventId}
-            onChange={(e) => set("eventId", e.target.value)}
-          >
-            <option value="">選択してください</option>
-            {events.map((ev) => (
-              <option key={ev.id} value={ev.id}>
-                {ev.title}
-              </option>
-            ))}
-          </Select>
+          <div>
+            <label
+              htmlFor="product-event"
+              className="mb-1 block text-sm font-medium text-gray-700"
+            >
+              対象イベント
+              <span className="ml-0.5 text-red-500">*</span>
+            </label>
+            <SearchableSelect
+              id="product-event"
+              value={form.eventId}
+              onChange={(v) => set("eventId", v)}
+              placeholder="イベントを選択"
+              searchPlaceholder="イベント名で検索…"
+              options={events.map((ev) => ({
+                value: ev.id,
+                label: ev.title,
+              }))}
+            />
+          </div>
           <Input
             label="商品名"
             required
