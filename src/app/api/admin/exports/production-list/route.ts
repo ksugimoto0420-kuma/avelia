@@ -13,11 +13,30 @@ export async function GET(req: Request) {
     const admin = await requireAdmin("OPERATOR");
     const { searchParams } = new URL(req.url);
     const eventId = searchParams.get("eventId");
+    // variantNames=A,B,C カンマ区切り。空の要素は無視。
+    const variantNamesRaw = searchParams.get("variantNames");
+    const variantNames = variantNamesRaw
+      ? variantNamesRaw
+          .split(",")
+          .map((s) => s.trim())
+          .filter((s) => s.length > 0)
+      : [];
 
     const items = await prisma.orderItem.findMany({
       where: {
         order: { status: "PAID" },
-        ...(eventId ? { variant: { product: { eventId } } } : {}),
+        ...(eventId
+          ? {
+              variant: {
+                product: { eventId },
+                ...(variantNames.length > 0
+                  ? { name: { in: variantNames } }
+                  : {}),
+              },
+            }
+          : variantNames.length > 0
+            ? { variant: { name: { in: variantNames } } }
+            : {}),
       },
       orderBy: { order: { createdAt: "asc" } },
       include: { order: { select: { orderNumber: true } } },
@@ -51,10 +70,18 @@ export async function GET(req: Request) {
     await logOperation({
       adminUserId: admin.id,
       action: "export.production_list",
-      detail: { eventId, count: rows.length },
+      detail: { eventId, variantNames, count: rows.length },
     });
 
-    return csvResponse("production-list.csv", csv);
+    // ファイル名: イベント単位・タレント絞りが分かるように
+    const safeSlug = (s: string) =>
+      s.replace(/[^A-Za-z0-9._-]/g, "_").slice(0, 40);
+    const eventLabel = eventId ? `event-${safeSlug(eventId)}` : "all-events";
+    const memberLabel =
+      variantNames.length > 0 ? `-${safeSlug(variantNames.join("_"))}` : "";
+    const fileName = `production-list-${eventLabel}${memberLabel}.csv`;
+
+    return csvResponse(fileName, csv);
   } catch (err) {
     return handleError(err);
   }
