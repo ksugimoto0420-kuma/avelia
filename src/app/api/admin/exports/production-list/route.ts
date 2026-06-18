@@ -1,4 +1,4 @@
-import { handleError } from "@/lib/api";
+import { handleError, ok } from "@/lib/api";
 import { requireAdmin } from "@/lib/auth/guards";
 import { csvResponse, toCsv } from "@/lib/csv";
 import { normalizeUnitNicknames } from "@/lib/nickname";
@@ -7,13 +7,14 @@ import { prisma } from "@/lib/prisma";
 
 // 制作リスト CSV（仕様書 10）。
 // 数量分の宛名がある場合は1点1行に展開する。
-// 列: 注文番号, 商品名, バリエーション, 通番, ニックネーム, 読み仮名, 備考
+// クエリ:
+//   eventId, variantNames=A,B,C  : 絞り込み
+//   preview=1, previewLimit=10   : プレビュー JSON
 export async function GET(req: Request) {
   try {
     const admin = await requireAdmin("OPERATOR");
     const { searchParams } = new URL(req.url);
     const eventId = searchParams.get("eventId");
-    // variantNames=A,B,C カンマ区切り。空の要素は無視。
     const variantNamesRaw = searchParams.get("variantNames");
     const variantNames = variantNamesRaw
       ? variantNamesRaw
@@ -21,6 +22,11 @@ export async function GET(req: Request) {
           .map((s) => s.trim())
           .filter((s) => s.length > 0)
       : [];
+    const preview = searchParams.get("preview") === "1";
+    const previewLimit = Math.max(
+      1,
+      Math.min(50, Number(searchParams.get("previewLimit") ?? "10")),
+    );
 
     const items = await prisma.orderItem.findMany({
       where: {
@@ -42,6 +48,15 @@ export async function GET(req: Request) {
       include: { order: { select: { orderNumber: true } } },
     });
 
+    const headers = [
+      "注文番号",
+      "商品名",
+      "バリエーション",
+      "通番",
+      "ニックネーム",
+      "読み仮名",
+      "備考",
+    ];
     const rows: (string | number)[][] = [];
     for (const i of items) {
       const units = normalizeUnitNicknames(i.unitNicknames, i.quantity, {
@@ -62,10 +77,17 @@ export async function GET(req: Request) {
       });
     }
 
-    const csv = toCsv(
-      ["注文番号", "商品名", "バリエーション", "通番", "ニックネーム", "読み仮名", "備考"],
-      rows,
-    );
+    if (preview) {
+      return ok({
+        headers,
+        rows: rows.slice(0, previewLimit),
+        total: rows.length,
+        eventId,
+        variantNames,
+      });
+    }
+
+    const csv = toCsv(headers, rows);
 
     await logOperation({
       adminUserId: admin.id,
@@ -73,7 +95,6 @@ export async function GET(req: Request) {
       detail: { eventId, variantNames, count: rows.length },
     });
 
-    // ファイル名: イベント単位・タレント絞りが分かるように
     const safeSlug = (s: string) =>
       s.replace(/[^A-Za-z0-9._-]/g, "_").slice(0, 40);
     const eventLabel = eventId ? `event-${safeSlug(eventId)}` : "all-events";

@@ -1,4 +1,4 @@
-import type { ContactStatus } from "@prisma/client";
+import type { ContactStatus, Prisma } from "@prisma/client";
 import Link from "next/link";
 import { Badge, type BadgeColor } from "@/components/ui/Badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
@@ -36,22 +36,30 @@ const inputCls =
 export default async function AdminContactMessagesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ filter?: string }>;
+  searchParams: Promise<{ filter?: string; q?: string }>;
 }) {
   await requireAdminPage("OPERATOR");
   const sp = await searchParams;
   const filter = FILTERS.find((f) => f.key === sp.filter) ?? FILTERS[0];
+  const q = sp.q?.trim() ?? "";
 
-  const where = filter.statuses
-    ? { status: { in: filter.statuses } }
-    : undefined;
+  const where: Prisma.ContactMessageWhereInput = {};
+  if (filter.statuses) where.status = { in: filter.statuses };
+  if (q)
+    where.OR = [
+      { name: { contains: q, mode: "insensitive" } },
+      { email: { contains: q, mode: "insensitive" } },
+      { subject: { contains: q, mode: "insensitive" } },
+      { message: { contains: q, mode: "insensitive" } },
+    ];
 
-  const [messages, openCount] = await Promise.all([
+  const [messages, total, openCount] = await Promise.all([
     prisma.contactMessage.findMany({
       where,
       orderBy: { createdAt: "desc" },
       take: 200,
     }),
+    prisma.contactMessage.count({ where }),
     prisma.contactMessage.count({ where: { status: "OPEN" } }),
   ]);
 
@@ -64,23 +72,57 @@ export default async function AdminContactMessagesPage({
         </p>
       </div>
 
-      {/* フィルタ */}
-      <div className="flex flex-wrap gap-2">
-        {FILTERS.map((f) => (
-          <Link
-            key={f.key}
-            href={f.key === FILTERS[0].key ? "/admin/contact-messages" : `/admin/contact-messages?filter=${f.key}`}
-            className={cn(
-              "rounded-full px-3 py-1 text-sm",
-              f.key === filter.key
-                ? "bg-gray-900 text-white"
-                : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50",
-            )}
+      {/* フィルタ + 検索 */}
+      <div className="flex flex-wrap items-center gap-2">
+        {FILTERS.map((f) => {
+          const params = new URLSearchParams();
+          if (f.key !== FILTERS[0].key) params.set("filter", f.key);
+          if (q) params.set("q", q);
+          const qs = params.toString();
+          const href = qs
+            ? `/admin/contact-messages?${qs}`
+            : "/admin/contact-messages";
+          return (
+            <Link
+              key={f.key}
+              href={href}
+              className={cn(
+                "rounded-full px-3 py-1 text-sm",
+                f.key === filter.key
+                  ? "bg-gray-900 text-white"
+                  : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50",
+              )}
+            >
+              {f.label}
+            </Link>
+          );
+        })}
+        <form
+          method="get"
+          action="/admin/contact-messages"
+          className="ml-auto flex items-center gap-2"
+        >
+          {filter.key !== FILTERS[0].key && (
+            <input type="hidden" name="filter" value={filter.key} />
+          )}
+          <input
+            type="search"
+            name="q"
+            defaultValue={q}
+            placeholder="氏名・メール・件名・本文"
+            className="h-9 w-64 rounded-lg border border-gray-300 px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+          />
+          <button
+            type="submit"
+            className="h-9 rounded-lg bg-brand-600 px-4 text-sm font-medium text-white hover:bg-brand-700"
           >
-            {f.label}
-          </Link>
-        ))}
+            検索
+          </button>
+        </form>
       </div>
+      <p className="text-xs text-gray-400">
+        {total} 件中 {messages.length} 件を表示
+      </p>
 
       {/* 一覧 */}
       {messages.length === 0 ? (

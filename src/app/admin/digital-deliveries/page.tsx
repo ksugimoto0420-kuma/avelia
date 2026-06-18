@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Pagination } from "@/components/ui/Pagination";
+import { SearchableSelectField } from "@/components/ui/SearchableSelectField";
 import { requireAdminPage } from "@/lib/auth/admin-page";
 import { prisma } from "@/lib/prisma";
 import { formatDateTime } from "@/lib/utils";
@@ -56,7 +57,7 @@ export default async function AdminDigitalDeliveriesPage({
     prisma.event.findMany({
       where: { products: { some: { type: "DIGITAL" } } },
       orderBy: { createdAt: "desc" },
-      select: { id: true, title: true },
+      select: { id: true, title: true, artistName: true },
     }),
     prisma.digitalDelivery.count({ where: { status: "PENDING" } }),
   ]);
@@ -102,15 +103,22 @@ export default async function AdminDigitalDeliveriesPage({
           />
         </FilterField>
         <FilterField label="イベント">
-          <FilterSelect
-            name="eventId"
-            defaultValue={eventId}
-            className="w-56"
-            options={[
-              { value: "", label: "すべて" },
-              ...events.map((e) => ({ value: e.id, label: e.title })),
-            ]}
-          />
+          <div className="w-64">
+            <SearchableSelectField
+              name="eventId"
+              defaultValue={eventId}
+              allowEmpty
+              emptyLabel="すべて"
+              emptyValue=""
+              placeholder="イベントを選択"
+              searchPlaceholder="アーティスト名やイベント名で検索…"
+              options={events.map((e) => ({
+                value: e.id,
+                label: e.artistName ? `${e.artistName} / ${e.title}` : e.title,
+                hint: e.artistName ?? undefined,
+              }))}
+            />
+          </div>
         </FilterField>
         <FilterField label="キーワード">
           <FilterText name="q" defaultValue={q} placeholder="注文番号・メール・宛名" />

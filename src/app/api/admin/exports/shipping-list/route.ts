@@ -1,4 +1,4 @@
-import { AppError, handleError } from "@/lib/api";
+import { AppError, handleError, ok } from "@/lib/api";
 import { requireAdmin } from "@/lib/auth/guards";
 import { csvResponse, toCsv } from "@/lib/csv";
 import { logOperation } from "@/lib/operation-log";
@@ -8,10 +8,9 @@ import { getSetting } from "@/lib/settings";
 // 発送リスト CSV（仕様書 10）。物販を含む支払済注文が対象。
 // クエリ:
 //   source = all | in_house | warehouse  (デフォルト all)
-//     in_house  : Product.fulfillmentSource = IN_HOUSE のみ
-//     warehouse : Product.fulfillmentSource = WAREHOUSE のみ
 //   format = standard | yamato (デフォルト standard)
-//     yamato : ヤマトB2クラウド・入力データ規格に近い代表列を出力
+//   preview = 1            : CSV ではなく { headers, rows, total } の JSON を返す
+//   previewLimit = 10      : preview 時のサンプル行数（デフォルト 10）
 export async function GET(req: Request) {
   try {
     const admin = await requireAdmin("OPERATOR");
@@ -19,6 +18,11 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const source = (url.searchParams.get("source") ?? "all").toLowerCase();
     const format = (url.searchParams.get("format") ?? "standard").toLowerCase();
+    const preview = url.searchParams.get("preview") === "1";
+    const previewLimit = Math.max(
+      1,
+      Math.min(50, Number(url.searchParams.get("previewLimit") ?? "10")),
+    );
     if (!["all", "in_house", "warehouse"].includes(source)) {
       throw new AppError("source パラメータが不正です", 400);
     }
@@ -57,16 +61,17 @@ export async function GET(req: Request) {
         ? await Promise.all([getSetting("siteName"), getSetting("supportEmail")])
         : ["", ""];
 
+    let headers: string[];
+    let rows: (string | number)[][];
+
     if (format === "yamato") {
-      // ヤマトB2クラウド「入力データ」形式（代表項目）
-      // 詳細フォーマットは運用開始後に B2 マスタに合わせて調整する。
-      const headers = [
+      headers = [
         "お客様管理番号",
-        "送り状種類", // 0=発払い, 2=コレクト, 3=DM便, 4=タイム
-        "クール区分", // 0=通常, 1=冷蔵, 2=冷凍
-        "出荷予定日", // YYYY/MM/DD
-        "お届け予定日", // YYYY/MM/DD
-        "配達時間帯", // 空欄=指定なし
+        "送り状種類",
+        "クール区分",
+        "出荷予定日",
+        "お届け予定日",
+        "配達時間帯",
         "お届け先電話番号",
         "お届け先郵便番号",
         "お届け先住所",
@@ -83,7 +88,7 @@ export async function GET(req: Request) {
         "記事",
       ];
 
-      const rows = orders.map((o) => {
+      rows = orders.map((o) => {
         const physicalItems = o.items.filter(
           (i) =>
             i.variant.product.type === "PHYSICAL" &&
@@ -96,10 +101,10 @@ export async function GET(req: Request) {
         const item1 = physicalItems[0];
         const item2 = physicalItems[1];
         const item1Label = item1
-          ? `${item1.productName}（${item1.variantName}）x${item1.quantity}`
+          ? `${item1.productName}(${item1.variantName})x${item1.quantity}`
           : "";
         const item2Label = item2
-          ? `${item2.productName}（${item2.variantName}）x${item2.quantity}`
+          ? `${item2.productName}(${item2.variantName})x${item2.quantity}`
           : "";
         const extraNote =
           physicalItems.length > 2
@@ -107,8 +112,8 @@ export async function GET(req: Request) {
             : "";
         return [
           o.orderNumber,
-          "0", // 発払い
-          "0", // 通常便
+          "0",
+          "0",
           "",
           "",
           "",
@@ -128,53 +133,9 @@ export async function GET(req: Request) {
           extraNote,
         ];
       });
-
-      const csv = toCsv(headers, rows);
-
-      await logOperation({
-        adminUserId: admin.id,
-        action: "export.shipping_list",
-        detail: { count: orders.length, source, format: "yamato" },
-      });
-
-      const sourceLabel =
-        source === "in_house"
-          ? "in-house"
-          : source === "warehouse"
-            ? "warehouse"
-            : "all";
-      return csvResponse(`shipping-list-yamato-${sourceLabel}.csv`, csv);
-    }
-
-    // 標準形式
-    const rows = orders.map((o) => {
-      const detail = o.items
-        .filter(
-          (i) =>
-            i.variant.product.type === "PHYSICAL" &&
-            (source === "all" ||
-              (source === "in_house" &&
-                i.variant.product.fulfillmentSource === "IN_HOUSE") ||
-              (source === "warehouse" &&
-                i.variant.product.fulfillmentSource === "WAREHOUSE")),
-        )
-        .map((i) => `${i.productName}（${i.variantName}）x${i.quantity}`)
-        .join(" / ");
-      return [
-        o.orderNumber,
-        o.recipientName ?? "",
-        o.recipientKana ?? "",
-        o.recipientPostal ?? "",
-        o.recipientAddress ?? "",
-        o.recipientPhone ?? "",
-        detail,
-        o.shippingMethod ?? "",
-        o.shipment?.status ?? "UNFULFILLED",
-      ];
-    });
-
-    const csv = toCsv(
-      [
+    } else {
+      // 標準形式
+      headers = [
         "注文番号",
         "氏名",
         "フリガナ",
@@ -184,14 +145,50 @@ export async function GET(req: Request) {
         "商品明細",
         "配送方法",
         "発送状態",
-      ],
-      rows,
-    );
+      ];
+      rows = orders.map((o) => {
+        const detail = o.items
+          .filter(
+            (i) =>
+              i.variant.product.type === "PHYSICAL" &&
+              (source === "all" ||
+                (source === "in_house" &&
+                  i.variant.product.fulfillmentSource === "IN_HOUSE") ||
+                (source === "warehouse" &&
+                  i.variant.product.fulfillmentSource === "WAREHOUSE")),
+          )
+          .map((i) => `${i.productName}(${i.variantName})x${i.quantity}`)
+          .join(" / ");
+        return [
+          o.orderNumber,
+          o.recipientName ?? "",
+          o.recipientKana ?? "",
+          o.recipientPostal ?? "",
+          o.recipientAddress ?? "",
+          o.recipientPhone ?? "",
+          detail,
+          o.shippingMethod ?? "",
+          o.shipment?.status ?? "UNFULFILLED",
+        ];
+      });
+    }
+
+    if (preview) {
+      return ok({
+        headers,
+        rows: rows.slice(0, previewLimit),
+        total: rows.length,
+        source,
+        format,
+      });
+    }
+
+    const csv = toCsv(headers, rows);
 
     await logOperation({
       adminUserId: admin.id,
       action: "export.shipping_list",
-      detail: { count: orders.length, source, format: "standard" },
+      detail: { count: orders.length, source, format },
     });
 
     const sourceLabel =
@@ -200,7 +197,8 @@ export async function GET(req: Request) {
         : source === "warehouse"
           ? "warehouse"
           : "all";
-    return csvResponse(`shipping-list-${sourceLabel}.csv`, csv);
+    const formatLabel = format === "yamato" ? "-yamato" : "";
+    return csvResponse(`shipping-list${formatLabel}-${sourceLabel}.csv`, csv);
   } catch (err) {
     return handleError(err);
   }

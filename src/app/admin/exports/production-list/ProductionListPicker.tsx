@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { CsvPreviewBar } from "@/components/admin/CsvPreviewBar";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 
 export type EventWithMembers = {
@@ -60,6 +61,16 @@ export function ProductionListPicker({ events }: { events: EventWithMembers[] })
     return qs
       ? `/api/admin/exports/production-list?${qs}`
       : "/api/admin/exports/production-list";
+  }, [eventId, selectedMembers]);
+
+  const previewHref = useMemo(() => {
+    const params = new URLSearchParams();
+    if (eventId) params.set("eventId", eventId);
+    if (selectedMembers.size > 0) {
+      params.set("variantNames", Array.from(selectedMembers).join(","));
+    }
+    params.set("preview", "1");
+    return `/api/admin/exports/production-list?${params.toString()}`;
   }, [eventId, selectedMembers]);
 
   return (
@@ -151,7 +162,7 @@ export function ProductionListPicker({ events }: { events: EventWithMembers[] })
         </div>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-4">
+      <div className="space-y-2 border-t border-gray-100 pt-4">
         <p className="text-xs text-gray-500">
           {eventId
             ? selectedMembers.size === 0
@@ -159,12 +170,10 @@ export function ProductionListPicker({ events }: { events: EventWithMembers[] })
               : `選択中: ${selectedMembers.size} 名のタレントで絞り込み`
             : "全イベント・全商品を出力します"}
         </p>
-        <a
-          href={downloadHref}
-          className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-bold text-white hover:bg-brand-700"
-        >
-          ⬇ CSV をダウンロード
-        </a>
+        <CsvPreviewBar
+          previewUrl={previewHref}
+          downloadUrl={downloadHref}
+        />
       </div>
     </div>
   );

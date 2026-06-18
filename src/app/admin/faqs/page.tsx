@@ -1,4 +1,11 @@
+import type { Prisma } from "@prisma/client";
 import { notFound } from "next/navigation";
+import {
+  FilterBar,
+  FilterField,
+  FilterSelect,
+  FilterText,
+} from "@/components/admin/Filters";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { requireAdminPage } from "@/lib/auth/admin-page";
@@ -15,15 +22,28 @@ const inputCls =
 export default async function AdminFaqsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ edit?: string }>;
+  searchParams: Promise<{ edit?: string; q?: string; published?: string }>;
 }) {
   await requireAdminPage("OPERATOR");
   const sp = await searchParams;
+  const q = sp.q?.trim() ?? "";
+  const published = sp.published ?? "";
 
-  const [faqs, editing] = await Promise.all([
+  const where: Prisma.FaqWhereInput = {};
+  if (published === "published") where.isPublished = true;
+  if (published === "draft") where.isPublished = false;
+  if (q)
+    where.OR = [
+      { question: { contains: q, mode: "insensitive" } },
+      { answer: { contains: q, mode: "insensitive" } },
+    ];
+
+  const [faqs, total, editing] = await Promise.all([
     prisma.faq.findMany({
+      where,
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
     }),
+    prisma.faq.count({ where }),
     sp.edit ? prisma.faq.findUnique({ where: { id: sp.edit } }) : null,
   ]);
   if (sp.edit && !editing) notFound();
@@ -97,16 +117,39 @@ export default async function AdminFaqsPage({
         </CardBody>
       </Card>
 
+      {/* フィルタ */}
+      <FilterBar action="/admin/faqs" clearHref="/admin/faqs">
+        <FilterField label="キーワード">
+          <FilterText
+            name="q"
+            defaultValue={q}
+            placeholder="質問・回答文"
+          />
+        </FilterField>
+        <FilterField label="公開状態">
+          <FilterSelect
+            name="published"
+            defaultValue={published}
+            className="w-32"
+            options={[
+              { value: "", label: "すべて" },
+              { value: "published", label: "公開中" },
+              { value: "draft", label: "非公開" },
+            ]}
+          />
+        </FilterField>
+      </FilterBar>
+
       {/* 一覧 */}
       <Card>
         <CardHeader
-          title={`登録済みFAQ（${faqs.length}件）`}
+          title={`登録済みFAQ（${total}件）`}
           subtitle="編集／公開切替／削除"
         />
         <CardBody className="px-0 py-0">
           {faqs.length === 0 ? (
             <p className="px-5 py-12 text-center text-gray-400">
-              まだ登録されたFAQはありません
+              該当するFAQはありません
             </p>
           ) : (
             <ul className="divide-y divide-gray-100">

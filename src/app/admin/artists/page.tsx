@@ -1,7 +1,15 @@
+import type { Prisma } from "@prisma/client";
 import Link from "next/link";
+import {
+  FilterBar,
+  FilterField,
+  FilterSelect,
+  FilterText,
+} from "@/components/admin/Filters";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
+import { Pagination } from "@/components/ui/Pagination";
 import { requireAdminPage } from "@/lib/auth/admin-page";
 import { prisma } from "@/lib/prisma";
 import { formatDateTime } from "@/lib/utils";
@@ -10,13 +18,48 @@ export const dynamic = "force-dynamic";
 
 export const metadata = { title: "アーティスト管理" };
 
-export default async function AdminArtistsPage() {
-  await requireAdminPage("OPERATOR");
+const PAGE_SIZE = 30;
 
-  const artists = await prisma.artist.findMany({
-    orderBy: { createdAt: "desc" },
-    include: { _count: { select: { events: true } } },
-  });
+export default async function AdminArtistsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | undefined>>;
+}) {
+  await requireAdminPage("OPERATOR");
+  const sp = await searchParams;
+  const q = sp.q?.trim() ?? "";
+  const published = sp.published ?? "";
+  const page = Math.max(1, Number(sp.page ?? "1"));
+
+  const where: Prisma.ArtistWhereInput = {};
+  if (published === "published") where.isPublished = true;
+  if (published === "draft") where.isPublished = false;
+  if (q)
+    where.OR = [
+      { name: { contains: q, mode: "insensitive" } },
+      { nameKana: { contains: q, mode: "insensitive" } },
+      { slug: { contains: q, mode: "insensitive" } },
+    ];
+
+  const [artists, total] = await Promise.all([
+    prisma.artist.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+      include: { _count: { select: { events: true } } },
+    }),
+    prisma.artist.count({ where }),
+  ]);
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+
+  const qs = (overrides: Record<string, string>) => {
+    const p = new URLSearchParams();
+    const merged = { q, published, ...overrides };
+    for (const [k, v] of Object.entries(merged)) if (v) p.set(k, v);
+    const s = p.toString();
+    return s ? `/admin/artists?${s}` : "/admin/artists";
+  };
 
   return (
     <div className="space-y-6">
@@ -30,12 +73,34 @@ export default async function AdminArtistsPage() {
         <Button href="/admin/artists/new">＋ 新規アーティスト</Button>
       </div>
 
+      <FilterBar action="/admin/artists" clearHref="/admin/artists">
+        <FilterField label="キーワード">
+          <FilterText
+            name="q"
+            defaultValue={q}
+            placeholder="名前・カナ・slug"
+          />
+        </FilterField>
+        <FilterField label="公開状態">
+          <FilterSelect
+            name="published"
+            defaultValue={published}
+            className="w-32"
+            options={[
+              { value: "", label: "すべて" },
+              { value: "published", label: "公開中" },
+              { value: "draft", label: "非公開" },
+            ]}
+          />
+        </FilterField>
+      </FilterBar>
+
       <Card>
-        <CardHeader title={`登録済みアーティスト（${artists.length}件）`} />
-        <CardBody className="px-0 py-0">
+        <CardHeader title={`登録済みアーティスト（${total}件）`} />
+        <CardBody className="space-y-4 px-0 py-0">
           {artists.length === 0 ? (
             <p className="px-5 py-12 text-center text-gray-400">
-              まだ登録されたアーティストがいません
+              該当するアーティストがいません
             </p>
           ) : (
             <table className="w-full text-sm">
@@ -91,6 +156,13 @@ export default async function AdminArtistsPage() {
               </tbody>
             </table>
           )}
+          <div className="px-5 pb-5">
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              buildHref={(p) => qs({ page: String(p) })}
+            />
+          </div>
         </CardBody>
       </Card>
     </div>
