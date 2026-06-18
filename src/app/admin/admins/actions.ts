@@ -8,7 +8,13 @@ import { hashPassword } from "@/lib/auth/password";
 import { logOperation } from "@/lib/operation-log";
 import { prisma } from "@/lib/prisma";
 
-const VALID_ROLES: AdminRole[] = ["OWNER", "MANAGER", "OPERATOR", "VIEWER"];
+const VALID_ROLES: AdminRole[] = [
+  "OWNER",
+  "MANAGER",
+  "OPERATOR",
+  "VIEWER",
+  "TALENT",
+];
 
 export async function createAdmin(formData: FormData) {
   const me = await requireAdmin("OWNER");
@@ -34,6 +40,11 @@ export async function createAdmin(formData: FormData) {
   const dup = await prisma.adminUser.findUnique({ where: { email } });
   if (dup) throw new Error("このメールアドレスは既に登録されています");
 
+  const assignedArtistId =
+    role === "TALENT"
+      ? ((formData.get("assignedArtistId") as string | null) || null)
+      : null;
+
   const created = await prisma.adminUser.create({
     data: {
       email,
@@ -41,6 +52,7 @@ export async function createAdmin(formData: FormData) {
       passwordHash: await hashPassword(password),
       role,
       isActive: true,
+      assignedArtistId,
     },
   });
 
@@ -76,12 +88,19 @@ export async function updateAdmin(formData: FormData) {
     throw new Error("自分自身のロールを下げることはできません");
   }
 
+  // TALENT 以外に変更した場合は assignedArtistId をクリアする
+  const assignedArtistId =
+    role === "TALENT"
+      ? ((formData.get("assignedArtistId") as string | null) || null)
+      : null;
+
   const data: {
     name: string;
     role: AdminRole;
     isActive: boolean;
+    assignedArtistId: string | null;
     passwordHash?: string;
-  } = { name, role, isActive };
+  } = { name, role, isActive, assignedArtistId };
 
   if (password.trim().length > 0) {
     if (password.length < 8) {

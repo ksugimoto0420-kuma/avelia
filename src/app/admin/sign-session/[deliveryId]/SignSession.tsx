@@ -14,6 +14,14 @@ type Props = {
   baseImageUrl: string | null; // 原本（背景）画像のURL
   pendingCount: number;
   nextDeliveryId: string | null;
+  /** 「← 終了」リンクの行き先（既定: 管理画面の納品一覧） */
+  exitHref?: string;
+  /** 次の納品への遷移先（既定: /admin/sign-session/[id]） */
+  nextHrefPrefix?: string;
+  /** 全て完了した時の遷移先（既定: /admin/sign-session/done） */
+  doneHref?: string;
+  /** サイン送信先 API（既定: 管理者用） */
+  submitEndpoint?: string;
 };
 
 const PEN_COLORS: { label: string; value: string }[] = [
@@ -49,6 +57,10 @@ export function SignSession({
   baseImageUrl,
   pendingCount,
   nextDeliveryId,
+  exitHref = "/admin/digital-deliveries",
+  nextHrefPrefix = "/admin/sign-session/",
+  doneHref = "/admin/sign-session/done",
+  submitEndpoint = "/api/admin/signatures",
 }: Props) {
   const router = useRouter();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -124,7 +136,7 @@ export function SignSession({
     try {
       // 透過PNGとして data URL を取得
       const dataUrl = pad.toDataURL("image/png");
-      const res = await fetch("/api/admin/signatures", {
+      const res = await fetch(submitEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ deliveryId, dataUrl }),
@@ -134,9 +146,9 @@ export function SignSession({
         throw new Error(json?.error?.message ?? "送信に失敗しました");
       // 次の納品へ
       if (nextDeliveryId) {
-        router.push(`/admin/sign-session/${nextDeliveryId}`);
+        router.push(`${nextHrefPrefix}${nextDeliveryId}`);
       } else {
-        router.push(`/admin/sign-session/done`);
+        router.push(doneHref);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -149,7 +161,7 @@ export function SignSession({
     <div className="mx-auto max-w-3xl px-4 py-6 sm:py-10">
       <div className="flex items-center justify-between gap-3">
         <Link
-          href="/admin/digital-deliveries"
+          href={exitHref}
           className="text-sm text-gray-500 hover:text-gray-700"
         >
           ← 終了

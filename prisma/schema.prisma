@@ -20,6 +20,7 @@ enum AdminRole {
   MANAGER
   OPERATOR
   VIEWER
+  TALENT // タレント本人。/talent 配下のみアクセス可能
 }
 
 enum ProductType {
@@ -150,11 +151,16 @@ model AdminUser {
   name         String
   role         AdminRole @default(OPERATOR)
   isActive     Boolean   @default(true)
+  // role=TALENT のとき、このタレントが担当するアーティスト。
+  // 自分の Artist 配下のサイン待ちのみ閲覧可能。
+  assignedArtistId String?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
   operationLogs OperationLog[]
+  assignedArtist Artist? @relation(fields: [assignedArtistId], references: [id], onDelete: SetNull)
 
+  @@index([assignedArtistId])
   @@map("admin_users")
 }
 
@@ -752,7 +758,8 @@ model Artist {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  events       Event[]
+  events           Event[]
+  assignedTalents  AdminUser[]
 
   @@index([isPublished])
   @@map("artists")

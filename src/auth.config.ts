@@ -43,11 +43,23 @@ export const authConfig = {
       const path = nextUrl.pathname;
       const user = auth?.user;
 
-      // 管理画面：/admin/login 以外は管理者必須
+      // 管理画面：/admin/login 以外は管理者必須。TALENT は /talent に追放
       if (path.startsWith("/admin")) {
         if (path === "/admin/login") return true;
-        if (user?.kind === "admin") return true;
+        if (user?.kind === "admin") {
+          if (user.role === "TALENT") {
+            return NextResponse.redirect(new URL("/talent", nextUrl));
+          }
+          return true;
+        }
         return NextResponse.redirect(new URL("/admin/login", nextUrl));
+      }
+
+      // タレント画面：/talent/login 以外は admin セッション必須
+      if (path.startsWith("/talent")) {
+        if (path === "/talent/login") return true;
+        if (user?.kind === "admin") return true;
+        return NextResponse.redirect(new URL("/talent/login", nextUrl));
       }
 
       // ユーザー専用ページ：要ログイン

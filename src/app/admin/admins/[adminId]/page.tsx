@@ -14,6 +14,7 @@ const ROLE_LABEL: Record<AdminRole, string> = {
   MANAGER: "マネージャー",
   OPERATOR: "オペレーター",
   VIEWER: "閲覧者",
+  TALENT: "タレント",
 };
 
 const labelCls = "mb-1 block text-sm font-medium text-gray-700";
@@ -29,7 +30,13 @@ export default async function EditAdminPage({
   const session = await auth();
   const { adminId } = await params;
 
-  const admin = await prisma.adminUser.findUnique({ where: { id: adminId } });
+  const [admin, artists] = await Promise.all([
+    prisma.adminUser.findUnique({ where: { id: adminId } }),
+    prisma.artist.findMany({
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
+  ]);
   if (!admin) notFound();
 
   const isSelf = session?.user?.id === admin.id;
@@ -44,8 +51,11 @@ export default async function EditAdminPage({
           <form action={updateAdmin} className="space-y-4">
             <input type="hidden" name="id" value={admin.id} />
             <div>
-              <label className={labelCls}>メールアドレス</label>
+              <label htmlFor="email" className={labelCls}>
+                メールアドレス
+              </label>
               <input
+                id="email"
                 type="email"
                 value={admin.email}
                 disabled
@@ -56,8 +66,11 @@ export default async function EditAdminPage({
               </p>
             </div>
             <div>
-              <label className={labelCls}>名前 *</label>
+              <label htmlFor="name" className={labelCls}>
+                名前 *
+              </label>
               <input
+                id="name"
                 name="name"
                 required
                 defaultValue={admin.name}
@@ -65,8 +78,11 @@ export default async function EditAdminPage({
               />
             </div>
             <div>
-              <label className={labelCls}>ロール *</label>
+              <label htmlFor="role" className={labelCls}>
+                ロール *
+              </label>
               <select
+                id="role"
                 name="role"
                 defaultValue={admin.role}
                 className={inputCls}
@@ -76,6 +92,7 @@ export default async function EditAdminPage({
                 <option value="MANAGER">{ROLE_LABEL.MANAGER}</option>
                 <option value="OPERATOR">{ROLE_LABEL.OPERATOR}</option>
                 <option value="VIEWER">{ROLE_LABEL.VIEWER}</option>
+                <option value="TALENT">{ROLE_LABEL.TALENT}</option>
               </select>
               {isSelf && (
                 <p className="mt-1 text-xs text-gray-500">
@@ -83,10 +100,38 @@ export default async function EditAdminPage({
                 </p>
               )}
               {isSelf && <input type="hidden" name="role" value={admin.role} />}
+              <p className="mt-1 text-xs text-gray-500">
+                TALENT は管理画面に入れず、/talent 配下のサイン記入画面のみ
+                利用できます。担当アーティストを下で設定してください。
+              </p>
             </div>
             <div>
-              <label className={labelCls}>パスワード変更（変更しない場合は空欄）</label>
+              <label htmlFor="assignedArtistId" className={labelCls}>
+                担当アーティスト（TALENT のみ）
+              </label>
+              <select
+                id="assignedArtistId"
+                name="assignedArtistId"
+                defaultValue={admin.assignedArtistId ?? ""}
+                className={inputCls}
+              >
+                <option value="">（未設定）</option>
+                {artists.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-gray-500">
+                ロールが TALENT 以外の場合は無視されます。
+              </p>
+            </div>
+            <div>
+              <label htmlFor="password" className={labelCls}>
+                パスワード変更（変更しない場合は空欄）
+              </label>
               <input
+                id="password"
                 type="password"
                 name="password"
                 minLength={8}

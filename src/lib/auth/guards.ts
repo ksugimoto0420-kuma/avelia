@@ -37,8 +37,10 @@ export async function getOptionalUser() {
   return session.user;
 }
 
-// ロールの権限強度（数値が大きいほど強い）
+// ロールの権限強度（数値が大きいほど強い）。
+// TALENT はタレント本人専用で、管理画面（VIEWER 以上）には入れない。
 const ROLE_RANK: Record<AdminRole, number> = {
+  TALENT: 0,
   VIEWER: 1,
   OPERATOR: 2,
   MANAGER: 3,
