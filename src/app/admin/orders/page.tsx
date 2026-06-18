@@ -25,12 +25,19 @@ const STATUS_LABEL: Record<string, string> = {
 export default async function AdminOrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; q?: string; page?: string }>;
+  searchParams: Promise<{
+    status?: string;
+    q?: string;
+    page?: string;
+    month?: string;
+  }>;
 }) {
   await requireAdminPage();
   const sp = await searchParams;
   const status = sp.status ?? "";
   const q = sp.q ?? "";
+  // 年月絞り込み: "YYYY-MM" 形式。空欄なら絞らない。
+  const month = sp.month ?? "";
   const page = Math.max(1, Number(sp.page ?? "1"));
 
   const where: Record<string, unknown> = {};
@@ -40,6 +47,12 @@ export default async function AdminOrdersPage({
       { orderNumber: { contains: q, mode: "insensitive" } },
       { user: { email: { contains: q, mode: "insensitive" } } },
     ];
+  }
+  if (/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) {
+    const [y, m] = month.split("-").map(Number);
+    const start = new Date(y, m - 1, 1);
+    const end = new Date(y, m, 1);
+    where.createdAt = { gte: start, lt: end };
   }
 
   const [orders, total] = await Promise.all([
@@ -103,6 +116,7 @@ export default async function AdminOrdersPage({
     const p = new URLSearchParams();
     if (status) p.set("status", status);
     if (q) p.set("q", q);
+    if (month) p.set("month", month);
     for (const [k, v] of Object.entries(overrides)) {
       if (v) p.set(k, v);
       else p.delete(k);
@@ -136,8 +150,28 @@ export default async function AdminOrdersPage({
                 {STATUS_LABEL[s]}
               </Link>
             ))}
-            <form className="ml-auto" action="/admin/orders" method="get">
+            <form
+              className="ml-auto flex flex-wrap items-center gap-2"
+              action="/admin/orders"
+              method="get"
+            >
               {status && <input type="hidden" name="status" value={status} />}
+              <label
+                htmlFor="orders-month"
+                className="text-xs font-medium text-gray-600"
+              >
+                注文年月
+              </label>
+              <input
+                id="orders-month"
+                type="month"
+                name="month"
+                defaultValue={month}
+                placeholder="例: 2026-06"
+                pattern="\d{4}-(0[1-9]|1[0-2])"
+                title="YYYY-MM 形式（例: 2026-06）"
+                className="h-9 rounded-lg border border-gray-300 px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+              />
               <input
                 type="search"
                 name="q"

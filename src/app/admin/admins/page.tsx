@@ -1,4 +1,10 @@
-import type { AdminRole } from "@prisma/client";
+import type { AdminRole, Prisma } from "@prisma/client";
+import {
+  FilterBar,
+  FilterField,
+  FilterSelect,
+  FilterText,
+} from "@/components/admin/Filters";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
@@ -33,11 +39,31 @@ const labelCls = "mb-1 block text-sm font-medium text-gray-700";
 const inputCls =
   "w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200";
 
-export default async function AdminAdminsPage() {
+export default async function AdminAdminsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | undefined>>;
+}) {
   await requireAdminPage("OWNER");
+  const sp = await searchParams;
+  const q = sp.q?.trim() ?? "";
+  const role = sp.role ?? "";
+  const active = sp.active ?? "";
+
+  const where: Prisma.AdminUserWhereInput = {};
+  if (role) where.role = role as AdminRole;
+  if (active === "active") where.isActive = true;
+  if (active === "inactive") where.isActive = false;
+  if (q)
+    where.OR = [
+      { name: { contains: q, mode: "insensitive" } },
+      { email: { contains: q, mode: "insensitive" } },
+      { assignedArtist: { name: { contains: q, mode: "insensitive" } } },
+    ];
 
   const [admins, artists] = await Promise.all([
     prisma.adminUser.findMany({
+      where,
       orderBy: [{ role: "asc" }, { createdAt: "asc" }],
       include: { assignedArtist: { select: { name: true } } },
     }),
@@ -142,6 +168,43 @@ export default async function AdminAdminsPage() {
           </form>
         </CardBody>
       </Card>
+
+      <FilterBar action="/admin/admins" clearHref="/admin/admins">
+        <FilterField label="キーワード">
+          <FilterText
+            name="q"
+            defaultValue={q}
+            placeholder="名前・メール・担当アーティスト"
+          />
+        </FilterField>
+        <FilterField label="ロール">
+          <FilterSelect
+            name="role"
+            defaultValue={role}
+            className="w-36"
+            options={[
+              { value: "", label: "すべて" },
+              { value: "OWNER", label: ROLE_LABEL.OWNER },
+              { value: "MANAGER", label: ROLE_LABEL.MANAGER },
+              { value: "OPERATOR", label: ROLE_LABEL.OPERATOR },
+              { value: "VIEWER", label: ROLE_LABEL.VIEWER },
+              { value: "TALENT", label: ROLE_LABEL.TALENT },
+            ]}
+          />
+        </FilterField>
+        <FilterField label="状態">
+          <FilterSelect
+            name="active"
+            defaultValue={active}
+            className="w-28"
+            options={[
+              { value: "", label: "すべて" },
+              { value: "active", label: "有効" },
+              { value: "inactive", label: "無効" },
+            ]}
+          />
+        </FilterField>
+      </FilterBar>
 
       <Card>
         <CardHeader title={`登録済み管理者（${admins.length}件）`} />
