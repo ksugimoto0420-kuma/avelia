@@ -21,21 +21,43 @@ export type DigitalContentCardData = {
   signed?: boolean; // 個別サイン納品
   pending?: boolean; // 制作待ち（準備中）
   nickname?: string | null;
+  /** カバー画像（商品imageUrl → イベントcoverImageUrl → null の順で選定済み） */
+  coverImageUrl?: string | null;
 };
+
+function FallbackIcon({ type }: { type: string }) {
+  return (
+    <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-violet-100 to-brand-50 text-4xl">
+      {type === "VIDEO"
+        ? "🎬"
+        : type === "AUDIO"
+          ? "🎵"
+          : type === "IMAGE"
+            ? "🖼"
+            : "📄"}
+    </div>
+  );
+}
 
 function CardInner({ data }: { data: DigitalContentCardData }) {
   return (
     <>
-      <div className="relative flex aspect-video items-center justify-center bg-gradient-to-br from-violet-100 to-brand-50 text-4xl">
-        {data.type === "VIDEO"
-          ? "🎬"
-          : data.type === "AUDIO"
-            ? "🎵"
-            : data.type === "IMAGE"
-              ? "🖼"
-              : "📄"}
+      <div className="relative aspect-video overflow-hidden bg-gray-50">
+        {data.coverImageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={data.coverImageUrl}
+            alt={data.title}
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <FallbackIcon type={data.type} />
+        )}
         {data.signed && (
-          <span className="absolute right-2 top-2 text-2xl" title="サイン入り">
+          <span
+            className="absolute right-2 top-2 rounded-full bg-white/85 px-2 py-1 text-base shadow"
+            title="サイン入り"
+          >
             ✍️
           </span>
         )}

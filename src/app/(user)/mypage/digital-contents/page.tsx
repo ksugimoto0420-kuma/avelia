@@ -16,13 +16,49 @@ export default async function MypageDigitalContents() {
     prisma.userDigitalContent.findMany({
       where: { userId: user.id },
       orderBy: { grantedAt: "desc" },
-      include: { digitalContent: true },
+      include: {
+        digitalContent: {
+          include: {
+            product: {
+              select: {
+                imageUrl: true,
+                event: { select: { coverImageUrl: true } },
+              },
+            },
+          },
+        },
+      },
     }),
     // 個別サイン納品（PERSONALIZED）
     prisma.digitalDelivery.findMany({
       where: { userId: user.id },
       orderBy: { createdAt: "desc" },
-      include: { digitalContent: { select: { title: true, type: true } } },
+      include: {
+        digitalContent: {
+          include: {
+            product: {
+              select: {
+                imageUrl: true,
+                event: { select: { coverImageUrl: true } },
+              },
+            },
+          },
+        },
+        orderItem: {
+          include: {
+            variant: {
+              include: {
+                product: {
+                  select: {
+                    imageUrl: true,
+                    event: { select: { coverImageUrl: true } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     }),
   ]);
 
@@ -34,6 +70,18 @@ export default async function MypageDigitalContents() {
     );
   }
 
+  /**
+   * カバー画像の優先順位（最初に見つかったものを採用）:
+   *  1. DigitalContent 紐づけ商品の imageUrl
+   *  2. 同イベントの coverImageUrl
+   *  3. orderItem 経由（実際に購入された商品）の imageUrl
+   *  4. 同イベントの coverImageUrl
+   */
+  function pickCover(...candidates: (string | null | undefined)[]): string | null {
+    for (const c of candidates) if (c) return c;
+    return null;
+  }
+
   const grantCards: DigitalContentCardData[] = grants.map((g) => ({
     key: `grant-${g.id}`,
     title: g.digitalContent.title,
@@ -41,6 +89,10 @@ export default async function MypageDigitalContents() {
     expiresAt: g.expiresAt,
     expired: Boolean(g.expiresAt && g.expiresAt < now),
     href: `/mypage/digital-contents/${g.digitalContentId}`,
+    coverImageUrl: pickCover(
+      g.digitalContent.product?.imageUrl,
+      g.digitalContent.product?.event?.coverImageUrl,
+    ),
   }));
 
   const deliveryCards: DigitalContentCardData[] = deliveries.map((d) => {
@@ -57,6 +109,12 @@ export default async function MypageDigitalContents() {
       nickname: d.nickname,
       href: ready ? `/api/user/deliveries/${d.id}` : null,
       isDownload: ready,
+      coverImageUrl: pickCover(
+        d.digitalContent.product?.imageUrl,
+        d.digitalContent.product?.event?.coverImageUrl,
+        d.orderItem.variant.product.imageUrl,
+        d.orderItem.variant.product.event.coverImageUrl,
+      ),
     };
   });
 

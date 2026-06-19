@@ -56,7 +56,21 @@ export async function GET(
     }
 
     // 通常ファイル配信
-    const buffer = await readFile(localFilePath(delivery.fileKey));
+    let buffer: Buffer;
+    try {
+      buffer = await readFile(localFilePath(delivery.fileKey));
+    } catch (e) {
+      const code = (e as NodeJS.ErrnoException)?.code;
+      if (code === "ENOENT") {
+        // ファイル実体が消えている／古いシードデータ等で参照先が無いケース。
+        // ユーザー側はエラーではなく「準備中」扱いにする方が体験として穏当。
+        return new Response(
+          "ファイル準備中です。しばらくしてから再度お試しください",
+          { status: 403 },
+        );
+      }
+      throw e;
+    }
     await prisma.digitalDelivery.update({
       where: { id },
       data: { downloadCount: { increment: 1 } },
