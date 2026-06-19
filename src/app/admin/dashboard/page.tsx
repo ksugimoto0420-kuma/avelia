@@ -53,7 +53,12 @@ export default async function AdminDashboard() {
         take: 8,
         include: { user: { select: { email: true } } },
       }),
-      // 低在庫アラート: 閾値設定済み & 公開中 & 利用可能在庫 <= 閾値
+      // 低在庫アラート:
+      //   閾値設定済み・利用可能在庫 ≤ 閾値・販売可能状態のみ
+      // 「販売可能」= 商品とイベントが公開中、かつイベント saleEndAt 未経過
+      //   非公開や販売終了済みのSKUは買えないのでアラート対象から除外する。
+      //   ここの条件は在庫管理画面の visibility=public フィルタと同条件にして
+      //   ダッシュボードと在庫一覧の件数が一致するよう揃えている。
       prisma.$queryRaw<LowStockRow[]>`
         SELECT pv.id AS "variantId", pv.name AS "variantName",
                p.name AS "productName", e.title AS "eventTitle",
@@ -67,6 +72,7 @@ export default async function AdminDashboard() {
           AND (i.quantity - i.reserved - i.sold) <= i."lowStockThreshold"
           AND p."isPublished" = true
           AND e."isPublished" = true
+          AND (e."saleEndAt" IS NULL OR e."saleEndAt" >= NOW())
         ORDER BY (i.quantity - i.reserved - i.sold) ASC, p.name ASC
         LIMIT 8
       `,

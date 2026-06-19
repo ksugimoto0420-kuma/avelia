@@ -32,6 +32,8 @@ export async function GET(req: Request) {
   // 24時間以内に同条件で通知済みのものはスキップ（再送抑制）
   const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
+  // 「販売可能」= 商品・イベント公開中 + 販売終了日時 未経過。
+  // 非公開や販売終了済みは買えないのでアラート対象から除外する。
   const rows = await prisma.$queryRaw<LowRow[]>`
     SELECT pv.id AS "variantId", pv.sku, pv.name AS "variantName",
            p.name AS "productName", e.title AS "eventTitle",
@@ -45,6 +47,7 @@ export async function GET(req: Request) {
       AND (i.quantity - i.reserved - i.sold) <= i."lowStockThreshold"
       AND p."isPublished" = true
       AND e."isPublished" = true
+      AND (e."saleEndAt" IS NULL OR e."saleEndAt" >= NOW())
       AND (i."lowStockAlertedAt" IS NULL OR i."lowStockAlertedAt" < ${yesterday})
   `;
 
