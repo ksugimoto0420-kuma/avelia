@@ -9,7 +9,8 @@ export const ADMIN_NAV: AdminNavGroup[] = [
   {
     title: "販売管理",
     items: [
-      { href: "/admin/artists", label: "アーティスト", icon: "🎤" },
+      // デモ段階では非表示（運用開始後に復活）
+      // { href: "/admin/artists", label: "アーティスト", icon: "🎤" },
       { href: "/admin/events", label: "イベント", icon: "🎫" },
       { href: "/admin/products", label: "商品", icon: "🎁" },
       { href: "/admin/inventories", label: "在庫", icon: "📦" },
@@ -31,11 +32,12 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     ],
   },
   {
-    title: "ロジ・収益",
+    title: "ロジ",
     items: [
       { href: "/admin/exports/production-list", label: "制作リスト", icon: "🛠" },
       { href: "/admin/exports/shipping-list", label: "発送リスト", icon: "🚚" },
-      { href: "/admin/revenue-shares", label: "R/S売上", icon: "💴" },
+      // デモ段階では非表示（運用開始後に復活）
+      // { href: "/admin/revenue-shares", label: "R/S売上", icon: "💴" },
     ],
   },
   {
