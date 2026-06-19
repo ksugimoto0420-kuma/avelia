@@ -21,8 +21,6 @@ const PAGE_SIZE = 30;
 
 const TYPE_LABEL: Record<string, string> = {
   IMAGE: "画像",
-  VIDEO: "動画",
-  AUDIO: "音声",
   FILE: "ファイル",
 };
 
@@ -158,8 +156,6 @@ export default async function AdminDigitalContentsPage({
             options={[
               { value: "", label: "すべて" },
               { value: "IMAGE", label: TYPE_LABEL.IMAGE },
-              { value: "VIDEO", label: TYPE_LABEL.VIDEO },
-              { value: "AUDIO", label: TYPE_LABEL.AUDIO },
               { value: "FILE", label: TYPE_LABEL.FILE },
             ]}
           />

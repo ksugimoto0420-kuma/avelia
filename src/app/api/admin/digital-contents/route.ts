@@ -9,7 +9,7 @@ const schema = z
     productId: z.string().optional().nullable(),
     title: z.string().min(1),
     description: z.string().optional().nullable(),
-    type: z.enum(["IMAGE", "VIDEO", "AUDIO", "FILE"]),
+    type: z.enum(["IMAGE", "FILE"]),
     deliveryType: z.enum(["SHARED", "PERSONALIZED"]).default("SHARED"),
     fileKey: z.string().optional().nullable(),
     baseImageKey: z.string().optional().nullable(),

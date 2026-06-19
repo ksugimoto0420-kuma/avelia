@@ -47,7 +47,9 @@ export default async function EditDigitalContentPage({
           productId: content.productId,
           title: content.title,
           description: content.description,
-          type: content.type,
+          // UI では IMAGE/FILE の 2 種だけサポート。旧データ (VIDEO/AUDIO) は
+          // FILE に丸めて表示。再保存時に FILE として上書きされる。
+          type: content.type === "IMAGE" ? "IMAGE" : "FILE",
           deliveryType: content.deliveryType,
           fileKey: content.fileKey,
           baseImageKey: content.baseImageKey,

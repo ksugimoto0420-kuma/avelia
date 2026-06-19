@@ -4,8 +4,6 @@ import { formatDate } from "@/lib/utils";
 
 const TYPE_LABEL: Record<string, string> = {
   IMAGE: "画像",
-  VIDEO: "動画",
-  AUDIO: "音声",
   FILE: "ファイル",
 };
 
@@ -28,13 +26,7 @@ export type DigitalContentCardData = {
 function FallbackIcon({ type }: { type: string }) {
   return (
     <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-violet-100 to-brand-50 text-4xl">
-      {type === "VIDEO"
-        ? "🎬"
-        : type === "AUDIO"
-          ? "🎵"
-          : type === "IMAGE"
-            ? "🖼"
-            : "📄"}
+      {type === "IMAGE" ? "🖼" : "📄"}
     </div>
   );
 }

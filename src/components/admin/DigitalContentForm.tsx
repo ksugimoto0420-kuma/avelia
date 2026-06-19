@@ -15,7 +15,7 @@ export type DigitalContentInitial = {
   productId: string | null;
   title: string;
   description: string | null;
-  type: "IMAGE" | "VIDEO" | "AUDIO" | "FILE";
+  type: "IMAGE" | "FILE";
   deliveryType: "SHARED" | "PERSONALIZED";
   fileKey: string | null;
   baseImageKey: string | null;
@@ -38,7 +38,7 @@ export function DigitalContentForm({
     productId: initial?.productId ?? "",
     title: initial?.title ?? "",
     description: initial?.description ?? "",
-    type: (initial?.type ?? "IMAGE") as "IMAGE" | "VIDEO" | "AUDIO" | "FILE",
+    type: (initial?.type ?? "IMAGE") as "IMAGE" | "FILE",
     deliveryType: (initial?.deliveryType ?? "SHARED") as "SHARED" | "PERSONALIZED",
     fileKey: initial?.fileKey ?? "",
     baseImageKey: initial?.baseImageKey ?? "",
@@ -143,8 +143,6 @@ export function DigitalContentForm({
               }
             >
               <option value="IMAGE">画像</option>
-              <option value="VIDEO">動画</option>
-              <option value="AUDIO">音声</option>
               <option value="FILE">ファイル</option>
             </Select>
             <Select

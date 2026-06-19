@@ -59,17 +59,10 @@ export default async function DigitalContentViewer({
         </Alert>
       ) : (
         <div className="overflow-hidden rounded-2xl border border-gray-100 bg-black/5 p-4">
-          {content.type === "IMAGE" && (
+          {content.type === "IMAGE" ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={url} alt={content.title} className="mx-auto max-h-[70vh]" />
-          )}
-          {content.type === "VIDEO" && (
-            <video src={url} controls className="mx-auto max-h-[70vh] w-full" />
-          )}
-          {content.type === "AUDIO" && (
-            <audio src={url} controls className="mx-auto w-full" />
-          )}
-          {content.type === "FILE" && (
+          ) : (
             <div className="py-8 text-center">
               <Button href={url}>ダウンロード</Button>
             </div>
