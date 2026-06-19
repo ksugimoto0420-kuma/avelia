@@ -157,7 +157,7 @@ export default async function AdminDashboard() {
             subtitle="閾値以下の SKU（公開中のみ表示）"
             action={
               <Link
-                href="/admin/inventories?stock=low"
+                href="/admin/inventories?stock=low&visibility=public"
                 className="text-sm font-medium text-brand-600 hover:underline"
               >
                 在庫管理へ →

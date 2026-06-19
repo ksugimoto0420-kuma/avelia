@@ -42,6 +42,7 @@ export default async function AdminInventoriesPage({
   const q = sp.q?.trim() ?? "";
   const stock = sp.stock ?? "";
   const eventType = sp.eventType ?? "";
+  const visibility = sp.visibility ?? "";
   const page = Math.max(1, Number(sp.page ?? "1"));
   const offset = (page - 1) * PAGE_SIZE;
 
@@ -60,6 +61,18 @@ export default async function AdminInventoriesPage({
     conds.push(Prisma.sql`(i.quantity - i.reserved - i.sold) BETWEEN 1 AND 10`);
   else if (stock === "soldout")
     conds.push(Prisma.sql`(i.quantity - i.reserved - i.sold) <= 0`);
+  // 公開状態の絞り込み
+  if (visibility === "public") {
+    conds.push(
+      Prisma.sql`p."isPublished" = true AND e."isPublished" = true AND (e."saleEndAt" IS NULL OR e."saleEndAt" >= NOW())`,
+    );
+  } else if (visibility === "draft") {
+    conds.push(Prisma.sql`(p."isPublished" = false OR e."isPublished" = false)`);
+  } else if (visibility === "ended") {
+    conds.push(
+      Prisma.sql`e."saleEndAt" IS NOT NULL AND e."saleEndAt" < NOW()`,
+    );
+  }
   const whereSql = conds.length
     ? Prisma.sql`WHERE ${Prisma.join(conds, " AND ")}`
     : Prisma.empty;
@@ -95,7 +108,7 @@ export default async function AdminInventoriesPage({
 
   const buildHref = (overrides: Record<string, string>) => {
     const p = new URLSearchParams();
-    const merged = { q, stock, eventType, ...overrides };
+    const merged = { q, stock, eventType, visibility, ...overrides };
     for (const [k, v] of Object.entries(merged)) if (v) p.set(k, v);
     const qs = p.toString();
     return qs ? `/admin/inventories?${qs}` : "/admin/inventories";
@@ -135,6 +148,19 @@ export default async function AdminInventoriesPage({
             ]}
           />
         </FilterField>
+        <FilterField label="公開状態">
+          <FilterSelect
+            name="visibility"
+            defaultValue={visibility}
+            className="w-40"
+            options={[
+              { value: "", label: "すべて" },
+              { value: "public", label: "公開中" },
+              { value: "draft", label: "非公開" },
+              { value: "ended", label: "販売終了" },
+            ]}
+          />
+        </FilterField>
       </FilterBar>
 
       <Card>
@@ -161,6 +187,7 @@ export default async function AdminInventoriesPage({
               <thead>
                 <tr className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
                   <th className="px-4 py-3 text-left">商品 / バリエーション</th>
+                  <th className="px-4 py-3 text-left">公開</th>
                   <th className="px-4 py-3 text-right">総在庫</th>
                   <th className="px-4 py-3 text-right">仮確保</th>
                   <th className="px-4 py-3 text-right">販売済</th>
@@ -171,7 +198,7 @@ export default async function AdminInventoriesPage({
               <tbody className="divide-y divide-gray-100">
                 {rows.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-10 text-center text-gray-400">
+                    <td colSpan={7} className="px-4 py-10 text-center text-gray-400">
                       該当する在庫がありません
                     </td>
                   </tr>
@@ -209,6 +236,17 @@ export default async function AdminInventoriesPage({
                                 </Badge>
                               ))}
                             </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          {r.eventEnded ? (
+                            <Badge color="gray">販売終了</Badge>
+                          ) : !r.eventPublished ? (
+                            <Badge color="gray">イベント非公開</Badge>
+                          ) : !r.productPublished ? (
+                            <Badge color="gray">商品非公開</Badge>
+                          ) : (
+                            <Badge color="green">公開中</Badge>
                           )}
                         </td>
                         <td className="px-4 py-3 text-right">{r.quantity}</td>
