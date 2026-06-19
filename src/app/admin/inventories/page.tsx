@@ -61,6 +61,11 @@ export default async function AdminInventoriesPage({
     conds.push(Prisma.sql`(i.quantity - i.reserved - i.sold) BETWEEN 1 AND 10`);
   else if (stock === "soldout")
     conds.push(Prisma.sql`(i.quantity - i.reserved - i.sold) <= 0`);
+  else if (stock === "below_threshold")
+    // SKU 個別に設定されている閾値 (lowStockThreshold) 以下のもの
+    conds.push(
+      Prisma.sql`i."lowStockThreshold" IS NOT NULL AND (i.quantity - i.reserved - i.sold) <= i."lowStockThreshold"`,
+    );
   // 公開状態の絞り込み
   if (visibility === "public") {
     conds.push(
@@ -126,9 +131,10 @@ export default async function AdminInventoriesPage({
           <FilterSelect
             name="stock"
             defaultValue={stock}
-            className="w-36"
+            className="w-48"
             options={[
               { value: "", label: "すべて" },
+              { value: "below_threshold", label: "閾値以下（アラート対象）" },
               { value: "in_stock", label: "在庫あり(11+)" },
               { value: "low", label: "残少(1〜10)" },
               { value: "soldout", label: "売切(0)" },
