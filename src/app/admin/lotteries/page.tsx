@@ -142,9 +142,10 @@ export default async function AdminLotteriesPage({
                         <DrawButton
                           lotteryId={l.id}
                           title={l.title}
+                          status={l.status}
+                          entryEndAt={l.entryEndAt.toISOString()}
                           entryCount={l._count.entries}
                           winnersCount={l.winnersCount}
-                          disabled={l.status === "DRAWN"}
                         />
                       </td>
                     </tr>

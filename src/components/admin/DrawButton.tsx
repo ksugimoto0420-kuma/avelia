@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
@@ -8,24 +8,44 @@ import { drawLottery } from "@/app/admin/lotteries/actions";
 
 /**
  * 抽選実行ボタン。実行前に確認モーダルで対象者数・当選者数を提示する（仕様書 9 必須）。
+ *
+ * クライアント側で「下書き」「応募締切前」「応募者0名」「既に抽選済」は
+ * 押せないようにし、無効化理由を tooltip と説明で出す。サーバー側でも
+ * 同じ条件を再チェックしている。
  */
 export function DrawButton({
   lotteryId,
   title,
+  status,
+  entryEndAt,
   entryCount,
   winnersCount,
-  disabled,
 }: {
   lotteryId: string;
   title: string;
+  /** Lottery.status: DRAFT | OPEN | CLOSED | DRAWN */
+  status: string;
+  /** Lottery.entryEndAt（ISO 文字列） */
+  entryEndAt: string;
   entryCount: number;
   winnersCount: number;
-  disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const router = useRouter();
+
+  const reason = useMemo<string | null>(() => {
+    if (status === "DRAWN") return "既に抽選済みです";
+    if (status === "DRAFT") return "下書きの抽選は実行できません";
+    const now = new Date();
+    const end = new Date(entryEndAt);
+    if (now < end) return "応募締切前は実行できません";
+    if (entryCount === 0) return "応募者がいないため実行できません";
+    return null;
+  }, [status, entryEndAt, entryCount]);
+
+  const disabled = reason != null;
 
   const handleDraw = () => {
     setError(null);
@@ -49,6 +69,7 @@ export function DrawButton({
         disabled={disabled}
         onClick={() => setOpen(true)}
         variant={disabled ? "outline" : "primary"}
+        title={reason ?? "抽選を実行する"}
       >
         抽選実行
       </Button>

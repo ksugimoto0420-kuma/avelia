@@ -116,6 +116,18 @@ export async function drawLottery(formData: FormData) {
     });
     if (!lottery) throw new Error("抽選が見つかりません");
     if (lottery.status === "DRAWN") throw new Error("既に抽選済みです");
+    if (lottery.status === "DRAFT") {
+      throw new Error(
+        "下書きの抽選は実行できません。先に「受付中」に変更し、応募締切後に実行してください",
+      );
+    }
+    const now = new Date();
+    if (now < lottery.entryEndAt) {
+      throw new Error("応募締切前は実行できません");
+    }
+    if (lottery.entries.length === 0) {
+      throw new Error("応募者がいないため実行できません");
+    }
 
     const entries = [...lottery.entries];
     // Fisher-Yates シャッフル
@@ -124,7 +136,6 @@ export async function drawLottery(formData: FormData) {
       [entries[i], entries[j]] = [entries[j], entries[i]];
     }
 
-    const now = new Date();
     const winners = entries.slice(0, lottery.winnersCount);
     const losers = entries.slice(lottery.winnersCount);
 
