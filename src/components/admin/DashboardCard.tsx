@@ -6,6 +6,7 @@ const tones = {
   blue: "from-sky-500 to-sky-400",
   amber: "from-amber-500 to-amber-400",
   purple: "from-violet-500 to-violet-400",
+  red: "from-red-500 to-red-400",
 } as const;
 
 export function DashboardCard({
