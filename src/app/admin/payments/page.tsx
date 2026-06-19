@@ -22,7 +22,6 @@ export default async function AdminPaymentsPage({
   const sp = await searchParams;
   const q = sp.q?.trim() ?? "";
   const status = sp.status ?? "";
-  const provider = sp.provider ?? "";
   // 支払い年月: "YYYY-MM" / "all" / 未指定 のいずれか。paidAt で絞る。
   const rawMonth = sp.month ?? "";
   const month = rawMonth === "all" ? "" : rawMonth;
@@ -31,8 +30,6 @@ export default async function AdminPaymentsPage({
 
   const where: Prisma.PaymentWhereInput = {};
   if (status) where.status = status as Prisma.PaymentWhereInput["status"];
-  if (provider)
-    where.provider = provider as Prisma.PaymentWhereInput["provider"];
   if (q)
     where.OR = [
       { providerPaymentId: { contains: q, mode: "insensitive" } },
@@ -63,7 +60,7 @@ export default async function AdminPaymentsPage({
 
   const qs = (overrides: Record<string, string>) => {
     const p = new URLSearchParams();
-    const merged = { q, status, provider, month: rawMonth, ...overrides };
+    const merged = { q, status, month: rawMonth, ...overrides };
     for (const [k, v] of Object.entries(merged)) if (v) p.set(k, v);
     const s = p.toString();
     return s ? `/admin/payments?${s}` : "/admin/payments";
@@ -84,7 +81,6 @@ export default async function AdminPaymentsPage({
       ),
     },
     { key: "user", header: "ユーザー", cell: (p) => p.order.user.email },
-    { key: "provider", header: "プロバイダ", cell: (p) => p.provider },
     {
       key: "amount",
       header: "金額",
@@ -125,7 +121,6 @@ export default async function AdminPaymentsPage({
         defaultMonth={defaultMonth}
         currentMonth={rawMonth}
         currentStatus={status}
-        currentProvider={provider}
         currentQ={q}
       />
 

@@ -209,7 +209,6 @@ export default async function AdminOrderDetailPage({
           <Card>
             <CardHeader title="決済情報" />
             <CardBody className="space-y-1 text-sm text-gray-700">
-              <p>プロバイダ: {order.payment?.provider ?? "-"}</p>
               <p>
                 決済ID:{" "}
                 <span className="break-all text-xs text-gray-400">

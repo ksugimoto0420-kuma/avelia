@@ -4,12 +4,14 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 /**
- * 決済管理用の即時絞り込み。状態・プロバイダ・年月・キーワードを
- * 変更するたびに router.push でサーバーを再フェッチする。
+ * 決済管理用の即時絞り込み。状態・年月・キーワードを変更するたび
+ * router.push でサーバーを再フェッチする。
  *
  * - 年月: 初回マウントで URL に month が無ければ JST 現在年月を自動セット
  * - 年月の「全期間」モードは `month=all` で表現
  * - キーワードは 300ms デバウンス
+ *
+ * プロバイダは Stripe 固定運用のため UI からは除外。
  */
 const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: "", label: "すべて" },
@@ -21,23 +23,15 @@ const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: "REFUNDED", label: "返金済" },
 ];
 
-const PROVIDER_OPTIONS: { value: string; label: string }[] = [
-  { value: "", label: "すべて" },
-  { value: "STRIPE", label: "Stripe" },
-  { value: "PAYJP", label: "Pay.JP" },
-];
-
 export function PaymentsFilterControls({
   defaultMonth,
   currentMonth,
   currentStatus,
-  currentProvider,
   currentQ,
 }: {
   defaultMonth: string;
   currentMonth: string;
   currentStatus: string;
-  currentProvider: string;
   currentQ: string;
 }) {
   const router = useRouter();
@@ -45,14 +39,12 @@ export function PaymentsFilterControls({
 
   const [month, setMonth] = useState<string>(currentMonth || defaultMonth);
   const [status, setStatus] = useState<string>(currentStatus);
-  const [provider, setProvider] = useState<string>(currentProvider);
   const [q, setQ] = useState<string>(currentQ);
 
   useEffect(() => {
     const m = search.get("month");
     setMonth(m ?? defaultMonth);
     setStatus(search.get("status") ?? "");
-    setProvider(search.get("provider") ?? "");
     setQ(search.get("q") ?? "");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
@@ -89,10 +81,6 @@ export function PaymentsFilterControls({
     setStatus(v);
     applyOverrides({ status: v });
   }
-  function onProviderChange(v: string) {
-    setProvider(v);
-    applyOverrides({ provider: v });
-  }
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   function onQChange(v: string) {
@@ -105,15 +93,13 @@ export function PaymentsFilterControls({
     if (debounceRef.current) clearTimeout(debounceRef.current);
     setMonth("all");
     setStatus("");
-    setProvider("");
     setQ("");
-    applyOverrides({ month: "all", status: "", provider: "", q: "" });
+    applyOverrides({ month: "all", status: "", q: "" });
   }
 
   const showAll = month === "all";
   const dirty =
     status ||
-    provider ||
     q ||
     (month && month !== defaultMonth && month !== "all");
 
@@ -137,20 +123,6 @@ export function PaymentsFilterControls({
           className="h-9 w-36 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-800 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
         >
           {STATUS_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-      </Field>
-      <Field label="プロバイダ" htmlFor="payments-provider">
-        <select
-          id="payments-provider"
-          value={provider}
-          onChange={(e) => onProviderChange(e.target.value)}
-          className="h-9 w-32 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-800 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
-        >
-          {PROVIDER_OPTIONS.map((o) => (
             <option key={o.value} value={o.value}>
               {o.label}
             </option>
