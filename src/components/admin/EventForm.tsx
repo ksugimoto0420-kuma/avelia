@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
+import { DateTimeField } from "@/components/ui/DateTimeField";
 import { SearchableSelectField } from "@/components/ui/SearchableSelectField";
 import { saveEvent } from "@/app/admin/events/actions";
 import { toJstDateTimeLocalString } from "@/lib/utils";
@@ -166,11 +167,9 @@ export function EventForm({
         <CardBody className="space-y-4">
           <div>
             <label className={labelCls}>開催日時（特典会・サイン会の実施日時）</label>
-            <input
-              type="datetime-local"
+            <DateTimeField
               name="eventDate"
               defaultValue={dtLocal(event?.eventDate ?? null)}
-              className={inputCls}
             />
           </div>
           <div>
@@ -189,20 +188,16 @@ export function EventForm({
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className={labelCls}>販売開始日時</label>
-              <input
-                type="datetime-local"
+              <DateTimeField
                 name="saleStartAt"
                 defaultValue={dtLocal(event?.saleStartAt ?? null)}
-                className={inputCls}
               />
             </div>
             <div>
               <label className={labelCls}>販売終了日時</label>
-              <input
-                type="datetime-local"
+              <DateTimeField
                 name="saleEndAt"
                 defaultValue={dtLocal(event?.saleEndAt ?? null)}
-                className={inputCls}
               />
             </div>
           </div>

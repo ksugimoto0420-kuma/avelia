@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
+import { DateTimeField } from "@/components/ui/DateTimeField";
 import { SearchableSelectField } from "@/components/ui/SearchableSelectField";
 import { saveLottery } from "@/app/admin/lotteries/actions";
 import { toJstDateTimeLocalString } from "@/lib/utils";
@@ -114,26 +115,22 @@ export function LotteryForm({
               <label htmlFor="lottery-entryStartAt" className={labelCls}>
                 応募開始日時 *
               </label>
-              <input
+              <DateTimeField
                 id="lottery-entryStartAt"
-                type="datetime-local"
                 name="entryStartAt"
                 required
                 defaultValue={dtLocal(initial?.entryStartAt ?? null)}
-                className={inputCls}
               />
             </div>
             <div>
               <label htmlFor="lottery-entryEndAt" className={labelCls}>
                 応募終了日時 *
               </label>
-              <input
+              <DateTimeField
                 id="lottery-entryEndAt"
-                type="datetime-local"
                 name="entryEndAt"
                 required
                 defaultValue={dtLocal(initial?.entryEndAt ?? null)}
-                className={inputCls}
               />
             </div>
           </div>
@@ -155,12 +152,10 @@ export function LotteryForm({
               <label htmlFor="lottery-purchaseDeadlineAt" className={labelCls}>
                 当選者の購入期限
               </label>
-              <input
+              <DateTimeField
                 id="lottery-purchaseDeadlineAt"
-                type="datetime-local"
                 name="purchaseDeadlineAt"
                 defaultValue={dtLocal(initial?.purchaseDeadlineAt ?? null)}
-                className={inputCls}
               />
             </div>
           </div>

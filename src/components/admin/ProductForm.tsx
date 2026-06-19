@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
+import { DateTimeField } from "@/components/ui/DateTimeField";
 import { Input, Select, Textarea } from "@/components/ui/Input";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { useToast } from "@/components/ui/Toast";
@@ -243,12 +244,15 @@ export function ProductForm({
               onChange={(e) => set("benefit", e.target.value)}
               placeholder="例: 直筆サイン入り / 2ショットチェキ"
             />
-            <Input
-              label="配信予定日 / お届け予定日"
-              type="datetime-local"
-              value={form.deliveryDate}
-              onChange={(e) => set("deliveryDate", e.target.value)}
-            />
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                配信予定日 / お届け予定日
+              </label>
+              <DateTimeField
+                value={form.deliveryDate}
+                onChange={(v) => set("deliveryDate", v)}
+              />
+            </div>
           </div>
           <Textarea
             label="説明（イベント内容・特典内容・配信内容など）"
@@ -350,18 +354,24 @@ export function ProductForm({
         <CardHeader title="販売・購入制限" />
         <CardBody className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Input
-              label="販売開始日時（空欄=イベントに従う）"
-              type="datetime-local"
-              value={form.saleStartAt}
-              onChange={(e) => set("saleStartAt", e.target.value)}
-            />
-            <Input
-              label="販売終了日時"
-              type="datetime-local"
-              value={form.saleEndAt}
-              onChange={(e) => set("saleEndAt", e.target.value)}
-            />
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                販売開始日時（空欄=イベントに従う）
+              </label>
+              <DateTimeField
+                value={form.saleStartAt}
+                onChange={(v) => set("saleStartAt", v)}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                販売終了日時
+              </label>
+              <DateTimeField
+                value={form.saleEndAt}
+                onChange={(v) => set("saleEndAt", v)}
+              />
+            </div>
             <Input
               label="1注文あたり上限（空欄=無制限）"
               type="number"
