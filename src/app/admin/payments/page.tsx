@@ -38,10 +38,12 @@ export default async function AdminPaymentsPage({
       { order: { user: { email: { contains: q, mode: "insensitive" } } } },
     ];
   if (/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) {
+    // 「年月」絞り込みは決済レコードの createdAt 基準。PENDING/AUTHORIZED/
+    // FAILED は paidAt が立たないため createdAt で揃えると見落としが無い。
     const [y, m] = month.split("-").map(Number);
     const start = new Date(y, m - 1, 1);
     const end = new Date(y, m, 1);
-    where.paidAt = { gte: start, lt: end };
+    where.createdAt = { gte: start, lt: end };
   }
 
   const [payments, total] = await Promise.all([

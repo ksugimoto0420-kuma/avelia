@@ -129,7 +129,7 @@ export function PaymentsFilterControls({
           ))}
         </select>
       </Field>
-      <Field label="支払年月" htmlFor="payments-month">
+      <Field label="年月" htmlFor="payments-month">
         <div className="flex items-center gap-2">
           <input
             id="payments-month"

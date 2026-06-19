@@ -30,6 +30,9 @@ type DemoSpec = {
 function addMin(base: Date, minutes: number): Date {
   return new Date(base.getTime() + minutes * 60 * 1000);
 }
+function minutesAgo(base: Date, m: number): Date {
+  return new Date(base.getTime() - m * 60 * 1000);
+}
 
 async function main() {
   const now = new Date();
@@ -75,7 +78,8 @@ async function main() {
       orderStatus: "REFUNDED",
       paymentStatus: "REFUNDED",
       description: "返金完了デモ",
-      paidAt: addMin(now, -60 * 24 * 3),
+      // 1時間前に決済 → 5分前に返金、というデモ用の素直な時系列
+      paidAt: minutesAgo(now, 60),
       cancelledAt: null,
       providerPaymentId: "pi_demo_refunded",
       failureReason: null,
@@ -137,8 +141,13 @@ async function main() {
             status: s.paymentStatus,
             amount: template.total,
             currency: "jpy",
-            paidAt: s.paymentStatus === "PAID" ? s.paidAt : null,
-            refundedAt: s.paymentStatus === "REFUNDED" ? addMin(now, -60) : null,
+            // PAID / REFUNDED は paidAt を立てる（返金は paidAt → refundedAt の時系列）
+            paidAt:
+              s.paymentStatus === "PAID" || s.paymentStatus === "REFUNDED"
+                ? s.paidAt
+                : null,
+            refundedAt:
+              s.paymentStatus === "REFUNDED" ? minutesAgo(now, 5) : null,
             providerPaymentId: s.providerPaymentId,
             failureReason: s.failureReason,
           },
