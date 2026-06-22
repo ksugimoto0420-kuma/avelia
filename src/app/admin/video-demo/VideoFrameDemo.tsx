@@ -288,6 +288,8 @@ export function VideoFrameDemo() {
       setResultExt(ext);
       setResultUrl(url);
       setRecording(false);
+      // 録画完了したら全画面を抜けて、結果プレビュー＋保存導線を表示する
+      setFullscreen(false);
     };
 
     recorder.start(250);
@@ -401,7 +403,7 @@ export function VideoFrameDemo() {
   // 全画面撮影モード — プレビューを画面いっぱいに広げ、
   // 「録画開始/停止」「カメラ切替」「全画面解除」だけを画面内に置く。
   // 結果が出た時点で全画面を抜けて通常UIに戻し、保存導線を出す。
-  if (fullscreen && !resultUrl) {
+  if (fullscreen) {
     return (
       <div className="fixed inset-0 z-50 flex flex-col bg-black">
         {/* プレビュー本体（全画面） */}
@@ -420,7 +422,7 @@ export function VideoFrameDemo() {
             <img
               src={frameImg.src}
               alt="frame"
-              className="pointer-events-none absolute inset-0 h-full w-full object-contain"
+              className="pointer-events-none absolute inset-0 h-full w-full"
             />
           )}
           {/* 録画中バッジ */}
@@ -652,6 +654,14 @@ export function VideoFrameDemo() {
         <button
           type="button"
           onClick={() => {
+            // 既存の録画結果が残っているとボタンの再押下で全画面に入っても
+            // 「結果プレビュー」で上書きされかねないのでクリアしてから入る。
+            if (resultUrl) {
+              URL.revokeObjectURL(resultUrl);
+              setResultUrl(null);
+              setResultBlob(null);
+              setShareNote(null);
+            }
             setFullscreen(true);
             if (!cameraOn) startCamera();
           }}
@@ -822,8 +832,10 @@ function buildFrameSvg(
   const dateSize = Math.floor(w * 0.038);
   const cornerR = Math.floor(w * 0.04);
   // ヘッダー / フッターのバーを上下に置き、ボディは透過枠
+  // preserveAspectRatio="none" を付けて、<img> や Canvas で
+  // 任意の縦横比に引き伸ばしてもプレビュー枠の四隅まで埋まるようにする。
   return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
   <!-- 全体に枠線 -->
   <rect x="${borderW / 2}" y="${borderW / 2}" width="${w - borderW}" height="${h - borderW}"
         rx="${cornerR}" ry="${cornerR}"
