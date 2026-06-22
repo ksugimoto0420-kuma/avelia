@@ -70,6 +70,11 @@ export function VideoFrameDemo() {
   const [fullscreen, setFullscreen] = useState(false);
   // 録画開始時点の日付を固定（録画中に日付が変わっても表示は変えない）
   const [todayLabel, setTodayLabel] = useState<string>(() => formatToday());
+  // 合成中フラグ・進捗
+  const [compositing, setCompositing] = useState(false);
+  const [compositeProgress, setCompositeProgress] = useState(0);
+  // 撮影時の facingMode（合成時に鏡像の有無を決めるため固定する）
+  const recordedFacingRef = useRef<"user" | "environment">("user");
 
   const frame = FRAMES.find((f) => f.key === frameKey) ?? FRAMES[0];
 
@@ -166,51 +171,204 @@ export function VideoFrameDemo() {
     };
   }, []);
 
-  /** Canvas に動画＋フレームを描画し続ける（録画中のフィード生成） */
-  const drawLoop = useCallback(() => {
-    const canvas = canvasRef.current;
-    const video = videoRef.current;
-    if (!canvas || !video) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+  /**
+   * 録画済み raw 動画(blob) に対し、Canvas でフレームを合成して
+   * 最終動画を生成する。撮影プレビューに比べ、出力サイズを 9:16 固定
+   * (VIDEO_WIDTH x VIDEO_HEIGHT) にできるため、PC/スマホ問わず仕上がりが揃う。
+   *
+   * フロー:
+   *   1) 入力 blob を <video>(オフスクリーン) として再生
+   *   2) 'play' が始まったら Canvas を動画と同期して描画ループ
+   *   3) Canvas.captureStream() + MediaRecorder で再録画
+   *   4) 'ended' で停止して Blob → URL を結果に確定
+   */
+  const composeRecording = useCallback(
+    async (rawBlob: Blob, facingAtRecord: "user" | "environment") => {
+      setError(null);
+      setCompositing(true);
+      setCompositeProgress(0);
 
-    canvas.width = VIDEO_WIDTH;
-    canvas.height = VIDEO_HEIGHT;
+      // 出力用の隠し canvas（DOM の canvasRef を流用）
+      const canvas = canvasRef.current;
+      if (!canvas) {
+        setError("合成用キャンバスが見つかりません");
+        setCompositing(false);
+        return;
+      }
+      canvas.width = VIDEO_WIDTH;
+      canvas.height = VIDEO_HEIGHT;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        setError("Canvas 2D context が取得できません");
+        setCompositing(false);
+        return;
+      }
 
-    const tick = () => {
-      // 動画をキャンバスにフィットさせる（cover）
-      const vw = video.videoWidth;
-      const vh = video.videoHeight;
-      if (vw > 0 && vh > 0) {
-        const r = Math.max(canvas.width / vw, canvas.height / vh);
-        const dw = vw * r;
-        const dh = vh * r;
-        const dx = (canvas.width - dw) / 2;
-        const dy = (canvas.height - dh) / 2;
-        // フロントカメラは左右反転して描く（プレビューと録画結果を一致させる）
-        if (facingMode === "user") {
-          ctx.save();
-          ctx.translate(canvas.width, 0);
-          ctx.scale(-1, 1);
-          ctx.drawImage(video, canvas.width - dx - dw, dy, dw, dh);
-          ctx.restore();
-        } else {
-          ctx.drawImage(video, dx, dy, dw, dh);
+      // オフスクリーンの video 要素で raw blob を再生する
+      const rawUrl = URL.createObjectURL(rawBlob);
+      const srcVideo = document.createElement("video");
+      srcVideo.src = rawUrl;
+      srcVideo.muted = true; // 自動再生のため
+      srcVideo.playsInline = true;
+      // メタデータ読み込み待ち
+      await new Promise<void>((resolve, reject) => {
+        srcVideo.onloadedmetadata = () => resolve();
+        srcVideo.onerror = () => reject(new Error("動画の読み込みに失敗"));
+      }).catch((e) => {
+        setError(e instanceof Error ? e.message : "動画読込エラー");
+      });
+      const durationSec = isFinite(srcVideo.duration) ? srcVideo.duration : 0;
+
+      // 出力 MediaRecorder（mimeType の決め方は撮影と同じ方針）
+      const isSafariOrIOS = (() => {
+        if (typeof navigator === "undefined") return false;
+        const ua = navigator.userAgent;
+        const isIOS = /iPad|iPhone|iPod/.test(ua);
+        const isSafari =
+          /Safari\//.test(ua) && !/Chrome\//.test(ua) && !/Chromium\//.test(ua);
+        return isIOS || isSafari;
+      })();
+      const mp4First = [
+        "video/mp4;codecs=h264,aac",
+        "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
+        "video/mp4",
+      ];
+      const webmFirst = [
+        "video/webm;codecs=vp9,opus",
+        "video/webm;codecs=vp8,opus",
+        "video/webm",
+      ];
+      const candidates = isSafariOrIOS
+        ? [...mp4First, ...webmFirst]
+        : [...webmFirst, ...mp4First];
+      const mimeType = candidates.find((m) => {
+        try {
+          return MediaRecorder.isTypeSupported(m);
+        } catch {
+          return false;
         }
-      } else {
-        ctx.fillStyle = "#000";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-      }
-      // フレームを重ねる（contain で中央配置 / フレームは全面サイズ前提）
-      if (frameImg) {
-        ctx.drawImage(frameImg, 0, 0, canvas.width, canvas.height);
-      }
-      animationRef.current = requestAnimationFrame(tick);
-    };
-    animationRef.current = requestAnimationFrame(tick);
-  }, [frameImg, facingMode]);
+      });
 
-  /** 録画開始 */
+      const outStream = canvas.captureStream(30);
+      // 音声を raw 動画から取り出してミックスする
+      // (srcVideo を Web Audio に流すのは複雑なので、captureStream を使う)
+      try {
+        const elAny = srcVideo as HTMLVideoElement & {
+          captureStream?: () => MediaStream;
+          mozCaptureStream?: () => MediaStream;
+        };
+        const inStream = elAny.captureStream
+          ? elAny.captureStream()
+          : elAny.mozCaptureStream
+            ? elAny.mozCaptureStream()
+            : null;
+        if (inStream) {
+          inStream.getAudioTracks().forEach((t) => outStream.addTrack(t));
+        }
+      } catch {
+        // 音声無しでも合成は継続する
+      }
+
+      let outRecorder: MediaRecorder;
+      const outChunks: Blob[] = [];
+      try {
+        outRecorder = mimeType
+          ? new MediaRecorder(outStream, { mimeType })
+          : new MediaRecorder(outStream);
+      } catch (e) {
+        URL.revokeObjectURL(rawUrl);
+        setError(
+          "このブラウザは合成出力に対応していません: " +
+            (e instanceof Error ? e.message : ""),
+        );
+        setCompositing(false);
+        return;
+      }
+      outRecorder.ondataavailable = (ev) => {
+        if (ev.data && ev.data.size > 0) outChunks.push(ev.data);
+      };
+
+      // 描画ループ
+      const drawTick = () => {
+        const vw = srcVideo.videoWidth;
+        const vh = srcVideo.videoHeight;
+        if (vw > 0 && vh > 0) {
+          const r = Math.max(canvas.width / vw, canvas.height / vh);
+          const dw = vw * r;
+          const dh = vh * r;
+          const dx = (canvas.width - dw) / 2;
+          const dy = (canvas.height - dh) / 2;
+          if (facingAtRecord === "user") {
+            ctx.save();
+            ctx.translate(canvas.width, 0);
+            ctx.scale(-1, 1);
+            ctx.drawImage(srcVideo, canvas.width - dx - dw, dy, dw, dh);
+            ctx.restore();
+          } else {
+            ctx.drawImage(srcVideo, dx, dy, dw, dh);
+          }
+        } else {
+          ctx.fillStyle = "#000";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+        if (frameImg) {
+          ctx.drawImage(frameImg, 0, 0, canvas.width, canvas.height);
+        }
+        if (durationSec > 0) {
+          setCompositeProgress(
+            Math.min(1, srcVideo.currentTime / durationSec),
+          );
+        }
+        animationRef.current = requestAnimationFrame(drawTick);
+      };
+
+      // 終了処理
+      const finalize = () => {
+        if (animationRef.current != null)
+          cancelAnimationFrame(animationRef.current);
+        animationRef.current = null;
+        try {
+          if (outRecorder.state !== "inactive") outRecorder.stop();
+        } catch {}
+      };
+      srcVideo.onended = finalize;
+
+      outRecorder.onstop = () => {
+        URL.revokeObjectURL(rawUrl);
+        const finalType = mimeType ?? "video/webm";
+        const ext: "mp4" | "webm" = finalType.includes("mp4") ? "mp4" : "webm";
+        const blob = new Blob(outChunks, { type: finalType });
+        const url = URL.createObjectURL(blob);
+        setResultBlob(blob);
+        setResultExt(ext);
+        setResultUrl(url);
+        setCompositing(false);
+        setCompositeProgress(1);
+        setFullscreen(false);
+      };
+
+      outRecorder.start(250);
+      try {
+        await srcVideo.play();
+      } catch (e) {
+        finalize();
+        setError(
+          "撮影動画の再生に失敗しました: " +
+            (e instanceof Error ? e.message : ""),
+        );
+        setCompositing(false);
+        return;
+      }
+      animationRef.current = requestAnimationFrame(drawTick);
+    },
+    [frameImg],
+  );
+
+  /**
+   * 録画開始（カメラの MediaStream を直接記録）。
+   * Canvas を介さないので撮影プレビューは歪まず、PCのWebカメラでも
+   * 自然な見た目になる。フレームの合成は録画完了後に composeRecording で行う。
+   */
   const startRecording = useCallback(() => {
     setError(null);
     setResultUrl(null);
@@ -220,19 +378,12 @@ export function VideoFrameDemo() {
     }
     // 録画開始時点の日付でフレームを再生成
     setTodayLabel(formatToday());
-    drawLoop();
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    // Canvas 自体のストリーム（映像）+ getUserMedia の音声トラック
-    const canvasStream = canvas.captureStream(30);
-    const audioTracks = streamRef.current.getAudioTracks();
-    audioTracks.forEach((t) => canvasStream.addTrack(t));
+    // 撮影中の facingMode を固定（合成時の鏡像有無を決めるため）
+    recordedFacingRef.current = facingMode;
 
     chunksRef.current = [];
-    // mimeType を順に試す（ブラウザ依存）。
-    // iOS Safari は写真Appに WebM を保存できないので、Safari/iOS では
-    // MP4(H.264/AAC) を最優先にして「写真に保存」できる動画を出す。
+    // 中間ファイルは WebM 優先で十分（合成時に最終 mimeType を選び直すため）。
+    // Safari/iOS は WebM が録れないので MP4 を選ぶ。
     const isSafariOrIOS = (() => {
       if (typeof navigator === "undefined") return false;
       const ua = navigator.userAgent;
@@ -241,31 +392,32 @@ export function VideoFrameDemo() {
         /Safari\//.test(ua) && !/Chrome\//.test(ua) && !/Chromium\//.test(ua);
       return isIOS || isSafari;
     })();
-    const mp4First = [
-      "video/mp4;codecs=h264,aac",
-      "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
-      "video/mp4",
-    ];
-    const webmFirst = [
-      "video/webm;codecs=vp9,opus",
-      "video/webm;codecs=vp8,opus",
-      "video/webm",
-    ];
     const candidates = isSafariOrIOS
-      ? [...mp4First, ...webmFirst]
-      : [...webmFirst, ...mp4First];
-    const mimeType = candidates.find((m) => {
+      ? [
+          "video/mp4;codecs=h264,aac",
+          "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
+          "video/mp4",
+          "video/webm",
+        ]
+      : [
+          "video/webm;codecs=vp9,opus",
+          "video/webm;codecs=vp8,opus",
+          "video/webm",
+          "video/mp4",
+        ];
+    const rawMime = candidates.find((m) => {
       try {
         return MediaRecorder.isTypeSupported(m);
       } catch {
         return false;
       }
     });
+
     let recorder: MediaRecorder;
     try {
-      recorder = mimeType
-        ? new MediaRecorder(canvasStream, { mimeType })
-        : new MediaRecorder(canvasStream);
+      recorder = rawMime
+        ? new MediaRecorder(streamRef.current, { mimeType: rawMime })
+        : new MediaRecorder(streamRef.current);
     } catch (e) {
       setError(
         "このブラウザは録画に対応していません: " +
@@ -278,18 +430,14 @@ export function VideoFrameDemo() {
       if (ev.data && ev.data.size > 0) chunksRef.current.push(ev.data);
     };
     recorder.onstop = () => {
-      if (animationRef.current != null)
-        cancelAnimationFrame(animationRef.current);
-      const finalType = mimeType ?? "video/webm";
-      const ext: "mp4" | "webm" = finalType.includes("mp4") ? "mp4" : "webm";
-      const blob = new Blob(chunksRef.current, { type: finalType });
-      const url = URL.createObjectURL(blob);
-      setResultBlob(blob);
-      setResultExt(ext);
-      setResultUrl(url);
+      const rawType = rawMime ?? "video/webm";
+      const rawBlob = new Blob(chunksRef.current, { type: rawType });
       setRecording(false);
-      // 録画完了したら全画面を抜けて、結果プレビュー＋保存導線を表示する
-      setFullscreen(false);
+      // 撮影終了したらカメラはもう不要なので止めて、合成に入る
+      const facing = recordedFacingRef.current;
+      stopCamera();
+      // composeRecording 内で結果と setFullscreen(false) を処理する
+      composeRecording(rawBlob, facing);
     };
 
     recorder.start(250);
@@ -297,7 +445,7 @@ export function VideoFrameDemo() {
     recordingStartedAtRef.current = Date.now();
     setRecording(true);
     setElapsedMs(0);
-  }, [drawLoop]);
+  }, [facingMode, composeRecording, stopCamera]);
 
   /** 録画停止（手動 or 30秒経過） */
   const stopRecording = useCallback(() => {
@@ -417,19 +565,22 @@ export function VideoFrameDemo() {
               (facingMode === "user" ? "[transform:scaleX(-1)]" : "")
             }
           />
-          {frameImg && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={frameImg.src}
-              alt="frame"
-              className="pointer-events-none absolute inset-0 h-full w-full"
-            />
-          )}
+          {/* 全画面プレビューはカメラ素のまま表示。
+              フレームは録画後に 9:16 固定で合成されるためここでは重ねない。
+              プレビューにフレームを乗せるとPCの横長画面で歪んで見栄えが悪い。 */}
           {/* 録画中バッジ */}
           {recording && (
             <div className="absolute left-4 top-[max(env(safe-area-inset-top),16px)] flex items-center gap-2 rounded-full bg-red-600/90 px-3 py-1 text-xs font-bold text-white shadow">
               <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-white" />
               REC {(elapsedMs / 1000).toFixed(1)}s
+            </div>
+          )}
+          {/* 撮影中フレーム選択ヒント */}
+          {!recording && cameraOn && (
+            <div className="absolute left-4 right-4 top-[max(env(safe-area-inset-top),16px)] flex items-center justify-center">
+              <div className="rounded-full bg-black/50 px-3 py-1 text-[11px] font-medium text-white/90 backdrop-blur">
+                {frame.emoji} {frame.label} を録画後に合成します
+              </div>
             </div>
           )}
           {/* 全画面解除 */}
@@ -723,6 +874,27 @@ export function VideoFrameDemo() {
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
           {error}
+        </div>
+      )}
+
+      {/* フレーム合成中 */}
+      {compositing && (
+        <div className="rounded-2xl border border-gray-200 bg-white p-4">
+          <p className="mb-2 text-sm font-semibold text-gray-700">
+            フレームを合成しています…
+          </p>
+          <div className="h-3 w-full overflow-hidden rounded-full bg-gray-100">
+            <div
+              className="h-full bg-brand-600 transition-[width] duration-150"
+              style={{
+                width: `${Math.round(compositeProgress * 100)}%`,
+              }}
+            />
+          </div>
+          <p className="mt-2 text-xs text-gray-500">
+            撮影した時間と同じくらいかかります（30秒撮影なら最大30秒）。
+            画面を閉じずにお待ちください。
+          </p>
         </div>
       )}
 
