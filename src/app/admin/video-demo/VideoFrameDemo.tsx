@@ -66,6 +66,10 @@ export function VideoFrameDemo() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [shareNote, setShareNote] = useState<string | null>(null);
+  // 全画面撮影モード（プレビューを画面いっぱいに広げる）
+  const [fullscreen, setFullscreen] = useState(false);
+  // 録画開始時点の日付を固定（録画中に日付が変わっても表示は変えない）
+  const [todayLabel, setTodayLabel] = useState<string>(() => formatToday());
 
   const frame = FRAMES.find((f) => f.key === frameKey) ?? FRAMES[0];
 
@@ -73,7 +77,7 @@ export function VideoFrameDemo() {
   const [frameImg, setFrameImg] = useState<HTMLImageElement | null>(null);
 
   useEffect(() => {
-    const svg = buildFrameSvg(frame, VIDEO_WIDTH, VIDEO_HEIGHT);
+    const svg = buildFrameSvg(frame, VIDEO_WIDTH, VIDEO_HEIGHT, todayLabel);
     const blob = new Blob([svg], { type: "image/svg+xml" });
     const url = URL.createObjectURL(blob);
     const img = new Image();
@@ -81,7 +85,7 @@ export function VideoFrameDemo() {
     img.onerror = () => setError("フレーム画像の生成に失敗しました");
     img.src = url;
     return () => URL.revokeObjectURL(url);
-  }, [frame]);
+  }, [frame, todayLabel]);
 
   /**
    * カメラ起動 / 切替。
@@ -214,6 +218,8 @@ export function VideoFrameDemo() {
       setError("先にカメラを起動してください");
       return;
     }
+    // 録画開始時点の日付でフレームを再生成
+    setTodayLabel(formatToday());
     drawLoop();
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -319,7 +325,7 @@ export function VideoFrameDemo() {
     setShareNote(null);
   }, [resultUrl]);
 
-  /** ダウンロード */
+  /** ダウンロード（保存後はカメラを自動停止して電源/プライバシーに配慮） */
   const downloadVideo = useCallback(() => {
     if (!resultUrl) return;
     const a = document.createElement("a");
@@ -328,7 +334,10 @@ export function VideoFrameDemo() {
     document.body.appendChild(a);
     a.click();
     a.remove();
-  }, [resultUrl, resultExt, frame]);
+    // 保存が走ったらカメラは止めて全画面モードも抜ける
+    stopCamera();
+    setFullscreen(false);
+  }, [resultUrl, resultExt, frame, stopCamera]);
 
   /**
    * 共有（iPhoneでアルバムに保存するための導線）。
@@ -375,6 +384,10 @@ export function VideoFrameDemo() {
           "共有はできましたが、形式が WebM のため iPhone の写真Appには直接保存できない場合があります。MP4 対応端末で再録画するか、『DL』からファイルに保存してください。",
         );
       }
+      // 共有シートを閉じた（=ユーザーが何らかのアクションを完了した）タイミングで
+      // カメラを止める。撮影しっぱなしによるバッテリ消費とプライバシー配慮。
+      stopCamera();
+      setFullscreen(false);
     } catch (e) {
       // ユーザーがキャンセルした場合は静かに無視
       if (e instanceof Error && e.name === "AbortError") return;
@@ -383,7 +396,139 @@ export function VideoFrameDemo() {
           (e instanceof Error ? e.message : "不明なエラー"),
       );
     }
-  }, [resultBlob, resultExt, frame]);
+  }, [resultBlob, resultExt, frame, stopCamera]);
+
+  // 全画面撮影モード — プレビューを画面いっぱいに広げ、
+  // 「録画開始/停止」「カメラ切替」「全画面解除」だけを画面内に置く。
+  // 結果が出た時点で全画面を抜けて通常UIに戻し、保存導線を出す。
+  if (fullscreen && !resultUrl) {
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col bg-black">
+        {/* プレビュー本体（全画面） */}
+        <div className="relative flex-1 overflow-hidden">
+          <video
+            ref={videoRef}
+            playsInline
+            muted
+            className={
+              "absolute inset-0 h-full w-full object-cover " +
+              (facingMode === "user" ? "[transform:scaleX(-1)]" : "")
+            }
+          />
+          {frameImg && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={frameImg.src}
+              alt="frame"
+              className="pointer-events-none absolute inset-0 h-full w-full object-contain"
+            />
+          )}
+          {/* 録画中バッジ */}
+          {recording && (
+            <div className="absolute left-4 top-[max(env(safe-area-inset-top),16px)] flex items-center gap-2 rounded-full bg-red-600/90 px-3 py-1 text-xs font-bold text-white shadow">
+              <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-white" />
+              REC {(elapsedMs / 1000).toFixed(1)}s
+            </div>
+          )}
+          {/* 全画面解除 */}
+          <button
+            type="button"
+            onClick={() => {
+              if (recording) stopRecording();
+              stopCamera();
+              setFullscreen(false);
+            }}
+            className="absolute right-4 top-[max(env(safe-area-inset-top),16px)] rounded-full bg-black/60 px-3 py-1.5 text-xs font-medium text-white backdrop-blur"
+          >
+            ✕ 閉じる
+          </button>
+          {!cameraOn && (
+            <div className="absolute inset-0 flex items-center justify-center px-6 text-center text-sm text-white/80">
+              下の「カメラ起動」を押してください
+            </div>
+          )}
+          {/* エラー表示 */}
+          {error && (
+            <div className="absolute left-4 right-4 top-16 rounded-lg bg-red-600/90 px-3 py-2 text-xs text-white">
+              {error}
+            </div>
+          )}
+        </div>
+
+        {/* 操作バー（safe-area込み） */}
+        <div className="bg-black/85 px-4 pt-3 pb-[max(env(safe-area-inset-bottom),12px)]">
+          <div className="flex items-center justify-center gap-4">
+            {/* 左: カメラ切替 */}
+            <button
+              type="button"
+              onClick={switchCamera}
+              disabled={!cameraOn || busy || recording}
+              className="flex h-12 w-12 items-center justify-center rounded-full border border-white/30 text-white disabled:opacity-40"
+              aria-label="カメラ切替"
+            >
+              🔄
+            </button>
+
+            {/* 中央: メインボタン（カメラ→録画→停止のステップで切替） */}
+            {!cameraOn ? (
+              <button
+                type="button"
+                onClick={() => startCamera()}
+                disabled={busy}
+                className="flex h-16 w-16 items-center justify-center rounded-full bg-white text-2xl shadow-lg disabled:opacity-50"
+                aria-label="カメラ起動"
+              >
+                🎥
+              </button>
+            ) : !recording ? (
+              <button
+                type="button"
+                onClick={startRecording}
+                className="flex h-16 w-16 items-center justify-center rounded-full bg-red-600 text-white shadow-lg ring-4 ring-white/30"
+                aria-label="録画開始"
+              >
+                <span className="block h-8 w-8 rounded-full bg-white" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={stopRecording}
+                className="flex h-16 w-16 items-center justify-center rounded-full bg-red-600 text-white shadow-lg ring-4 ring-white/30"
+                aria-label="録画停止"
+              >
+                <span className="block h-7 w-7 rounded bg-white" />
+              </button>
+            )}
+
+            {/* 右: フレーム切替（簡易） */}
+            <button
+              type="button"
+              onClick={() => {
+                const idx = FRAMES.findIndex((f) => f.key === frameKey);
+                const next = FRAMES[(idx + 1) % FRAMES.length];
+                setFrameKey(next.key);
+              }}
+              className="flex h-12 w-12 items-center justify-center rounded-full border border-white/30 text-lg text-white"
+              aria-label="フレーム切替"
+              title={frame.label}
+            >
+              {frame.emoji}
+            </button>
+          </div>
+          <p className="mt-2 text-center text-[11px] text-white/60">
+            {recording
+              ? `録画中 ${(elapsedMs / 1000).toFixed(1)}s / 最大30秒`
+              : cameraOn
+                ? "中央の赤ボタンで録画開始"
+                : "中央のカメラアイコンで起動"}
+          </p>
+        </div>
+
+        {/* 録画用 Canvas は隠す */}
+        <canvas ref={canvasRef} className="hidden" />
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 px-4 py-6">
@@ -504,6 +649,17 @@ export function VideoFrameDemo() {
 
       {/* 操作ボタン */}
       <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={() => {
+            setFullscreen(true);
+            if (!cameraOn) startCamera();
+          }}
+          disabled={busy}
+          className="rounded-lg bg-gray-900 px-5 py-2 text-sm font-bold text-white hover:bg-gray-800 disabled:opacity-50"
+        >
+          📱 全画面で撮影
+        </button>
         {!cameraOn ? (
           <button
             type="button"
@@ -657,11 +813,13 @@ function buildFrameSvg(
   frame: { colorBg: string; colorText: string; emoji: string; label: string },
   w: number,
   h: number,
+  dateLabel: string,
 ): string {
   const padding = Math.floor(w * 0.05);
   const borderW = Math.floor(w * 0.04);
   const titleSize = Math.floor(w * 0.07);
   const subSize = Math.floor(w * 0.04);
+  const dateSize = Math.floor(w * 0.038);
   const cornerR = Math.floor(w * 0.04);
   // ヘッダー / フッターのバーを上下に置き、ボディは透過枠
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -685,7 +843,22 @@ function buildFrameSvg(
         font-size="${subSize}" font-weight="700" fill="${frame.colorText}">
     ${escapeXml(frame.label)}
   </text>
+  <!-- 右下に撮影日（録画開始時点で確定） -->
+  <text x="${w - padding}" y="${h - Math.floor(h * 0.045)}"
+        text-anchor="end"
+        font-family="ui-sans-serif, system-ui, -apple-system, 'Hiragino Sans', 'Noto Sans JP', sans-serif"
+        font-size="${dateSize}" font-weight="700" fill="${frame.colorText}" fill-opacity="0.9">
+    ${escapeXml(dateLabel)}
+  </text>
 </svg>`;
+}
+
+/** 今日の日付を YYYY.MM.DD 形式で返す */
+function formatToday(d: Date = new Date()): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}.${m}.${day}`;
 }
 
 function escapeXml(s: string): string {
