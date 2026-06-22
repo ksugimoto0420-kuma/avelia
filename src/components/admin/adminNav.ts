@@ -29,6 +29,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     items: [
       { href: "/admin/digital-contents", label: "デジタルコンテンツ", icon: "🎬" },
       { href: "/admin/digital-deliveries", label: "サイン納品", icon: "✍️" },
+      { href: "/admin/video-demo", label: "動画フレーム デモ", icon: "📹" },
     ],
   },
   {
