@@ -11,7 +11,7 @@ export function UserFooter() {
             </p>
             <p className="mt-2 max-w-sm text-sm text-gray-500">
               アイドル・アーティストのオンライン特典会・サイン会、
-              直筆サイン入りグッズ・すきくじ・トレカのファン向けショップ。
+              直筆サイン入りグッズ・アベリアくじ・トレカのファン向けショップ。
             </p>
           </div>
           <nav className="grid grid-cols-2 gap-x-12 gap-y-2 text-sm text-gray-600">

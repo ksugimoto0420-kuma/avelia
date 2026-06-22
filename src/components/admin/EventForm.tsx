@@ -56,7 +56,7 @@ export function EventForm({
                 className={inputCls}
               >
                 <option value="MEET_GREET">オンライン特典会</option>
-                <option value="KUJI">すきくじ（抽選くじ）</option>
+                <option value="KUJI">アベリアくじ（抽選くじ）</option>
                 <option value="TRADING_CARD">トレカ</option>
                 <option value="GOODS">グッズ</option>
               </select>

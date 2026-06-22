@@ -8,7 +8,7 @@ import { formatDateTime } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "抽選販売（すきくじ）" };
+export const metadata = { title: "抽選販売（アベリアくじ）" };
 
 export default async function LotteriesListPage() {
   const user = await getOptionalUser();
@@ -42,7 +42,7 @@ export default async function LotteriesListPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10">
-      <h1 className="text-3xl font-bold text-gray-900">抽選販売（すきくじ）</h1>
+      <h1 className="text-3xl font-bold text-gray-900">抽選販売（アベリアくじ）</h1>
       <p className="mt-2 text-sm text-gray-500">
         応募期間中の抽選にご応募いただけます。当選された方のみ、購入期限内に対象商品をご購入いただけます。
       </p>

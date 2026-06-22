@@ -134,7 +134,7 @@ export default async function HomePage() {
           </h1>
           <p className="mt-4 max-w-xl text-brand-50">
             オンライン特典会・サイン会の参加券、直筆サイン入りポスター・写真集、
-            すきくじ（抽選）やトレカまで。先着・抽選に対応したファン向けショップです。
+            アベリアくじ（抽選）やトレカまで。先着・抽選に対応したファン向けショップです。
           </p>
           <form
             action="/events"

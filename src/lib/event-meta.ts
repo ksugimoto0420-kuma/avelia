@@ -3,7 +3,7 @@ import type { BadgeColor } from "@/components/ui/Badge";
 
 export const EVENT_TYPE_LABEL: Record<EventType, string> = {
   MEET_GREET: "オンライン特典会",
-  KUJI: "すきくじ",
+  KUJI: "アベリアくじ",
   TRADING_CARD: "トレカ",
   GOODS: "グッズ",
 };
