@@ -29,7 +29,9 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     items: [
       { href: "/admin/digital-contents", label: "デジタルコンテンツ", icon: "🎬" },
       { href: "/admin/digital-deliveries", label: "サイン納品", icon: "✍️" },
-      { href: "/admin/video-demo", label: "動画フレーム デモ", icon: "📹" },
+      // 動画フレーム デモは社内検証中のため一旦メニュー非表示
+      // URLは生きているので /admin/video-demo に直接アクセスして確認可能
+      // { href: "/admin/video-demo", label: "動画フレーム デモ", icon: "📹" },
     ],
   },
   {

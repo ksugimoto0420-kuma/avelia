@@ -57,6 +57,7 @@ export function VideoFrameDemo() {
 
   const [frameKey, setFrameKey] = useState<string>(FRAMES[0].key);
   const [cameraOn, setCameraOn] = useState(false);
+  const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
   const [recording, setRecording] = useState(false);
   const [elapsedMs, setElapsedMs] = useState(0);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
@@ -79,40 +80,67 @@ export function VideoFrameDemo() {
     return () => URL.revokeObjectURL(url);
   }, [frame]);
 
-  /** カメラ起動 */
-  const startCamera = useCallback(async () => {
-    setError(null);
-    setBusy(true);
-    try {
-      // 既に起動中なら一度止める
-      streamRef.current?.getTracks().forEach((t) => t.stop());
+  /**
+   * カメラ起動 / 切替。
+   * 引数の facing が省略された場合は現在の state（facingMode）を使う。
+   * 指定の facingMode が無い端末（PCにアウトカメラ無し等）では
+   * フォールバックで facingMode 指定なしで再試行する。
+   */
+  const startCamera = useCallback(
+    async (facing?: "user" | "environment") => {
+      const target = facing ?? facingMode;
+      setError(null);
+      setBusy(true);
+      try {
+        // 既に起動中なら一度止める（切替時のカメラ占有エラー回避）
+        streamRef.current?.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
 
-      // facingMode: "user" でフロントカメラ（自撮り想定）。"environment" で背面
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
+        const baseVideo = {
           width: { ideal: VIDEO_WIDTH },
           height: { ideal: VIDEO_HEIGHT },
-          facingMode: "user",
-        },
-        audio: true,
-      });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play().catch(() => {});
+        } as const;
+
+        let stream: MediaStream;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { ...baseVideo, facingMode: { ideal: target } },
+            audio: true,
+          });
+        } catch {
+          // 指定カメラが無い端末向けフォールバック（PCのアウトカメラ要求など）
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: baseVideo,
+            audio: true,
+          });
+        }
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play().catch(() => {});
+        }
+        setFacingMode(target);
+        setCameraOn(true);
+      } catch (e) {
+        console.error(e);
+        setError(
+          e instanceof Error
+            ? `カメラを起動できませんでした: ${e.message}`
+            : "カメラを起動できませんでした",
+        );
+      } finally {
+        setBusy(false);
       }
-      setCameraOn(true);
-    } catch (e) {
-      console.error(e);
-      setError(
-        e instanceof Error
-          ? `カメラを起動できませんでした: ${e.message}`
-          : "カメラを起動できませんでした",
-      );
-    } finally {
-      setBusy(false);
-    }
-  }, []);
+    },
+    [facingMode],
+  );
+
+  /** カメラ切替（フロント ⇄ 背面）。録画中は無効。 */
+  const switchCamera = useCallback(() => {
+    if (recording) return;
+    const next = facingMode === "user" ? "environment" : "user";
+    startCamera(next);
+  }, [facingMode, recording, startCamera]);
 
   /** カメラ停止 */
   const stopCamera = useCallback(() => {
@@ -152,7 +180,16 @@ export function VideoFrameDemo() {
         const dh = vh * r;
         const dx = (canvas.width - dw) / 2;
         const dy = (canvas.height - dh) / 2;
-        ctx.drawImage(video, dx, dy, dw, dh);
+        // フロントカメラは左右反転して描く（プレビューと録画結果を一致させる）
+        if (facingMode === "user") {
+          ctx.save();
+          ctx.translate(canvas.width, 0);
+          ctx.scale(-1, 1);
+          ctx.drawImage(video, canvas.width - dx - dw, dy, dw, dh);
+          ctx.restore();
+        } else {
+          ctx.drawImage(video, dx, dy, dw, dh);
+        }
       } else {
         ctx.fillStyle = "#000";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -164,7 +201,7 @@ export function VideoFrameDemo() {
       animationRef.current = requestAnimationFrame(tick);
     };
     animationRef.current = requestAnimationFrame(tick);
-  }, [frameImg]);
+  }, [frameImg, facingMode]);
 
   /** 録画開始 */
   const startRecording = useCallback(() => {
@@ -311,12 +348,15 @@ export function VideoFrameDemo() {
       {/* プレビュー */}
       <div className="rounded-2xl border border-gray-200 bg-black p-4">
         <div className="relative mx-auto aspect-[9/16] max-w-xs overflow-hidden rounded-xl bg-black">
-          {/* カメラ素のプレビュー */}
+          {/* カメラ素のプレビュー（フロントは鏡像にする） */}
           <video
             ref={videoRef}
             playsInline
             muted
-            className="absolute inset-0 h-full w-full object-cover"
+            className={
+              "absolute inset-0 h-full w-full object-cover " +
+              (facingMode === "user" ? "[transform:scaleX(-1)]" : "")
+            }
           />
           {/* フレーム上重ね（プレビュー時は SVG を <img> で重ねるだけ。
               録画時は Canvas に転写される） */}
@@ -345,25 +385,74 @@ export function VideoFrameDemo() {
         <canvas ref={canvasRef} className="hidden" />
       </div>
 
+      {/* カメラ選択（インカメ / アウトカメ） */}
+      <div className="rounded-2xl border border-gray-200 bg-white p-4">
+        <p className="mb-2 text-sm font-semibold text-gray-700">カメラ選択</p>
+        <div className="flex flex-wrap gap-2">
+          {(
+            [
+              { key: "user", label: "🤳 インカメラ（自撮り）" },
+              { key: "environment", label: "📷 アウトカメラ（背面）" },
+            ] as const
+          ).map((opt) => {
+            const active = facingMode === opt.key;
+            return (
+              <button
+                key={opt.key}
+                type="button"
+                onClick={() => {
+                  if (recording) return;
+                  if (cameraOn) startCamera(opt.key);
+                  else setFacingMode(opt.key);
+                }}
+                disabled={recording}
+                className={
+                  "rounded-full border-2 px-4 py-1.5 text-sm font-medium transition disabled:opacity-50 " +
+                  (active
+                    ? "border-brand-600 bg-brand-600 text-white"
+                    : "border-gray-300 bg-white text-gray-700 hover:border-brand-400")
+                }
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+        <p className="mt-2 text-xs text-gray-400">
+          ※ 録画中はカメラを切り替えられません。アウトカメラはスマホ・タブレットで有効です。
+        </p>
+      </div>
+
       {/* 操作ボタン */}
       <div className="flex flex-wrap items-center gap-3">
         {!cameraOn ? (
           <button
             type="button"
-            onClick={startCamera}
+            onClick={() => startCamera()}
             disabled={busy}
             className="rounded-lg bg-brand-600 px-5 py-2 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-50"
           >
             🎥 カメラ起動
           </button>
         ) : (
-          <button
-            type="button"
-            onClick={stopCamera}
-            className="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-          >
-            カメラ停止
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={switchCamera}
+              disabled={busy || recording}
+              className="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              title={recording ? "録画中は切り替えできません" : ""}
+            >
+              🔄 カメラ切替
+            </button>
+            <button
+              type="button"
+              onClick={stopCamera}
+              className="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              カメラ停止
+            </button>
+          </>
         )}
         {cameraOn && !recording && (
           <button
