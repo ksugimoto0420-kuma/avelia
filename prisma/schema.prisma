@@ -131,6 +131,9 @@ model User {
   postalCode   String?
   address      String?
   emailVerified DateTime?
+  // 抽選の事前指名フィルター用属性。任意。
+  gender       Gender?
+  joinedAt     DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -142,6 +145,13 @@ model User {
   passwordResetTokens PasswordResetToken[]
 
   @@map("users")
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  UNDISCLOSED
 }
 
 model AdminUser {
@@ -637,6 +647,11 @@ model LotteryEntry {
   wonAt              DateTime?
   purchaseDeadlineAt DateTime?
   orderId            String?
+  // ハイブリッド抽選: 運営の事前指名フラグ。抽選実行時に必ず当選扱いになる。
+  pinned             Boolean            @default(false)
+  pinnedAt           DateTime?
+  pinnedById         String? // 指名した管理者ID (AdminUser.id)
+  pinReason          String? // 任意の指名理由メモ（監査・引き継ぎ用）
 
   lottery Lottery @relation(fields: [lotteryId], references: [id], onDelete: Cascade)
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -644,6 +659,7 @@ model LotteryEntry {
 
   @@unique([lotteryId, userId])
   @@index([lotteryId, status])
+  @@index([lotteryId, pinned])
   @@map("lottery_entries")
 }
 

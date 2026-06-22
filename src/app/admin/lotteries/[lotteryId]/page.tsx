@@ -1,5 +1,9 @@
 import { notFound } from "next/navigation";
 import { LotteryForm } from "@/components/admin/LotteryForm";
+import {
+  LotteryDraftPanel,
+  type Candidate,
+} from "@/components/admin/LotteryDraftPanel";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { requireAdminPage } from "@/lib/auth/admin-page";
@@ -54,12 +58,78 @@ export default async function EditLotteryPage({
             id: true,
             name: true,
             email: true,
+            gender: true,
+            joinedAt: true,
+            createdAt: true,
           },
         },
       },
     }),
   ]);
   if (!lottery) notFound();
+
+  // 応募者の累計購入回数・累計購入額を集計（PAID/SHIPPED/COMPLETED 系を購入扱い）。
+  // 抽選用候補テーブルに渡す。
+  const candidateUserIds = entries
+    .filter((e) => e.status === "ENTERED")
+    .map((e) => e.userId);
+  const orderAggregates = candidateUserIds.length
+    ? await prisma.order.groupBy({
+        by: ["userId"],
+        where: {
+          userId: { in: candidateUserIds },
+          // 未払い・キャンセルは除外して「購入実績」とみなす
+          paidAt: { not: null },
+        },
+        _count: { _all: true },
+        _sum: { total: true },
+      })
+    : [];
+  const aggByUserId = new Map<string, { count: number; sum: number }>();
+  for (const a of orderAggregates) {
+    aggByUserId.set(a.userId, {
+      count: a._count._all,
+      sum: a._sum.total ?? 0,
+    });
+  }
+
+  const now = new Date();
+  const candidates: Candidate[] = entries
+    .filter((e) => e.status === "ENTERED")
+    .map((e) => {
+      const since = e.user.joinedAt ?? e.user.createdAt;
+      const membershipDays = Math.max(
+        0,
+        Math.floor((now.getTime() - new Date(since).getTime()) / (1000 * 60 * 60 * 24)),
+      );
+      const agg = aggByUserId.get(e.userId);
+      return {
+        entryId: e.id,
+        user: {
+          id: e.user.id,
+          name: e.user.name,
+          email: e.user.email,
+          gender: e.user.gender,
+          joinedAt: e.user.joinedAt ? e.user.joinedAt.toISOString() : null,
+        },
+        enteredAt: e.enteredAt.toISOString(),
+        orderCount: agg?.count ?? 0,
+        totalSpent: agg?.sum ?? 0,
+        membershipDays,
+        pinned: e.pinned,
+        pinReason: e.pinReason,
+      };
+    });
+
+  // 抽選実行可否（クライアントへ理由も渡す）
+  let drawBlockReason: string | null = null;
+  if (lottery.status === "DRAFT") drawBlockReason = "下書きの抽選は実行できません。受付中に変更してください。";
+  else if (lottery.status === "DRAWN") drawBlockReason = "既に抽選済みです。";
+  else if (now < lottery.entryEndAt)
+    drawBlockReason = `応募締切前は実行できません（締切: ${formatDateTime(lottery.entryEndAt)}）。`;
+  else if (candidates.length === 0)
+    drawBlockReason = "応募者がいないため実行できません。";
+  const canDraw = drawBlockReason == null;
 
   const canDelete = lottery.status !== "DRAWN" && lottery._count.entries === 0;
 
@@ -95,6 +165,32 @@ export default async function EditLotteryPage({
         }))}
       />
 
+      {lottery.status !== "DRAWN" && (
+        <Card>
+          <CardHeader
+            title="ハイブリッド抽選: 事前指名＋ガチ抽選"
+            subtitle={`応募 ${entries.length} 名（抽選未実行）。事前指名した方は確定当選、残り枠はガチ抽選になります。`}
+          />
+          <CardBody>
+            {candidates.length === 0 ? (
+              <p className="rounded-xl border border-dashed border-gray-200 py-10 text-center text-sm text-gray-400">
+                まだ応募中の候補がいません
+              </p>
+            ) : (
+              <LotteryDraftPanel
+                lotteryId={lottery.id}
+                lotteryTitle={lottery.title}
+                winnersCount={lottery.winnersCount}
+                canDraw={canDraw}
+                drawBlockReason={drawBlockReason}
+                candidates={candidates}
+              />
+            )}
+          </CardBody>
+        </Card>
+      )}
+
+      {/* 抽選後（または応募確認用）の一覧。常時表示。 */}
       <Card>
         <CardHeader
           title="応募・当選者一覧"
@@ -172,6 +268,8 @@ type EntryRow = {
   wonAt: Date | null;
   purchaseDeadlineAt: Date | null;
   orderId: string | null;
+  pinned: boolean;
+  pinReason: string | null;
   user: { id: string; name: string | null; email: string };
 };
 
@@ -187,6 +285,7 @@ function EntrySection({ title, rows }: { title: string; rows: EntryRow[] }) {
             <tr>
               <th className="px-3 py-2 text-left">ユーザー</th>
               <th className="px-3 py-2 text-left">状態</th>
+              <th className="px-3 py-2 text-left">指名</th>
               <th className="px-3 py-2 text-left">応募日時</th>
               <th className="px-3 py-2 text-left">当選日時</th>
               <th className="px-3 py-2 text-left">購入期限</th>
@@ -205,6 +304,15 @@ function EntrySection({ title, rows }: { title: string; rows: EntryRow[] }) {
                   </td>
                   <td className="px-3 py-2">
                     <Badge color={conf.color}>{conf.label}</Badge>
+                  </td>
+                  <td className="px-3 py-2 text-xs">
+                    {e.pinned ? (
+                      <Badge color="yellow">
+                        指名{e.pinReason ? `: ${e.pinReason}` : ""}
+                      </Badge>
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )}
                   </td>
                   <td className="px-3 py-2 text-xs text-gray-600">
                     {formatDateTime(e.enteredAt)}

@@ -311,7 +311,18 @@ async function main() {
   });
 
   // --- 一般ユーザー（テストユーザー + ダミー20名） ---
+  // 抽選の指名フィルター用に gender / joinedAt も付与する。
+  // ファン番号で決定的に振り分け、ハイブリッド抽選デモ時の挙動を再現しやすくする。
   const userPw = await hash("password123");
+  const genderRotation: ("MALE" | "FEMALE" | "OTHER" | "UNDISCLOSED")[] = [
+    "FEMALE",
+    "FEMALE",
+    "FEMALE",
+    "MALE",
+    "MALE",
+    "OTHER",
+    "UNDISCLOSED",
+  ];
   const users: Prisma.UserCreateManyInput[] = [
     {
       id: randomUUID(),
@@ -322,6 +333,9 @@ async function main() {
       phone: "09012345678",
       postalCode: "1500001",
       address: "東京都渋谷区神宮前1-1-1",
+      gender: "MALE",
+      // 入会から3年以上の古参想定
+      joinedAt: new Date(Date.now() - 3 * 365 * 24 * 60 * 60 * 1000),
     },
   ];
   for (let i = 1; i <= 20; i++) {
@@ -332,6 +346,9 @@ async function main() {
       name: `ファン${i}`,
       postalCode: "1000001",
       address: "東京都千代田区1-1",
+      gender: genderRotation[i % genderRotation.length],
+      // i に応じて入会年数を 1〜30か月の幅で散らす
+      joinedAt: new Date(Date.now() - (30 + i * 30) * 24 * 60 * 60 * 1000),
     });
   }
   await prisma.user.createMany({ data: users });
