@@ -133,17 +133,21 @@ export function AddToCart({
             {nicknameNote ?? "10文字以内・よみがな必須。"}
             <br />
             ここで入力するか、カートページで商品ごとに入力できます。
+            <br />
+            <span className="font-semibold">
+              ※ レジに進む前までに必ず入力してください
+            </span>
           </p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Input
-              label="ニックネーム（任意・10文字以内）"
+              label="ニックネーム（10文字以内）*"
               maxLength={10}
               value={nickname}
               onChange={(e) => setNickname(e.target.value)}
               placeholder="例: ひな"
             />
             <Input
-              label="よみがな"
+              label="よみがな *"
               maxLength={20}
               value={nicknameKana}
               onChange={(e) => setNicknameKana(e.target.value)}
