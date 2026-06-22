@@ -156,6 +156,29 @@ export default async function AdminUserDetailPage({
                   defaultValue={user.address ?? ""}
                 />
               </div>
+              {/* 抽選の事前指名フィルター用属性。任意入力。 */}
+              <SelectField
+                label="性別"
+                name="gender"
+                defaultValue={user.gender ?? ""}
+                options={[
+                  { value: "", label: "未設定" },
+                  { value: "MALE", label: "男性" },
+                  { value: "FEMALE", label: "女性" },
+                  { value: "OTHER", label: "その他" },
+                  { value: "UNDISCLOSED", label: "未公開" },
+                ]}
+              />
+              <Field
+                label="入会日"
+                name="joinedAt"
+                type="date"
+                defaultValue={
+                  user.joinedAt
+                    ? user.joinedAt.toISOString().slice(0, 10)
+                    : ""
+                }
+              />
               <div className="sm:col-span-2">
                 <button
                   type="submit"
@@ -373,22 +396,58 @@ function Field({
   label,
   name,
   defaultValue,
+  type = "text",
 }: {
   label: string;
   name: string;
   defaultValue: string;
+  type?: string;
 }) {
   return (
-    <div>
-      <label className="mb-1 block text-sm font-medium text-gray-700">
+    <label className="block">
+      <span className="mb-1 block text-sm font-medium text-gray-700">
         {label}
-      </label>
+      </span>
       <input
         name={name}
+        type={type}
         defaultValue={defaultValue}
+        aria-label={label}
         className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
       />
-    </div>
+    </label>
+  );
+}
+
+function SelectField({
+  label,
+  name,
+  defaultValue,
+  options,
+}: {
+  label: string;
+  name: string;
+  defaultValue: string;
+  options: { value: string; label: string }[];
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-sm font-medium text-gray-700">
+        {label}
+      </span>
+      <select
+        name={name}
+        defaultValue={defaultValue}
+        aria-label={label}
+        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 

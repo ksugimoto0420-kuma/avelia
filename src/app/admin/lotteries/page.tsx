@@ -1,7 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import Link from "next/link";
 import { StatusBadge } from "@/components/admin/StatusBadge";
-import { DrawButton } from "@/components/admin/DrawButton";
 import { FilterBar, FilterField, FilterSelect, FilterText } from "@/components/admin/Filters";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody } from "@/components/ui/Card";
@@ -139,14 +138,19 @@ export default async function AdminLotteriesPage({
                         {formatDateTime(l.purchaseDeadlineAt)}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <DrawButton
-                          lotteryId={l.id}
-                          title={l.title}
-                          status={l.status}
-                          entryEndAt={l.entryEndAt.toISOString()}
-                          entryCount={l._count.entries}
-                          winnersCount={l.winnersCount}
-                        />
+                        {/* 抽選操作は詳細ページの「抽選実施」タブで行う。
+                            一覧からは導線として「実施画面を開く」リンクを提示するだけにする。 */}
+                        <Link
+                          href={`/admin/lotteries/${l.id}/draw`}
+                          className={
+                            "inline-flex items-center rounded-md border px-3 py-1 text-xs font-medium " +
+                            (l.status === "DRAWN"
+                              ? "border-gray-200 text-gray-500"
+                              : "border-brand-600 bg-brand-50 text-brand-700 hover:bg-brand-100")
+                          }
+                        >
+                          {l.status === "DRAWN" ? "結果を見る" : "抽選実施"}
+                        </Link>
                       </td>
                     </tr>
                   ))

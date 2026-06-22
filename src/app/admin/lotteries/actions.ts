@@ -231,6 +231,7 @@ export async function drawLottery(formData: FormData) {
 
   revalidatePath("/admin/lotteries");
   revalidatePath(`/admin/lotteries/${lotteryId}`);
+  revalidatePath(`/admin/lotteries/${lotteryId}/draw`);
 }
 
 /**
@@ -287,6 +288,7 @@ export async function setEntryPinned(formData: FormData) {
   });
 
   revalidatePath(`/admin/lotteries/${entry.lottery.id}`);
+  revalidatePath(`/admin/lotteries/${entry.lottery.id}/draw`);
 }
 
 /**
@@ -358,6 +360,7 @@ export async function bulkPinEntries(formData: FormData) {
   });
 
   revalidatePath(`/admin/lotteries/${lotteryId}`);
+  revalidatePath(`/admin/lotteries/${lotteryId}/draw`);
 }
 
 /**
@@ -396,4 +399,5 @@ export async function clearAllPins(formData: FormData) {
   });
 
   revalidatePath(`/admin/lotteries/${lotteryId}`);
+  revalidatePath(`/admin/lotteries/${lotteryId}/draw`);
 }
