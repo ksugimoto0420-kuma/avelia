@@ -61,8 +61,11 @@ export function VideoFrameDemo() {
   const [recording, setRecording] = useState(false);
   const [elapsedMs, setElapsedMs] = useState(0);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
+  const [resultBlob, setResultBlob] = useState<Blob | null>(null);
+  const [resultExt, setResultExt] = useState<"mp4" | "webm">("webm");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [shareNote, setShareNote] = useState<string | null>(null);
 
   const frame = FRAMES.find((f) => f.key === frameKey) ?? FRAMES[0];
 
@@ -221,13 +224,30 @@ export function VideoFrameDemo() {
     audioTracks.forEach((t) => canvasStream.addTrack(t));
 
     chunksRef.current = [];
-    // mimeType を順に試す（ブラウザ依存）
-    const candidates = [
+    // mimeType を順に試す（ブラウザ依存）。
+    // iOS Safari は写真Appに WebM を保存できないので、Safari/iOS では
+    // MP4(H.264/AAC) を最優先にして「写真に保存」できる動画を出す。
+    const isSafariOrIOS = (() => {
+      if (typeof navigator === "undefined") return false;
+      const ua = navigator.userAgent;
+      const isIOS = /iPad|iPhone|iPod/.test(ua);
+      const isSafari =
+        /Safari\//.test(ua) && !/Chrome\//.test(ua) && !/Chromium\//.test(ua);
+      return isIOS || isSafari;
+    })();
+    const mp4First = [
+      "video/mp4;codecs=h264,aac",
+      "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
+      "video/mp4",
+    ];
+    const webmFirst = [
       "video/webm;codecs=vp9,opus",
       "video/webm;codecs=vp8,opus",
       "video/webm",
-      "video/mp4",
     ];
+    const candidates = isSafariOrIOS
+      ? [...mp4First, ...webmFirst]
+      : [...webmFirst, ...mp4First];
     const mimeType = candidates.find((m) => {
       try {
         return MediaRecorder.isTypeSupported(m);
@@ -254,10 +274,12 @@ export function VideoFrameDemo() {
     recorder.onstop = () => {
       if (animationRef.current != null)
         cancelAnimationFrame(animationRef.current);
-      const blob = new Blob(chunksRef.current, {
-        type: mimeType ?? "video/webm",
-      });
+      const finalType = mimeType ?? "video/webm";
+      const ext: "mp4" | "webm" = finalType.includes("mp4") ? "mp4" : "webm";
+      const blob = new Blob(chunksRef.current, { type: finalType });
       const url = URL.createObjectURL(blob);
+      setResultBlob(blob);
+      setResultExt(ext);
       setResultUrl(url);
       setRecording(false);
     };
@@ -292,7 +314,9 @@ export function VideoFrameDemo() {
   const reset = useCallback(() => {
     if (resultUrl) URL.revokeObjectURL(resultUrl);
     setResultUrl(null);
+    setResultBlob(null);
     setError(null);
+    setShareNote(null);
   }, [resultUrl]);
 
   /** ダウンロード */
@@ -300,11 +324,66 @@ export function VideoFrameDemo() {
     if (!resultUrl) return;
     const a = document.createElement("a");
     a.href = resultUrl;
-    a.download = `frame-demo-${frame.key}-${Date.now()}.webm`;
+    a.download = `frame-demo-${frame.key}-${Date.now()}.${resultExt}`;
     document.body.appendChild(a);
     a.click();
     a.remove();
-  }, [resultUrl, frame]);
+  }, [resultUrl, resultExt, frame]);
+
+  /**
+   * 共有（iPhoneでアルバムに保存するための導線）。
+   * navigator.share に File を渡すと iOS では共有シートが出て
+   * 「ビデオを保存」で写真Appに入る。
+   * MP4 でないと写真Appが受け付けないので、WebM の場合は説明を出す。
+   */
+  const canShareFile = useCallback(() => {
+    if (typeof navigator === "undefined") return false;
+    if (!resultBlob) return false;
+    const navAny = navigator as Navigator & {
+      canShare?: (data: ShareData) => boolean;
+    };
+    if (typeof navAny.share !== "function") return false;
+    const file = new File([resultBlob], `frame-demo.${resultExt}`, {
+      type: resultBlob.type,
+    });
+    if (typeof navAny.canShare === "function") {
+      return navAny.canShare({ files: [file] });
+    }
+    return true;
+  }, [resultBlob, resultExt]);
+
+  const shareVideo = useCallback(async () => {
+    if (!resultBlob) return;
+    setShareNote(null);
+    const file = new File(
+      [resultBlob],
+      `frame-demo-${frame.key}-${Date.now()}.${resultExt}`,
+      { type: resultBlob.type },
+    );
+    try {
+      await navigator.share({
+        files: [file],
+        title: "Avelia FunClub",
+        text: "フレーム動画",
+      });
+      if (resultExt === "mp4") {
+        setShareNote(
+          "共有シートが開きました。『ビデオを保存』を選ぶと写真Appに保存できます。",
+        );
+      } else {
+        setShareNote(
+          "共有はできましたが、形式が WebM のため iPhone の写真Appには直接保存できない場合があります。MP4 対応端末で再録画するか、『DL』からファイルに保存してください。",
+        );
+      }
+    } catch (e) {
+      // ユーザーがキャンセルした場合は静かに無視
+      if (e instanceof Error && e.name === "AbortError") return;
+      setShareNote(
+        "共有に失敗しました: " +
+          (e instanceof Error ? e.message : "不明なエラー"),
+      );
+    }
+  }, [resultBlob, resultExt, frame]);
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 px-4 py-6">
@@ -494,12 +573,21 @@ export function VideoFrameDemo() {
             className="mx-auto w-full max-w-xs rounded-xl bg-black"
           />
           <div className="mt-3 flex flex-wrap gap-2">
+            {canShareFile() && (
+              <button
+                type="button"
+                onClick={shareVideo}
+                className="rounded-lg bg-emerald-600 px-5 py-2 text-sm font-bold text-white hover:bg-emerald-700"
+              >
+                📤 共有 / アルバムに保存
+              </button>
+            )}
             <button
               type="button"
               onClick={downloadVideo}
               className="rounded-lg bg-brand-600 px-5 py-2 text-sm font-bold text-white hover:bg-brand-700"
             >
-              ⬇ 動画をダウンロード
+              ⬇ ダウンロード（ファイル保存）
             </button>
             <button
               type="button"
@@ -509,9 +597,17 @@ export function VideoFrameDemo() {
               撮り直す
             </button>
           </div>
-          <p className="mt-2 text-xs text-gray-400">
-            形式: WebM（VP9/VP8/Opus 等、ブラウザに応じて自動選択）。
-            iOS Safari など一部ブラウザでは MP4 になります。
+          {shareNote && (
+            <p className="mt-2 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+              {shareNote}
+            </p>
+          )}
+          <p className="mt-2 text-xs text-gray-500">
+            形式: {resultExt === "mp4" ? "MP4 (H.264/AAC)" : "WebM"}
+            {" "}・iPhone（Safari）は<b>「共有 / アルバムに保存」</b>から
+            <b>「ビデオを保存」</b>で写真Appに入ります。
+            Androidは「共有」→「フォト」を選択でアルバムに保存可能。
+            PCは「ダウンロード」でファイル保存されます。
           </p>
         </div>
       )}
@@ -539,6 +635,16 @@ export function VideoFrameDemo() {
           <li>
             iOS Safari は HTTPS 必須 + ユーザー操作起因でのみ getUserMedia が
             動きます。今回のデモは HTTPS（Vercel）で配信されているため動作します。
+          </li>
+          <li>
+            写真Appに保存するには MP4(H.264) が必要なため、iPhone/Safari では
+            録画形式を自動的に MP4 優先に切替えています。WebM 録画のままだと
+            iPhone の写真Appには入りません。
+          </li>
+          <li>
+            「共有 / アルバムに保存」は Web Share API を利用しており、
+            ブラウザの共有シート（iOS なら「写真に保存」、Android なら
+            「フォト」など）を経由してアルバムに保存します。
           </li>
         </ul>
       </details>
