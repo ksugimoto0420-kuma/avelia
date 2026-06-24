@@ -996,11 +996,12 @@ function Step4Preview({
   return (
     <section className="rounded-2xl border border-gray-200 bg-white p-4 space-y-4">
       <h2 className="text-base font-semibold text-gray-700">
-        Step 4: 合成プレビュー
+        Step 4: 動画を書き出す
       </h2>
       <p className="text-xs text-gray-500">
-        「録画開始」を押すと動画が頭から再生され、フレーム + 宛名 + サインを
-        重ねた状態で録画されます。終わるか、最大 5 分で自動停止します。
+        「動画を書き出す」を押すと、元動画を頭から再生しながら裏で
+        フレーム + 宛名 + サインを重ねた合成動画を作ります。
+        元動画が終わるか、最大 5 分で自動的に書き出しが完了します。
       </p>
 
       <div className="relative mx-auto aspect-video w-full max-w-2xl overflow-hidden rounded-xl bg-black">
@@ -1021,7 +1022,7 @@ function Step4Preview({
         {recording && (
           <div className="absolute left-3 top-3 flex items-center gap-2 rounded-full bg-red-600/90 px-3 py-1 text-xs font-bold text-white shadow">
             <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-white" />
-            REC {(elapsedMs / 1000).toFixed(1)}s
+            書き出し中 {(elapsedMs / 1000).toFixed(1)}s
           </div>
         )}
       </div>
@@ -1034,7 +1035,7 @@ function Step4Preview({
             disabled={busy}
             className="rounded-lg bg-red-600 px-5 py-2 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50"
           >
-            ⏺ 録画開始（動画を再生しながら合成）
+            🎬 動画を書き出す
           </button>
         ) : (
           <button
@@ -1042,7 +1043,7 @@ function Step4Preview({
             onClick={stopRecord}
             className="rounded-lg bg-gray-900 px-5 py-2 text-sm font-bold text-white hover:bg-gray-700"
           >
-            ⏹ 停止
+            ⏹ 書き出しを止める
           </button>
         )}
         {busy && <span className="text-xs text-gray-500">処理中…</span>}
@@ -1051,7 +1052,7 @@ function Step4Preview({
       {resultUrl && (
         <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 space-y-3">
           <p className="text-sm font-semibold text-gray-700">
-            録画した動画（プレビュー）
+            書き出した動画（プレビュー）
           </p>
           <video
             src={resultUrl}
