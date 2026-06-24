@@ -59,7 +59,9 @@ const FRAMES: FrameVariant[] = [
 
 const PEN_COLORS = ["#111111", "#ffffff", "#dc2626", "#d4a017", "#ec4899"];
 
-const MAX_RECORD_MS = 5 * 60 * 1000; // フェーズ1の上限: 5分
+// 書き出し時間の上限。デモでは計測のため広めに 30 分まで許容する。
+// ただし端末のメモリ・Blob サイズ制限で途中で失敗することがある。
+const MAX_RECORD_MS = 30 * 60 * 1000;
 
 type Step = 1 | 2 | 3 | 4;
 
@@ -105,6 +107,14 @@ export function SignedVideoDemo() {
   const [resultExt, setResultExt] = useState<"mp4" | "webm">("webm");
   // 書き出した動画のサムネ用画像（合成プレビューの最初のフレーム PNG）
   const [thumbnailDataUrl, setThumbnailDataUrl] = useState<string | null>(null);
+  // 計測情報（書き出し中・完了後に表示する）
+  const [metrics, setMetrics] = useState<{
+    bytesSoFar: number; // チャンク累計バイト
+    elapsedMs: number; // 書き出し開始からの経過 ms
+    finalBytes?: number; // 完了時の最終バイト数
+    finalDurationMs?: number; // 完了時の合計録画 ms
+    finalMimeType?: string;
+  } | null>(null);
 
   // 共通
   const [error, setError] = useState<string | null>(null);
@@ -183,6 +193,7 @@ export function SignedVideoDemo() {
     setResultBlob(null);
     setResultUrl(null);
     setThumbnailDataUrl(null);
+    setMetrics(null);
     setShareNote(null);
     setError(null);
     setStep(1);
@@ -250,6 +261,8 @@ export function SignedVideoDemo() {
           setResultExt={setResultExt}
           thumbnailDataUrl={thumbnailDataUrl}
           setThumbnailDataUrl={setThumbnailDataUrl}
+          metrics={metrics}
+          setMetrics={setMetrics}
           recording={recording}
           setRecording={setRecording}
           elapsedMs={elapsedMs}
@@ -313,6 +326,13 @@ export function SignedVideoDemo() {
           <li>
             宛名は直筆のサインの中に含めて書く想定です。
             フレーム左下には今日の日付（YYYY.MM.DD）が入ります。
+          </li>
+          <li>
+            <b>計測モード</b>: 書き出し時間の上限を 30 分まで広げています。
+            端末のメモリと Blob サイズ制限が限界要因なので、
+            iPhone Safari は 720p で 3〜5 分前後、PC は 10 分以上が目安です。
+            結果セクションの「📊 計測結果」でファイルサイズ・サイズ/秒を
+            記録できるので、複数端末で試して実測値を集めてください。
           </li>
         </ul>
       </details>
@@ -811,6 +831,14 @@ function computeSignRect(
   }
 }
 
+type Metrics = {
+  bytesSoFar: number;
+  elapsedMs: number;
+  finalBytes?: number;
+  finalDurationMs?: number;
+  finalMimeType?: string;
+};
+
 function Step4Compose({
   videoUrl,
   videoDimensions,
@@ -828,6 +856,8 @@ function Step4Compose({
   setResultExt,
   thumbnailDataUrl,
   setThumbnailDataUrl,
+  metrics,
+  setMetrics,
   recording,
   setRecording,
   elapsedMs,
@@ -854,6 +884,8 @@ function Step4Compose({
   setResultExt: (v: "mp4" | "webm") => void;
   thumbnailDataUrl: string | null;
   setThumbnailDataUrl: (v: string | null) => void;
+  metrics: Metrics | null;
+  setMetrics: (v: Metrics | null) => void;
   recording: boolean;
   setRecording: (v: boolean) => void;
   elapsedMs: number;
@@ -966,6 +998,7 @@ function Step4Compose({
   const startCompose = useCallback(async () => {
     setError(null);
     setShareNote(null);
+    setMetrics(null);
     if (resultUrl) {
       URL.revokeObjectURL(resultUrl);
       setResultUrl(null);
@@ -1093,8 +1126,17 @@ function Step4Compose({
       );
       return;
     }
+    let bytesAccum = 0;
     recorder.ondataavailable = (ev) => {
-      if (ev.data && ev.data.size > 0) chunksRef.current.push(ev.data);
+      if (ev.data && ev.data.size > 0) {
+        chunksRef.current.push(ev.data);
+        bytesAccum += ev.data.size;
+        // 書き出し中のリアルタイム計測（チャンク到来のたびに更新）
+        setMetrics({
+          bytesSoFar: bytesAccum,
+          elapsedMs: Date.now() - startedAtRef.current,
+        });
+      }
     };
     recorder.onstop = () => {
       if (animRef.current != null) cancelAnimationFrame(animRef.current);
@@ -1105,6 +1147,14 @@ function Step4Compose({
       setResultBlob(blob);
       setResultUrl(url);
       setResultExt(ext);
+      const finalDurationMs = Date.now() - startedAtRef.current;
+      setMetrics({
+        bytesSoFar: bytesAccum,
+        elapsedMs: finalDurationMs,
+        finalBytes: blob.size,
+        finalDurationMs,
+        finalMimeType: finalType,
+      });
       setRecording(false);
     };
 
@@ -1131,6 +1181,7 @@ function Step4Compose({
     setShareNote,
     setElapsedMs,
     setThumbnailDataUrl,
+    setMetrics,
     signPosition,
     signSizeRatio,
     videoDimensions,
@@ -1232,7 +1283,8 @@ function Step4Compose({
       <p className="text-xs text-gray-500">
         サインを置く場所とサイズを決めてください。元動画の縦横比はそのまま
         保持されます。「動画を書き出す」を押すと元動画を頭から再生しながら
-        合成動画を作ります。最大 5 分で自動停止します。
+        合成動画を作ります。デモ計測のため最大 30 分まで許容しますが、
+        端末のメモリ・CPU・電池により途中で失敗する場合があります。
       </p>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -1305,6 +1357,11 @@ function Step4Compose({
                 <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-white" />
                 書き出し中 {(elapsedMs / 1000).toFixed(1)}s
               </div>
+              {metrics && (
+                <div className="absolute right-3 top-3 rounded-full bg-black/70 px-3 py-1 text-xs font-medium text-white shadow">
+                  {formatBytes(metrics.bytesSoFar)}
+                </div>
+              )}
             </div>
           )}
           {/* 録画してない時用の隠しキャンバス（参照確保のため常時存在させる） */}
@@ -1390,6 +1447,54 @@ function Step4Compose({
             形式: {resultExt === "mp4" ? "MP4 (H.264/AAC)" : "WebM"} ／ サイズ:{" "}
             {videoDimensions.width} × {videoDimensions.height}
           </p>
+          {metrics?.finalBytes != null && metrics.finalDurationMs != null && (
+            <div className="rounded-lg border border-gray-200 bg-white p-3 text-xs">
+              <p className="mb-2 font-semibold text-gray-700">
+                📊 計測結果
+              </p>
+              <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-gray-600 sm:grid-cols-3">
+                <div>
+                  <dt className="text-gray-400">ファイルサイズ</dt>
+                  <dd className="font-mono">{formatBytes(metrics.finalBytes)}</dd>
+                </div>
+                <div>
+                  <dt className="text-gray-400">書き出し時間</dt>
+                  <dd className="font-mono">{formatMs(metrics.finalDurationMs)}</dd>
+                </div>
+                <div>
+                  <dt className="text-gray-400">サイズ / 秒</dt>
+                  <dd className="font-mono">
+                    {formatBytes(
+                      Math.round(
+                        metrics.finalBytes / (metrics.finalDurationMs / 1000),
+                      ),
+                    )}
+                    /s
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-gray-400">解像度</dt>
+                  <dd className="font-mono">
+                    {videoDimensions.width}×{videoDimensions.height}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-gray-400">推定 fps</dt>
+                  <dd className="font-mono">30 fps</dd>
+                </div>
+                <div>
+                  <dt className="text-gray-400">MIME</dt>
+                  <dd className="font-mono break-all">
+                    {metrics.finalMimeType ?? "-"}
+                  </dd>
+                </div>
+              </dl>
+              <p className="mt-2 text-[11px] text-gray-400">
+                端末ごとの限界把握のための計測値です。30 分上限に対し、
+                バッテリ・メモリ・CPU 負荷で途中失敗する場合があります。
+              </p>
+            </div>
+          )}
           <p className="text-[11px] text-gray-400">
             ※ ブラウザの仕様上、書き出した動画ファイル単体のサムネイルは
             端末によって黒く表示される場合があります。
@@ -1459,4 +1564,21 @@ function formatToday(d: Date = new Date()): string {
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}.${m}.${day}`;
+}
+
+/** バイト数を人間向けに整形 */
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024)
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
+/** ミリ秒を mm:ss(.t) で */
+function formatMs(ms: number): string {
+  const totalSec = ms / 1000;
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec - m * 60;
+  return `${String(m).padStart(2, "0")}:${s.toFixed(1).padStart(4, "0")}`;
 }
