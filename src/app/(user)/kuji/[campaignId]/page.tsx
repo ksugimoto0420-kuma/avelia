@@ -282,36 +282,61 @@ export default async function KujiDetailPage({
         </div>
       </div>
 
-      {/* 固定フッター（購入ボタン） */}
+      {/* 固定フッター（販売終了 + 購入ボタン） */}
       {campaign.bundles.length > 0 && (
         <div className="fixed inset-x-0 bottom-0 z-30 border-t border-gray-200 bg-white/95 px-3 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] backdrop-blur">
-          <div className="mx-auto max-w-3xl">
-            {!isOpen ? (
-              <p className="rounded-lg bg-gray-100 px-3 py-2 text-center text-xs text-gray-600">
-                現在は販売期間外です
+          <div className="mx-auto flex max-w-3xl items-center gap-3">
+            {/* 左: 販売終了時間 */}
+            <div className="shrink-0 text-center">
+              <p className="inline-block rounded-md bg-pink-500 px-2 py-0.5 text-[11px] font-bold text-white">
+                販売終了時間
               </p>
-            ) : (
-              <div className="flex items-center gap-2 overflow-x-auto">
-                {campaign.bundles.map((b) => (
-                  <div
-                    key={b.id}
-                    className="min-w-[28%] flex-1 sm:min-w-[20%]"
-                  >
-                    {user ? (
-                      <form action={purchaseKujiBundle}>
-                        <input
-                          type="hidden"
-                          name="campaignId"
-                          value={campaign.id}
-                        />
-                        <input
-                          type="hidden"
-                          name="bundleId"
-                          value={b.id}
-                        />
-                        <button
-                          type="submit"
-                          className="w-full rounded-full bg-pink-600 px-3 py-2.5 text-center text-white shadow-md transition hover:bg-pink-700 active:scale-[0.98]"
+              <p className="mt-0.5 text-xs font-bold text-gray-800">
+                {formatSaleEnd(campaign.saleEndAt)}
+              </p>
+            </div>
+
+            {/* 右: 購入ボタン */}
+            <div className="min-w-0 flex-1">
+              {!isOpen ? (
+                <p className="rounded-lg bg-gray-100 px-3 py-2 text-center text-xs text-gray-600">
+                  現在は販売期間外です
+                </p>
+              ) : (
+                <div className="flex items-center justify-end gap-2 overflow-x-auto">
+                  {campaign.bundles.map((b) => (
+                    <div
+                      key={b.id}
+                      className="min-w-[88px] shrink-0"
+                    >
+                      {user ? (
+                        <form action={purchaseKujiBundle}>
+                          <input
+                            type="hidden"
+                            name="campaignId"
+                            value={campaign.id}
+                          />
+                          <input
+                            type="hidden"
+                            name="bundleId"
+                            value={b.id}
+                          />
+                          <button
+                            type="submit"
+                            className="w-full rounded-full bg-pink-600 px-3 py-2.5 text-center text-white shadow-md transition hover:bg-pink-700 active:scale-[0.98]"
+                          >
+                            <span className="block text-sm font-extrabold leading-tight">
+                              {b.drawCount}連購入
+                            </span>
+                            <span className="block text-[11px] opacity-90">
+                              {formatYen(b.priceTotal)}
+                            </span>
+                          </button>
+                        </form>
+                      ) : (
+                        <Link
+                          href={`/auth/login?callbackUrl=${encodeURIComponent(`/kuji/${campaign.id}`)}`}
+                          className="block w-full rounded-full border border-pink-400 bg-white px-3 py-2.5 text-center text-pink-700 shadow-md transition hover:bg-pink-50 active:scale-[0.98]"
                         >
                           <span className="block text-sm font-extrabold leading-tight">
                             {b.drawCount}連購入
@@ -319,25 +344,13 @@ export default async function KujiDetailPage({
                           <span className="block text-[11px] opacity-90">
                             {formatYen(b.priceTotal)}
                           </span>
-                        </button>
-                      </form>
-                    ) : (
-                      <Link
-                        href={`/auth/login?callbackUrl=${encodeURIComponent(`/kuji/${campaign.id}`)}`}
-                        className="block w-full rounded-full border border-pink-400 bg-white px-3 py-2.5 text-center text-pink-700 shadow-md transition hover:bg-pink-50 active:scale-[0.98]"
-                      >
-                        <span className="block text-sm font-extrabold leading-tight">
-                          {b.drawCount}連購入
-                        </span>
-                        <span className="block text-[11px] opacity-90">
-                          {formatYen(b.priceTotal)}
-                        </span>
-                      </Link>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
+                        </Link>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -358,4 +371,18 @@ function Row({
       <span className="text-gray-800">{value}</span>
     </div>
   );
+}
+
+/**
+ * 固定フッター用の販売終了表記。
+ * 例: 「7月12日（日）23:59まで」
+ */
+function formatSaleEnd(d: Date): string {
+  const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
+  const m = d.getMonth() + 1;
+  const day = d.getDate();
+  const w = weekdays[d.getDay()];
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return `${m}月${day}日（${w}）${hh}:${mm}まで`;
 }
