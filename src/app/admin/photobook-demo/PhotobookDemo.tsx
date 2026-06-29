@@ -641,7 +641,7 @@ function Step2Sign({
         {/* 選択操作 + 一括ボタン */}
         <div className="flex flex-wrap items-center gap-2 rounded-lg bg-gray-50 p-2 text-xs">
           <span className="font-semibold text-gray-700">
-            選択中: {selectedPages.size} ページ
+            選択中: {selectedPages.size} ページ ／ 配置済み: {placements.length} ページ
           </span>
           <button
             type="button"
@@ -912,6 +912,7 @@ function Step3Viewer({
   }, [placements]);
 
   const verticalContainerRef = useRef<HTMLDivElement | null>(null);
+  const viewerRootRef = useRef<HTMLDivElement | null>(null);
   const [thumbOpen, setThumbOpen] = useState(false);
   const [toolbarHidden, setToolbarHidden] = useState(false);
   const toolbarHideTimer = useRef<number | null>(null);
@@ -919,13 +920,24 @@ function Step3Viewer({
   // めくりアニメ用
   const [flipping, setFlipping] = useState<"none" | "next" | "prev">("none");
 
-  // ページめくりロジック（見開き）
+  /**
+   * 見開きナビゲーション設計:
+   *   viewerPage は「現在のスプレッドの左ページ番号」を表す。
+   *     - 1: 表紙だけ単独表示
+   *     - 2: [2, 3] の見開き
+   *     - 4: [4, 5] の見開き
+   *     ...
+   *   表紙(1) → [2,3] → [4,5] → ... と進む。
+   *   表紙以降は常に偶数開始ページ。
+   */
   const goPrev = useCallback(() => {
     if (viewerMode === "spread") {
       if (viewerPage <= 1 || flipping !== "none") return;
       setFlipping("prev");
       window.setTimeout(() => {
-        setViewerPage(Math.max(1, viewerPage - 2));
+        // 表紙へ戻る or 偶数ページへ
+        const target = viewerPage <= 2 ? 1 : viewerPage - 2;
+        setViewerPage(target);
         setFlipping("none");
       }, 400);
     } else {
@@ -935,10 +947,13 @@ function Step3Viewer({
 
   const goNext = useCallback(() => {
     if (viewerMode === "spread") {
-      if (viewerPage >= pages.length || flipping !== "none") return;
+      if (flipping !== "none") return;
+      // 表紙(1) からは [2,3] へ
+      const target = viewerPage === 1 ? 2 : viewerPage + 2;
+      if (target > pages.length) return;
       setFlipping("next");
       window.setTimeout(() => {
-        setViewerPage(Math.min(pages.length, viewerPage + 2));
+        setViewerPage(target);
         setFlipping("none");
       }, 400);
     } else {
@@ -1009,6 +1024,22 @@ function Step3Viewer({
     };
   }, [wakeToolbar]);
 
+  // PC: Mac トラックパッドの水平スクロールでブラウザバックが発火するのを防ぐ。
+  // React の onWheel は passive なので preventDefault が効かない → native event を addEventListener する。
+  useEffect(() => {
+    const el = viewerRootRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (viewerMode !== "spread") return;
+      // 水平方向の方が大きいときだけ抑制
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY) && Math.abs(e.deltaX) > 10) {
+        e.preventDefault();
+      }
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [viewerMode]);
+
   // 1ページ描画ヘルパー
   const renderPage = (page: PageRender, key: string) => {
     const pm = placementMap.get(page.pageNumber);
@@ -1048,12 +1079,16 @@ function Step3Viewer({
   };
 
   // ビューワ本体（全画面 / 通常を共通レイアウトに）
+  // touch-action: pan-y で水平スワイプをブラウザに渡さず、ブラウザバックを抑制
+  // overscroll-behavior: contain で過剰スクロールも親に伝播させない
   const viewerBody = (
     <div
+      ref={viewerRootRef}
       className={
-        fullscreen
+        (fullscreen
           ? "fixed inset-0 z-50 flex flex-col bg-zinc-900"
-          : "relative flex h-[80vh] flex-col rounded-2xl border border-gray-200 bg-zinc-900"
+          : "relative flex h-[80vh] flex-col rounded-2xl border border-gray-200 bg-zinc-900") +
+        " [touch-action:pan-y] [overscroll-behavior:contain]"
       }
       onMouseMove={wakeToolbar}
       onTouchStart={(e) => {
@@ -1139,18 +1174,21 @@ function Step3Viewer({
               {pages.map((p) => {
                 const has = placementMap.has(p.pageNumber);
                 const active =
-                  viewerPage === p.pageNumber ||
-                  (viewerMode === "spread" &&
-                    p.pageNumber === viewerPage + 1);
+                  viewerMode === "spread"
+                    ? viewerPage === 1
+                      ? p.pageNumber === 1
+                      : p.pageNumber === viewerPage ||
+                        p.pageNumber === viewerPage + 1
+                    : viewerPage === p.pageNumber;
                 return (
                   <button
                     key={p.pageNumber}
                     type="button"
                     onClick={() => {
-                      // 見開きは奇数開始に合わせる
+                      // 表紙以降は偶数開始の見開き、表紙(1)は単独
                       const target =
                         viewerMode === "spread" && p.pageNumber > 1
-                          ? p.pageNumber - ((p.pageNumber + 1) % 2)
+                          ? p.pageNumber - (p.pageNumber % 2)
                           : p.pageNumber;
                       setViewerPage(Math.max(1, target));
                     }}
@@ -1281,12 +1319,28 @@ function SpreadStage({
   const flipNextRight = pages.find((p) => p.pageNumber === viewerPage + 2);
   const flipPrevLeft = pages.find((p) => p.pageNumber === viewerPage - 2);
 
-  // 見開きステージのサイズはアスペクト比3:4 を維持
-  const stageStyle: React.CSSProperties = {
-    width: `${72 * zoom}vmin`,
-    maxWidth: `${800 * zoom}px`,
-    aspectRatio: viewerPage === 1 ? "3 / 4" : "3 / 2",
-  };
+  // 元PDFのアスペクト比を取得（1ページ目を基準）
+  const refPage = pages[0];
+  const pageRatio = refPage ? refPage.width / refPage.height : 0.7;
+
+  // ステージサイズ:
+  //   - 表紙(単独): 縦長で 1ページ分の幅
+  //   - 見開き: 2ページ分の幅。height 基準で高さを合わせると左右が広がる。
+  //
+  // 利用可能スペースに対し「高さフィット」を優先。表紙は幅 約45vh*ratio、
+  // 見開きは 90vh*ratio になるよう height を 90vh 固定で width を計算する。
+  const stageStyle: React.CSSProperties =
+    viewerPage === 1
+      ? {
+          height: `${85 * zoom}vh`,
+          maxHeight: `${85 * zoom}vh`,
+          aspectRatio: `${pageRatio}`,
+        }
+      : {
+          height: `${85 * zoom}vh`,
+          maxHeight: `${85 * zoom}vh`,
+          aspectRatio: `${pageRatio * 2}`,
+        };
 
   return (
     <div className="flex h-full w-full items-center justify-center bg-zinc-900 p-4">
