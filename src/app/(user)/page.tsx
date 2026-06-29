@@ -14,14 +14,23 @@ export default async function HomePage() {
 
   // 「販売中（終了が近い順）→ 販売予定（開始が近い順）→ 終了」の順で
   // 合計6件取る。各ステージから最大6件ずつ取って必要なだけ連結。
+  // KUJI 種別は独立した /kuji に切り出したのでトップからも除外する
   const [onSale, upcoming, rawProducts] = await Promise.all([
     prisma.event.findMany({
-      where: { isPublished: true, ...eventStageWhere("on_sale", now) },
+      where: {
+        isPublished: true,
+        eventType: { not: "KUJI" },
+        ...eventStageWhere("on_sale", now),
+      },
       orderBy: eventStageOrderBy.on_sale,
       take: 6,
     }),
     prisma.event.findMany({
-      where: { isPublished: true, ...eventStageWhere("upcoming", now) },
+      where: {
+        isPublished: true,
+        eventType: { not: "KUJI" },
+        ...eventStageWhere("upcoming", now),
+      },
       orderBy: eventStageOrderBy.upcoming,
       take: 6,
     }),

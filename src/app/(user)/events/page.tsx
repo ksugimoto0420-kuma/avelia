@@ -1,4 +1,4 @@
-import type { EventType, Prisma } from "@prisma/client";
+import type { EventType, Prisma, SaleMethod } from "@prisma/client";
 import Link from "next/link";
 import { EventCard, type EventCardData } from "@/components/user/EventCard";
 import { EVENT_TYPE_LABEL } from "@/lib/event-meta";
@@ -17,31 +17,53 @@ const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
   { key: "ended", label: "終了" },
 ];
 
+// KUJI はフロント表示から除外（独立した /kuji に切り出したため）
 const TYPE_FILTERS: { key: string; label: string }[] = [
   { key: "", label: "全種別" },
   { key: "MEET_GREET", label: EVENT_TYPE_LABEL.MEET_GREET },
-  { key: "KUJI", label: EVENT_TYPE_LABEL.KUJI },
   { key: "TRADING_CARD", label: EVENT_TYPE_LABEL.TRADING_CARD },
   { key: "GOODS", label: EVENT_TYPE_LABEL.GOODS },
 ];
 
-const VALID_TYPES = ["MEET_GREET", "KUJI", "TRADING_CARD", "GOODS"];
+const VALID_TYPES = ["MEET_GREET", "TRADING_CARD", "GOODS"];
+
+// 販売方式（先着 / 抽選）。同じ一覧内でバッジ識別する前提で、
+// 必要な人はフィルタで絞れるようにする。
+const SALE_FILTERS: { key: string; label: string }[] = [
+  { key: "", label: "全販売方式" },
+  { key: "FIRST_COME", label: "先着" },
+  { key: "LOTTERY", label: "抽選" },
+];
+
+const VALID_SALE_METHODS = ["FIRST_COME", "LOTTERY"];
 
 export default async function EventsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ filter?: string; type?: string; q?: string }>;
+  searchParams: Promise<{
+    filter?: string;
+    type?: string;
+    sale?: string;
+    q?: string;
+  }>;
 }) {
   const sp = await searchParams;
   const filter = (STATUS_FILTERS.find((f) => f.key === sp.filter)?.key ??
     "all") as StatusFilter;
   const type = sp.type && VALID_TYPES.includes(sp.type) ? sp.type : "";
+  const sale =
+    sp.sale && VALID_SALE_METHODS.includes(sp.sale) ? sp.sale : "";
   const q = (sp.q ?? "").trim();
   const now = new Date();
 
   // 共通 where（フィルタ・検索）
-  const baseWhere: Prisma.EventWhereInput = { isPublished: true };
+  // フロントからは KUJI 種別を常時除外する
+  const baseWhere: Prisma.EventWhereInput = {
+    isPublished: true,
+    eventType: { not: "KUJI" },
+  };
   if (type) baseWhere.eventType = type as EventType;
+  if (sale) baseWhere.saleMethod = sale as SaleMethod;
   if (q) {
     baseWhere.OR = [
       { title: { contains: q, mode: "insensitive" } },
@@ -91,14 +113,17 @@ export default async function EventsPage({
   const buildHref = (overrides: {
     type?: string;
     filter?: string;
+    sale?: string;
     q?: string;
   }) => {
     const p = new URLSearchParams();
     const t = overrides.type ?? type;
     const f = overrides.filter ?? filter;
+    const s = overrides.sale ?? sale;
     const query = overrides.q ?? q;
     if (t) p.set("type", t);
     if (f && f !== "all") p.set("filter", f);
+    if (s) p.set("sale", s);
     if (query) p.set("q", query);
     const qs = p.toString();
     return qs ? `/events?${qs}` : "/events";
@@ -118,6 +143,7 @@ export default async function EventsPage({
         {filter !== "all" && (
           <input type="hidden" name="filter" value={filter} />
         )}
+        {sale && <input type="hidden" name="sale" value={sale} />}
         <input
           name="q"
           defaultValue={q}
@@ -177,6 +203,24 @@ export default async function EventsPage({
             )}
           >
             {f.label}
+          </Link>
+        ))}
+      </div>
+
+      {/* 販売方式（先着 / 抽選） */}
+      <div className="mt-3 flex flex-wrap gap-2">
+        {SALE_FILTERS.map((s) => (
+          <Link
+            key={s.key || "all"}
+            href={buildHref({ sale: s.key })}
+            className={cn(
+              "rounded-full px-3 py-1 text-sm",
+              s.key === sale
+                ? "bg-pink-600 text-white"
+                : "text-gray-500 hover:bg-gray-100",
+            )}
+          >
+            {s.label}
           </Link>
         ))}
       </div>
