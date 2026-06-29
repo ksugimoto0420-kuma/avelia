@@ -64,12 +64,12 @@ export default async function KujiListPage() {
                   href={`/kuji/${c.id}`}
                   className="group block overflow-hidden rounded-2xl bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
                 >
-                  {/* バナー画像（縦長 3:4） */}
+                  {/* バナー画像（横長 16:9） */}
                   <div className="relative">
                     <MediaImage
                       src={c.bannerImageUrl}
                       alt={c.title}
-                      aspect="3/4"
+                      aspect="16/9"
                     />
                     {/* ステータスバッジ */}
                     <div className="absolute left-3 top-3">
