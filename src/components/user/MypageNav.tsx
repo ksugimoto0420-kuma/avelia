@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 const ITEMS = [
   { href: "/mypage", label: "概要" },
   { href: "/mypage/orders", label: "注文履歴" },
+  { href: "/mypage/kuji", label: "アベリアくじ" },
   { href: "/mypage/digital-contents", label: "デジタルコンテンツ" },
   { href: "/mypage/lottery-results", label: "抽選結果" },
   { href: "/mypage/profile", label: "会員情報" },

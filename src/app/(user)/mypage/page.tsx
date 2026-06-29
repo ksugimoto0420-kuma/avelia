@@ -9,19 +9,33 @@ export const dynamic = "force-dynamic";
 export default async function MypageOverview() {
   const user = await requireUserPage();
 
-  const [orderCount, paidAgg, grantCount, deliveryCount, wonCount] =
-    await Promise.all([
-      prisma.order.count({ where: { userId: user.id } }),
-      prisma.order.aggregate({
-        where: { userId: user.id, status: "PAID" },
-        _sum: { total: true },
-      }),
-      prisma.userDigitalContent.count({ where: { userId: user.id } }),
-      prisma.digitalDelivery.count({ where: { userId: user.id } }),
-      prisma.lotteryEntry.count({
-        where: { userId: user.id, status: { in: ["WON", "PURCHASED"] } },
-      }),
-    ]);
+  const [
+    orderCount,
+    paidAgg,
+    grantCount,
+    deliveryCount,
+    wonCount,
+    kujiDrawCount,
+  ] = await Promise.all([
+    // アベリアくじの Order（KujiDraw 紐づき）はマイページ「注文数」から除外
+    prisma.order.count({
+      where: { userId: user.id, kujiDraws: { none: {} } },
+    }),
+    prisma.order.aggregate({
+      where: {
+        userId: user.id,
+        status: "PAID",
+        kujiDraws: { none: {} },
+      },
+      _sum: { total: true },
+    }),
+    prisma.userDigitalContent.count({ where: { userId: user.id } }),
+    prisma.digitalDelivery.count({ where: { userId: user.id } }),
+    prisma.lotteryEntry.count({
+      where: { userId: user.id, status: { in: ["WON", "PURCHASED"] } },
+    }),
+    prisma.kujiDraw.count({ where: { userId: user.id } }),
+  ]);
   const contentCount = grantCount + deliveryCount;
 
   const stats = [
@@ -37,12 +51,17 @@ export default async function MypageOverview() {
       href: "/mypage/digital-contents",
     },
     { label: "当選", value: wonCount, href: "/mypage/lottery-results" },
+    {
+      label: "アベリアくじ",
+      value: kujiDrawCount,
+      href: "/mypage/kuji",
+    },
   ];
 
   return (
     <div className="space-y-6">
       <p className="text-sm text-gray-500">{user.email} でログイン中</p>
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
         {stats.map((s) => (
           <Link key={s.label} href={s.href}>
             <Card className="transition hover:shadow-md">

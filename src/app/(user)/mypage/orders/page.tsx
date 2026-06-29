@@ -6,8 +6,14 @@ export const dynamic = "force-dynamic";
 
 export default async function MypageOrders() {
   const user = await requireUserPage("/mypage/orders");
+  // アベリアくじの Order（OrderItem を持たず KujiDraw が紐づく）は
+  // 「注文履歴」ではなく「アベリアくじ履歴」(/mypage/kuji) に表示する。
+  // ここでは KujiDraw が一件も紐付いていない Order だけを取得する。
   const orders = await prisma.order.findMany({
-    where: { userId: user.id },
+    where: {
+      userId: user.id,
+      kujiDraws: { none: {} },
+    },
     orderBy: { createdAt: "desc" },
     include: { items: true, shipment: true },
   });
