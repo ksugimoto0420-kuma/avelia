@@ -143,6 +143,7 @@ model User {
   digitalContents     UserDigitalContent[]
   digitalDeliveries   DigitalDelivery[]
   passwordResetTokens PasswordResetToken[]
+  kujiDraws           KujiDraw[]
 
   @@map("users")
 }
@@ -223,6 +224,7 @@ model Event {
   products      Product[]
   lotteries     Lottery[]
   revenueShares RevenueShare[]
+  kujiCampaigns KujiCampaign[]
 
   @@index([isPublished, saleStartAt, saleEndAt])
   @@index([artistId])
@@ -433,6 +435,7 @@ model Order {
   digitalContents UserDigitalContent[]
   digitalDeliveries DigitalDelivery[]
   lotteryEntries  LotteryEntry[]
+  kujiDraws       KujiDraw[]
 
   @@index([userId])
   @@index([status])
@@ -776,7 +779,114 @@ model Artist {
 
   events           Event[]
   assignedTalents  AdminUser[]
+  kujiCampaigns    KujiCampaign[]
 
   @@index([isPublished])
   @@map("artists")
+}
+
+// ---------------------------------------------------------------------------
+// アベリアくじ（オンラインガチャ）
+// ---------------------------------------------------------------------------
+// 仕様: docs/avelia-kuji-spec.md 参照
+// 「上位賞=本数制 / 下位賞=確率制」のハイブリッド在庫モデル。
+// 連数SKU(1/10/50/100)を選んで購入すると、即時抽選 → ガチャ演出 → 後日配送。
+// 全員ハズレなしの設計（上位賞が枯れたら確率制の重みに按分される）。
+
+enum KujiStatus {
+  DRAFT // 下書き
+  OPEN // 販売中
+  CLOSED // 締切
+}
+
+enum KujiPrizeType {
+  LIMITED // 本数制（在庫管理あり、枯れたら排出停止）
+  PROBABILITY // 確率制（在庫無制限、weighted抽選）
+}
+
+model KujiCampaign {
+  id              String     @id @default(cuid())
+  title           String
+  description     String?
+  bannerImageUrl  String?
+  eventId         String?
+  artistId        String?
+  saleStartAt     DateTime
+  saleEndAt       DateTime
+  pricePerDraw    Int        // 1回あたりの単価
+  deliveryNote    String?    // 配送目安テキスト
+  notesText       String?    // 注意事項テキスト
+  status          KujiStatus @default(DRAFT)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  event   Event?       @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  artist  Artist?      @relation(fields: [artistId], references: [id], onDelete: SetNull)
+  prizes  KujiPrize[]
+  bundles KujiBundle[]
+  draws   KujiDraw[]
+
+  @@index([status])
+  @@index([saleStartAt, saleEndAt])
+  @@map("kuji_campaigns")
+}
+
+model KujiPrize {
+  id                String        @id @default(cuid())
+  campaignId        String
+  rank              String        // "S", "A", "B", ...（任意の文字列）
+  order             Int           // 表示順（小さい順）
+  name              String
+  imageUrl          String?
+  variantNote       String?       // 「14種：各キャラA/B」など
+  type              KujiPrizeType
+  // LIMITED 用
+  totalCount        Int?
+  remainingCount    Int?
+  // PROBABILITY 用（重み。合計が PROBABILITY 賞全体で 10000 になるように運用）
+  probabilityWeight Int?
+  // 連数限定オマケのみで排出する賞（通常抽選からは除外される）
+  bundleOnly        Boolean       @default(false)
+
+  campaign     KujiCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  draws        KujiDraw[]
+  bundleSlots  KujiBundle[] @relation("BundleBonus")
+
+  @@index([campaignId, order])
+  @@map("kuji_prizes")
+}
+
+model KujiBundle {
+  id           String  @id @default(cuid())
+  campaignId   String
+  drawCount    Int     // 1, 10, 50, 100 等
+  priceTotal   Int     // セット価格（割引可能）
+  bonusPrizeId String? // 連数オマケ賞（任意）
+  sku          String? @unique
+
+  campaign   KujiCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  bonusPrize KujiPrize?   @relation("BundleBonus", fields: [bonusPrizeId], references: [id], onDelete: SetNull)
+
+  @@unique([campaignId, drawCount])
+  @@map("kuji_bundles")
+}
+
+model KujiDraw {
+  id            String   @id @default(cuid())
+  campaignId    String
+  userId        String
+  orderId       String
+  prizeId       String
+  isBundleBonus Boolean  @default(false)
+  drawnAt       DateTime @default(now())
+
+  campaign KujiCampaign @relation(fields: [campaignId], references: [id])
+  user     User         @relation(fields: [userId], references: [id])
+  order    Order        @relation(fields: [orderId], references: [id])
+  prize    KujiPrize    @relation(fields: [prizeId], references: [id])
+
+  @@index([campaignId, drawnAt])
+  @@index([userId])
+  @@index([orderId])
+  @@map("kuji_draws")
 }

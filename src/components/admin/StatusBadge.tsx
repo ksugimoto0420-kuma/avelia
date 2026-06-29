@@ -37,12 +37,19 @@ const DELIVERY: Record<string, { label: string; color: BadgeColor }> = {
   READY: { label: "納品済", color: "green" },
 };
 
+const KUJI: Record<string, { label: string; color: BadgeColor }> = {
+  DRAFT: { label: "下書き", color: "gray" },
+  OPEN: { label: "販売中", color: "green" },
+  CLOSED: { label: "終了", color: "gray" },
+};
+
 const MAPS = {
   order: ORDER,
   payment: PAYMENT,
   shipment: SHIPMENT,
   lottery: LOTTERY,
   delivery: DELIVERY,
+  kuji: KUJI,
 } as const;
 
 export function StatusBadge({
