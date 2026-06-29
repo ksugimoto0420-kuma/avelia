@@ -162,7 +162,6 @@ const CAMPAIGNS: CampaignSeed[] = [
 async function createCampaign(
   seed: CampaignSeed,
   artistId: string | null,
-  eventId: string | null,
 ) {
   const now = new Date();
   const day = 24 * 60 * 60 * 1000;
@@ -174,7 +173,6 @@ async function createCampaign(
       title: seed.title,
       description: seed.description,
       bannerImageUrl: `https://loremflickr.com/1200/675/${seed.bannerKeyword}?lock=${seed.bannerLock}`,
-      eventId,
       artistId,
       saleStartAt,
       saleEndAt,
@@ -250,10 +248,9 @@ async function main() {
   console.log(`# 既存テスト用くじ: ${existing.length} 件 / 削除: ${deleted} 件`);
 
   const artist = await prisma.artist.findFirst();
-  const event = await prisma.event.findFirst();
 
   for (const seed of CAMPAIGNS) {
-    await createCampaign(seed, artist?.id ?? null, event?.id ?? null);
+    await createCampaign(seed, artist?.id ?? null);
   }
 
   console.log(`\n✅ 合計 ${CAMPAIGNS.length} 件のテストくじを作成しました`);

@@ -10,7 +10,6 @@ export type KujiCampaignFormData = {
   title: string;
   description: string | null;
   bannerImageUrl: string | null;
-  eventId: string | null;
   artistId: string | null;
   saleStartAt: Date | null;
   saleEndAt: Date | null;
@@ -30,11 +29,9 @@ type Option = { id: string; label: string };
 
 export function KujiCampaignForm({
   initial,
-  events,
   artists,
 }: {
   initial?: KujiCampaignFormData;
-  events: Option[];
   artists: Option[];
 }) {
   return (
@@ -81,39 +78,21 @@ export function KujiCampaignForm({
               placeholder="https://..."
             />
           </div>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <label htmlFor="kuji-eventId" className={labelCls}>
-                対象イベント
-              </label>
-              <SearchableSelectField
-                id="kuji-eventId"
-                name="eventId"
-                defaultValue={initial?.eventId ?? ""}
-                allowEmpty
-                emptyLabel="（指定なし）"
-                options={events.map((e) => ({
-                  value: e.id,
-                  label: e.label,
-                }))}
-              />
-            </div>
-            <div>
-              <label htmlFor="kuji-artistId" className={labelCls}>
-                出演者
-              </label>
-              <SearchableSelectField
-                id="kuji-artistId"
-                name="artistId"
-                defaultValue={initial?.artistId ?? ""}
-                allowEmpty
-                emptyLabel="（指定なし）"
-                options={artists.map((a) => ({
-                  value: a.id,
-                  label: a.label,
-                }))}
-              />
-            </div>
+          <div>
+            <label htmlFor="kuji-artistId" className={labelCls}>
+              出演者
+            </label>
+            <SearchableSelectField
+              id="kuji-artistId"
+              name="artistId"
+              defaultValue={initial?.artistId ?? ""}
+              allowEmpty
+              emptyLabel="（指定なし）"
+              options={artists.map((a) => ({
+                value: a.id,
+                label: a.label,
+              }))}
+            />
           </div>
         </CardBody>
       </Card>

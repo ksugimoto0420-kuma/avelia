@@ -37,7 +37,6 @@ export default async function AdminKujiListPage({
     where.OR = [
       { title: { contains: q, mode: "insensitive" } },
       { description: { contains: q, mode: "insensitive" } },
-      { event: { title: { contains: q, mode: "insensitive" } } },
       { artist: { name: { contains: q, mode: "insensitive" } } },
     ];
   }
@@ -49,7 +48,6 @@ export default async function AdminKujiListPage({
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
       include: {
-        event: { select: { title: true } },
         artist: { select: { name: true } },
         _count: { select: { prizes: true, bundles: true, draws: true } },
       },
@@ -112,7 +110,7 @@ export default async function AdminKujiListPage({
               <thead>
                 <tr className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
                   <th className="px-4 py-3 text-left">タイトル</th>
-                  <th className="px-4 py-3 text-left">出演者 / イベント</th>
+                  <th className="px-4 py-3 text-left">出演者</th>
                   <th className="px-4 py-3 text-right">単価</th>
                   <th className="px-4 py-3 text-right">賞 / SKU / 抽選</th>
                   <th className="px-4 py-3 text-left">期間</th>
@@ -142,9 +140,6 @@ export default async function AdminKujiListPage({
                       </td>
                       <td className="px-4 py-3">
                         <p>{c.artist?.name ?? "-"}</p>
-                        <p className="text-xs text-gray-400">
-                          {c.event?.title ?? ""}
-                        </p>
                       </td>
                       <td className="px-4 py-3 text-right">
                         {formatYen(c.pricePerDraw)}

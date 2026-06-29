@@ -44,7 +44,6 @@ export async function saveKujiCampaign(formData: FormData) {
     description: ((formData.get("description") as string) ?? "").trim() || null,
     bannerImageUrl:
       ((formData.get("bannerImageUrl") as string) ?? "").trim() || null,
-    eventId: (formData.get("eventId") as string) || null,
     artistId: (formData.get("artistId") as string) || null,
     saleStartAt,
     saleEndAt,

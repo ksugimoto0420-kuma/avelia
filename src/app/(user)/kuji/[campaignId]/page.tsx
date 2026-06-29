@@ -31,7 +31,6 @@ export default async function KujiDetailPage({
   const campaign = await prisma.kujiCampaign.findUnique({
     where: { id: campaignId },
     include: {
-      event: { select: { title: true, artistName: true } },
       artist: { select: { name: true } },
       prizes: { orderBy: { order: "asc" } },
       bundles: {
@@ -93,8 +92,7 @@ export default async function KujiDetailPage({
               </span>
             </div>
             <p className="mt-2 text-xs text-gray-500">
-              {campaign.artist?.name ?? campaign.event?.artistName ?? ""}
-              {campaign.event?.title ? ` / ${campaign.event.title}` : ""}
+              {campaign.artist?.name ?? ""}
             </p>
             <h1 className="mt-1 text-xl font-bold text-gray-900 sm:text-2xl">
               {campaign.title}

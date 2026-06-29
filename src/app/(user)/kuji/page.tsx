@@ -19,7 +19,6 @@ export default async function KujiListPage() {
     where: { status: { in: ["OPEN", "CLOSED"] } },
     orderBy: { saleEndAt: "desc" },
     include: {
-      event: { select: { title: true, artistName: true } },
       artist: { select: { name: true } },
       _count: { select: { prizes: true } },
     },
@@ -90,7 +89,7 @@ export default async function KujiListPage() {
                   {/* 情報部 */}
                   <div className="p-4">
                     <p className="text-xs text-gray-500">
-                      {c.artist?.name ?? c.event?.artistName ?? ""}
+                      {c.artist?.name ?? ""}
                     </p>
                     <h2 className="mt-1 line-clamp-2 text-base font-bold text-gray-900 group-hover:text-pink-600">
                       {c.title}

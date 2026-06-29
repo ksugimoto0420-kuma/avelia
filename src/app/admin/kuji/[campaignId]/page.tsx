@@ -29,7 +29,7 @@ export default async function EditKujiPage({
   await requireAdminPage("OPERATOR");
   const { campaignId } = await params;
 
-  const [campaign, events, artists] = await Promise.all([
+  const [campaign, artists] = await Promise.all([
     prisma.kujiCampaign.findUnique({
       where: { id: campaignId },
       include: {
@@ -40,11 +40,6 @@ export default async function EditKujiPage({
         },
         _count: { select: { draws: true } },
       },
-    }),
-    prisma.event.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 200,
-      select: { id: true, title: true, artistName: true },
     }),
     prisma.artist.findMany({
       orderBy: { createdAt: "desc" },
@@ -84,7 +79,6 @@ export default async function EditKujiPage({
           title: campaign.title,
           description: campaign.description,
           bannerImageUrl: campaign.bannerImageUrl,
-          eventId: campaign.eventId,
           artistId: campaign.artistId,
           saleStartAt: campaign.saleStartAt,
           saleEndAt: campaign.saleEndAt,
@@ -93,10 +87,6 @@ export default async function EditKujiPage({
           notesText: campaign.notesText,
           status: campaign.status,
         }}
-        events={events.map((e) => ({
-          id: e.id,
-          label: e.artistName ? `${e.artistName} / ${e.title}` : e.title,
-        }))}
         artists={artists.map((a) => ({ id: a.id, label: a.name }))}
       />
 

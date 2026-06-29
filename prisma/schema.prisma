@@ -224,7 +224,6 @@ model Event {
   products      Product[]
   lotteries     Lottery[]
   revenueShares RevenueShare[]
-  kujiCampaigns KujiCampaign[]
 
   @@index([isPublished, saleStartAt, saleEndAt])
   @@index([artistId])
@@ -809,7 +808,6 @@ model KujiCampaign {
   title           String
   description     String?
   bannerImageUrl  String?
-  eventId         String?
   artistId        String?
   saleStartAt     DateTime
   saleEndAt       DateTime
@@ -820,7 +818,6 @@ model KujiCampaign {
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
 
-  event   Event?       @relation(fields: [eventId], references: [id], onDelete: SetNull)
   artist  Artist?      @relation(fields: [artistId], references: [id], onDelete: SetNull)
   prizes  KujiPrize[]
   bundles KujiBundle[]
