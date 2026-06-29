@@ -629,115 +629,22 @@ function Step2Sign({
 
   return (
     <section className="space-y-4">
-      <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-3">
-        <h2 className="text-base font-semibold text-gray-700">
-          Step 2: サインを描いて、ページに配置する
-        </h2>
-        <p className="text-xs text-gray-500">
-          サムネをタップして「サインを入れるページ」を複数選択 → サインを描き → 「選択中のページに一括配置」で
-          まとめて配置できます。個別ページの細かい位置調整は下のプレビューでクリックして変更してください。
-        </p>
-
-        {/* 選択操作 + 一括ボタン */}
-        <div className="flex flex-wrap items-center gap-2 rounded-lg bg-gray-50 p-2 text-xs">
-          <span className="font-semibold text-gray-700">
-            選択中: {selectedPages.size} ページ ／ 配置済み: {placements.length} ページ
-          </span>
-          <button
-            type="button"
-            onClick={selectAll}
-            className="rounded-md border border-gray-300 bg-white px-2 py-1 hover:bg-gray-50"
-          >
-            全選択
-          </button>
-          <button
-            type="button"
-            onClick={clearSelection}
-            className="rounded-md border border-gray-300 bg-white px-2 py-1 hover:bg-gray-50"
-          >
-            選択解除
-          </button>
-          <div className="ml-auto flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={applyToSelected}
-              disabled={!signaturePng || selectedPages.size === 0}
-              className="rounded-md bg-pink-600 px-3 py-1 font-bold text-white hover:bg-pink-700 disabled:opacity-40"
-            >
-              ✍ 選択中のページに一括配置 ({selectedPages.size})
-            </button>
-            <button
-              type="button"
-              onClick={removeSelected}
-              disabled={selectedPages.size === 0}
-              className="rounded-md border border-gray-300 bg-white px-3 py-1 text-gray-700 hover:bg-gray-50 disabled:opacity-40"
-            >
-              選択中の配置を消す
-            </button>
-          </div>
-        </div>
-
-        {/* ページサムネ（複数選択型 + 個別ページ詳細編集にもリンク） */}
-        <div className="overflow-x-auto">
-          <div className="flex gap-2">
-            {pages.map((p) => {
-              const has = placements.some((pl) => pl.pageNumber === p.pageNumber);
-              const isSelected = selectedPages.has(p.pageNumber);
-              const isActive = activePage === p.pageNumber;
-              return (
-                <div
-                  key={p.pageNumber}
-                  className={
-                    "relative w-24 shrink-0 rounded-lg border-2 p-1 text-[10px] transition " +
-                    (isActive
-                      ? "border-brand-600 bg-brand-50"
-                      : isSelected
-                        ? "border-pink-500 bg-pink-50"
-                        : "border-gray-200 bg-white")
-                  }
-                >
-                  {/* 上部チェックボックス（選択） */}
-                  <label className="absolute left-1 top-1 z-10 flex cursor-pointer items-center justify-center rounded bg-white/90 px-1 py-0.5">
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={() => togglePage(p.pageNumber)}
-                      className="h-3.5 w-3.5 accent-pink-600"
-                      aria-label={`ページ ${p.pageNumber} を選択`}
-                    />
-                  </label>
-                  {/* 配置済み印 */}
-                  {has && (
-                    <span className="absolute right-1 top-1 z-10 rounded-full bg-pink-600 px-1.5 py-0.5 text-[9px] font-bold text-white">
-                      ✓
-                    </span>
-                  )}
-                  {/* サムネ画像（タップで個別編集モードに） */}
-                  <button
-                    type="button"
-                    onClick={() => setActivePage(p.pageNumber)}
-                    className="block w-full text-center"
-                    aria-label={`ページ ${p.pageNumber} を編集`}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={p.dataUrl}
-                      alt={`p${p.pageNumber}`}
-                      className="aspect-[3/4] w-full rounded object-contain"
-                    />
-                    <span className="mt-1 block">P.{p.pageNumber}</span>
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+      {/* 進捗サマリ */}
+      <div className="rounded-lg bg-gray-50 p-2 text-xs">
+        <span className="font-semibold text-gray-700">
+          サイン: {signaturePng ? "✓ 描画済み" : "未描画"} ／ 選択中:{" "}
+          {selectedPages.size} ページ ／ 配置済み: {placements.length} ページ
+        </span>
       </div>
 
-      {/* サイン描画ボード */}
+      {/* ① サインを描く */}
       <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-3">
-        <p className="text-sm font-semibold text-gray-700">
-          サインを描く
+        <h2 className="text-base font-semibold text-gray-700">
+          ① サインを描く
+        </h2>
+        <p className="text-xs text-gray-500">
+          まずはここでサインを描いてください。色・太さを選んで、書き終わったら
+          「サインを確定」を押します。
         </p>
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-1">
@@ -767,18 +674,6 @@ function Step2Sign({
             />
             <span>{penWidth}px</span>
           </label>
-          <label className="flex items-center gap-2 text-xs text-gray-600">
-            配置サイズ
-            <input
-              type="range"
-              min={10}
-              max={70}
-              value={Math.round(signSizeRatio * 100)}
-              onChange={(e) => setSignSizeRatio(Number(e.target.value) / 100)}
-              className="accent-pink-600"
-            />
-            <span>{Math.round(signSizeRatio * 100)}%</span>
-          </label>
           <div className="ml-auto flex items-center gap-2">
             <button
               type="button"
@@ -797,9 +692,9 @@ function Step2Sign({
             <button
               type="button"
               onClick={confirmSig}
-              className="rounded-md bg-brand-600 px-3 py-1 text-xs font-medium text-white hover:bg-brand-700"
+              className="rounded-md bg-brand-600 px-3 py-1 text-xs font-bold text-white hover:bg-brand-700"
             >
-              サインを確定
+              ✓ サインを確定
             </button>
           </div>
         </div>
@@ -820,18 +715,154 @@ function Step2Sign({
         </div>
         {signaturePng && (
           <p className="text-xs text-emerald-700">
-            ✓ サインが確定しました。下のページプレビューで置きたい場所をタップ/クリックすると配置されます。
+            ✓ サインが確定しました。次のステップでページを選んでください。
           </p>
         )}
       </div>
 
-      {/* ページプレビュー（個別ページの位置調整用） */}
+      {/* ② サインを入れたいページを選ぶ */}
+      <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-3">
+        <h2 className="text-base font-semibold text-gray-700">
+          ② サインを入れたいページを選ぶ
+        </h2>
+        <p className="text-xs text-gray-500">
+          サムネのチェックボックスをタップして、サインを入れたいページを選びます。
+          複数選択できます。
+        </p>
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <button
+            type="button"
+            onClick={selectAll}
+            className="rounded-md border border-gray-300 bg-white px-2 py-1 hover:bg-gray-50"
+          >
+            全選択
+          </button>
+          <button
+            type="button"
+            onClick={clearSelection}
+            className="rounded-md border border-gray-300 bg-white px-2 py-1 hover:bg-gray-50"
+          >
+            選択解除
+          </button>
+          <span className="ml-auto font-semibold text-pink-600">
+            {selectedPages.size} ページ選択中
+          </span>
+        </div>
+        <div className="overflow-x-auto">
+          <div className="flex gap-2">
+            {pages.map((p) => {
+              const has = placements.some(
+                (pl) => pl.pageNumber === p.pageNumber,
+              );
+              const isSelected = selectedPages.has(p.pageNumber);
+              const isActive = activePage === p.pageNumber;
+              return (
+                <div
+                  key={p.pageNumber}
+                  className={
+                    "relative w-24 shrink-0 rounded-lg border-2 p-1 text-[10px] transition " +
+                    (isActive
+                      ? "border-brand-600 bg-brand-50"
+                      : isSelected
+                        ? "border-pink-500 bg-pink-50"
+                        : "border-gray-200 bg-white")
+                  }
+                >
+                  <label className="absolute left-1 top-1 z-10 flex cursor-pointer items-center justify-center rounded bg-white/90 px-1 py-0.5">
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => togglePage(p.pageNumber)}
+                      className="h-3.5 w-3.5 accent-pink-600"
+                      aria-label={`ページ ${p.pageNumber} を選択`}
+                    />
+                  </label>
+                  {has && (
+                    <span className="absolute right-1 top-1 z-10 rounded-full bg-pink-600 px-1.5 py-0.5 text-[9px] font-bold text-white">
+                      ✓
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setActivePage(p.pageNumber)}
+                    className="block w-full text-center"
+                    aria-label={`ページ ${p.pageNumber} を編集`}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={p.dataUrl}
+                      alt={`p${p.pageNumber}`}
+                      className="aspect-[3/4] w-full rounded object-contain"
+                    />
+                    <span className="mt-1 block">P.{p.pageNumber}</span>
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* ③ 選択ページにサインを配置 */}
+      <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-3">
+        <h2 className="text-base font-semibold text-gray-700">
+          ③ 選択ページにサインを配置
+        </h2>
+        <p className="text-xs text-gray-500">
+          配置サイズを決めて「選択中のページに一括配置」を押すと、選んだ全ページに
+          同じサインが入ります。位置を変えたい場合は ④ で個別調整できます。
+        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="flex items-center gap-2 text-xs text-gray-600">
+            配置サイズ
+            <input
+              type="range"
+              min={10}
+              max={70}
+              value={Math.round(signSizeRatio * 100)}
+              onChange={(e) => setSignSizeRatio(Number(e.target.value) / 100)}
+              className="accent-pink-600"
+            />
+            <span>{Math.round(signSizeRatio * 100)}%</span>
+          </label>
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={applyToSelected}
+              disabled={!signaturePng || selectedPages.size === 0}
+              className="rounded-md bg-pink-600 px-4 py-2 text-sm font-bold text-white hover:bg-pink-700 disabled:opacity-40"
+            >
+              ✍ 選択中の {selectedPages.size} ページに一括配置
+            </button>
+            <button
+              type="button"
+              onClick={removeSelected}
+              disabled={selectedPages.size === 0}
+              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+            >
+              選択中の配置を消す
+            </button>
+          </div>
+        </div>
+        {!signaturePng && (
+          <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-700">
+            ① でサインを描いて「サインを確定」してから配置できます。
+          </p>
+        )}
+        {signaturePng && selectedPages.size === 0 && (
+          <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-700">
+            ② で配置するページを選んでください。
+          </p>
+        )}
+      </div>
+
+      {/* ④ 個別ページの位置を微調整（任意） */}
       {current && (
         <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-3">
           <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold text-gray-700">
-              ページ {current.pageNumber} の個別調整
-            </p>
+            <h2 className="text-base font-semibold text-gray-700">
+              ④ 個別ページの位置を微調整（任意）
+            </h2>
             {placement && (
               <button
                 type="button"
@@ -842,6 +873,13 @@ function Step2Sign({
               </button>
             )}
           </div>
+          <p className="text-xs text-gray-500">
+            ②で選んだサムネをクリックすると、ここに該当ページが表示されます。
+            ページ内のクリック位置を中心にサインが配置されます。
+          </p>
+          <p className="text-xs text-gray-600">
+            <b>編集中のページ:</b> P.{current.pageNumber}
+          </p>
           <div
             ref={previewRef}
             onClick={placeOnPage}
@@ -871,8 +909,7 @@ function Step2Sign({
             )}
           </div>
           <p className="text-[11px] text-gray-400">
-            ※ クリック/タップした位置を中心にサインが配置されます。
-            ここで決めた位置は次回の「一括配置」のデフォルト位置になります。
+            ※ ここで決めた位置は次回の「一括配置」のデフォルト位置にもなります。
           </p>
         </div>
       )}
@@ -1324,26 +1361,46 @@ function SpreadStage({
   const pageRatio = refPage ? refPage.width / refPage.height : 0.7;
 
   // ステージサイズ:
-  //   - 表紙(単独): 縦長で 1ページ分の幅
-  //   - 見開き: 2ページ分の幅。height 基準で高さを合わせると左右が広がる。
+  //   表紙(単独): 縦長 (aspect = pageRatio = width/height ≒ 0.7)
+  //   見開き: 横長 (aspect = pageRatio × 2 ≒ 1.4)
   //
-  // 利用可能スペースに対し「高さフィット」を優先。表紙は幅 約45vh*ratio、
-  // 見開きは 90vh*ratio になるよう height を 90vh 固定で width を計算する。
-  const stageStyle: React.CSSProperties =
-    viewerPage === 1
-      ? {
-          height: `${85 * zoom}vh`,
-          maxHeight: `${85 * zoom}vh`,
-          aspectRatio: `${pageRatio}`,
-        }
-      : {
-          height: `${85 * zoom}vh`,
-          maxHeight: `${85 * zoom}vh`,
-          aspectRatio: `${pageRatio * 2}`,
-        };
+  // 親領域に「高さ・幅どちらかでフィット」させる。CSS の aspect-ratio だけだと
+  // 挙動が不安定なので、ResizeObserver で親サイズをピクセルで測って計算する。
+  const aspect = viewerPage === 1 ? pageRatio : pageRatio * 2;
+  const stageContainerRef = useRef<HTMLDivElement | null>(null);
+  const [stageSize, setStageSize] = useState({ w: 0, h: 0 });
+
+  useEffect(() => {
+    const el = stageContainerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      const r = el.getBoundingClientRect();
+      // 親の 95% にマージンを取りつつ、aspect に合わせてフィット
+      const availW = r.width * 0.95 * zoom;
+      const availH = r.height * 0.95 * zoom;
+      // 「高さ基準で計算した幅」と「幅基準で計算した高さ」のうち、両方収まるサイズ
+      const wByH = availH * aspect;
+      if (wByH <= availW) {
+        setStageSize({ w: wByH, h: availH });
+      } else {
+        setStageSize({ w: availW, h: availW / aspect });
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [aspect, zoom]);
+
+  const stageStyle: React.CSSProperties = {
+    width: stageSize.w > 0 ? `${stageSize.w}px` : "70%",
+    height: stageSize.h > 0 ? `${stageSize.h}px` : "auto",
+    aspectRatio: `${aspect}`,
+  };
 
   return (
-    <div className="flex h-full w-full items-center justify-center bg-zinc-900 p-4">
+    <div
+      ref={stageContainerRef}
+      className="flex h-full w-full items-center justify-center bg-zinc-900 p-4"
+    >
       <div
         className="relative"
         style={{
@@ -1360,7 +1417,7 @@ function SpreadStage({
       >
         {viewerPage === 1 ? (
           // 表紙：単独ページ
-          <div className="absolute inset-0 mx-auto" style={{ aspectRatio: "3/4" }}>
+          <div className="absolute inset-0 mx-auto">
             {rightPage && renderPage(rightPage, "cover")}
           </div>
         ) : (
