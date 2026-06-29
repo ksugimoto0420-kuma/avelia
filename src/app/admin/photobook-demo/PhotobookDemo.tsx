@@ -71,15 +71,23 @@ export function PhotobookDemo() {
 
   // 2-3. サイン配置
   const [activePage, setActivePage] = useState<number>(1);
+  // 一括配置する対象ページ（チェックボックスで複数選択）
+  const [selectedPages, setSelectedPages] = useState<Set<number>>(
+    () => new Set<number>(),
+  );
   const [signaturePng, setSignaturePng] = useState<string | null>(null);
   const [placements, setPlacements] = useState<SignaturePlacement[]>([]);
-  // 配置中のサイズ・位置
+  // 配置中のサイズ
   const [signSizeRatio, setSignSizeRatio] = useState(0.3);
+  // デフォルト配置位置（一括配置や初回クリック時の中心位置）
+  const [defaultXRatio, setDefaultXRatio] = useState(0.5);
+  const [defaultYRatio, setDefaultYRatio] = useState(0.85);
 
   // 4. ビューワ
   const [viewerMode, setViewerMode] = useState<"spread" | "vertical">("spread");
   const [viewerPage, setViewerPage] = useState(1);
   const [zoom, setZoom] = useState(1);
+  const [fullscreen, setFullscreen] = useState(false);
 
   // 共通
   const [error, setError] = useState<string | null>(null);
@@ -173,8 +181,10 @@ export function PhotobookDemo() {
     setPages([]);
     setSignaturePng(null);
     setPlacements([]);
+    setSelectedPages(new Set());
     setActivePage(1);
     setError(null);
+    setFullscreen(false);
     setStep(1);
   };
 
@@ -212,12 +222,18 @@ export function PhotobookDemo() {
           pages={pages}
           activePage={activePage}
           setActivePage={setActivePage}
+          selectedPages={selectedPages}
+          setSelectedPages={setSelectedPages}
           signaturePng={signaturePng}
           setSignaturePng={setSignaturePng}
           placements={placements}
           setPlacements={setPlacements}
           signSizeRatio={signSizeRatio}
           setSignSizeRatio={setSignSizeRatio}
+          defaultXRatio={defaultXRatio}
+          setDefaultXRatio={setDefaultXRatio}
+          defaultYRatio={defaultYRatio}
+          setDefaultYRatio={setDefaultYRatio}
         />
       )}
       {step === 3 && pages.length > 0 && (
@@ -230,6 +246,8 @@ export function PhotobookDemo() {
           setViewerPage={setViewerPage}
           zoom={zoom}
           setZoom={setZoom}
+          fullscreen={fullscreen}
+          setFullscreen={setFullscreen}
         />
       )}
 
@@ -412,22 +430,34 @@ function Step2Sign({
   pages,
   activePage,
   setActivePage,
+  selectedPages,
+  setSelectedPages,
   signaturePng,
   setSignaturePng,
   placements,
   setPlacements,
   signSizeRatio,
   setSignSizeRatio,
+  defaultXRatio,
+  setDefaultXRatio,
+  defaultYRatio,
+  setDefaultYRatio,
 }: {
   pages: PageRender[];
   activePage: number;
   setActivePage: (n: number) => void;
+  selectedPages: Set<number>;
+  setSelectedPages: (v: Set<number>) => void;
   signaturePng: string | null;
   setSignaturePng: (v: string | null) => void;
   placements: SignaturePlacement[];
   setPlacements: (v: SignaturePlacement[]) => void;
   signSizeRatio: number;
   setSignSizeRatio: (n: number) => void;
+  defaultXRatio: number;
+  setDefaultXRatio: (n: number) => void;
+  defaultYRatio: number;
+  setDefaultYRatio: (n: number) => void;
 }) {
   const current = pages.find((p) => p.pageNumber === activePage);
   const placement = placements.find((p) => p.pageNumber === activePage);
@@ -526,7 +556,7 @@ function Step2Sign({
     setSignaturePng(png);
   };
 
-  // ページプレビュー上での配置クリック
+  // ページプレビュー上での配置クリック（個別ページ調整用）
   const previewRef = useRef<HTMLDivElement | null>(null);
   const placeOnPage = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!signaturePng || !current) return;
@@ -534,20 +564,67 @@ function Step2Sign({
     if (!box) return;
     const xRatio = (e.clientX - box.left) / box.width;
     const yRatio = (e.clientY - box.top) / box.height;
+    // クリック位置を中心に配置（中央寄せ調整）
+    const adjX = Math.max(0, Math.min(1, xRatio - signSizeRatio / 2));
+    const adjY = Math.max(0, Math.min(1, yRatio - signSizeRatio / 4));
     const newPlacements = placements.filter(
       (p) => p.pageNumber !== current.pageNumber,
     );
     newPlacements.push({
       pageNumber: current.pageNumber,
-      xRatio: Math.max(0, Math.min(1, xRatio - signSizeRatio / 2)),
-      yRatio: Math.max(0, Math.min(1, yRatio - signSizeRatio / 4)),
+      xRatio: adjX,
+      yRatio: adjY,
       widthRatio: signSizeRatio,
       imagePng: signaturePng,
     });
     setPlacements(newPlacements);
+    // 次回の一括配置用のデフォルト位置も更新
+    setDefaultXRatio(xRatio);
+    setDefaultYRatio(yRatio);
   };
   const removePlacement = (pageNumber: number) => {
     setPlacements(placements.filter((p) => p.pageNumber !== pageNumber));
+  };
+
+  // 選択ページに一括でサインを配置
+  const applyToSelected = () => {
+    if (!signaturePng) return;
+    if (selectedPages.size === 0) return;
+    const adjX = Math.max(0, Math.min(1, defaultXRatio - signSizeRatio / 2));
+    const adjY = Math.max(0, Math.min(1, defaultYRatio - signSizeRatio / 4));
+    const newPlacements = placements.filter(
+      (p) => !selectedPages.has(p.pageNumber),
+    );
+    for (const pageNumber of Array.from(selectedPages).sort((a, b) => a - b)) {
+      newPlacements.push({
+        pageNumber,
+        xRatio: adjX,
+        yRatio: adjY,
+        widthRatio: signSizeRatio,
+        imagePng: signaturePng,
+      });
+    }
+    setPlacements(newPlacements);
+  };
+
+  const removeSelected = () => {
+    if (selectedPages.size === 0) return;
+    setPlacements(
+      placements.filter((p) => !selectedPages.has(p.pageNumber)),
+    );
+  };
+
+  const togglePage = (pageNumber: number) => {
+    const next = new Set(selectedPages);
+    if (next.has(pageNumber)) next.delete(pageNumber);
+    else next.add(pageNumber);
+    setSelectedPages(next);
+  };
+  const selectAll = () => {
+    setSelectedPages(new Set(pages.map((p) => p.pageNumber)));
+  };
+  const clearSelection = () => {
+    setSelectedPages(new Set());
   };
 
   return (
@@ -557,41 +634,100 @@ function Step2Sign({
           Step 2: サインを描いて、ページに配置する
         </h2>
         <p className="text-xs text-gray-500">
-          下のページサムネから「サインを入れるページ」を選び、サインを描いてから
-          プレビュー上の置きたい位置をタップ/クリックしてください。
+          サムネをタップして「サインを入れるページ」を複数選択 → サインを描き → 「選択中のページに一括配置」で
+          まとめて配置できます。個別ページの細かい位置調整は下のプレビューでクリックして変更してください。
         </p>
 
-        {/* ページサムネ */}
+        {/* 選択操作 + 一括ボタン */}
+        <div className="flex flex-wrap items-center gap-2 rounded-lg bg-gray-50 p-2 text-xs">
+          <span className="font-semibold text-gray-700">
+            選択中: {selectedPages.size} ページ
+          </span>
+          <button
+            type="button"
+            onClick={selectAll}
+            className="rounded-md border border-gray-300 bg-white px-2 py-1 hover:bg-gray-50"
+          >
+            全選択
+          </button>
+          <button
+            type="button"
+            onClick={clearSelection}
+            className="rounded-md border border-gray-300 bg-white px-2 py-1 hover:bg-gray-50"
+          >
+            選択解除
+          </button>
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={applyToSelected}
+              disabled={!signaturePng || selectedPages.size === 0}
+              className="rounded-md bg-pink-600 px-3 py-1 font-bold text-white hover:bg-pink-700 disabled:opacity-40"
+            >
+              ✍ 選択中のページに一括配置 ({selectedPages.size})
+            </button>
+            <button
+              type="button"
+              onClick={removeSelected}
+              disabled={selectedPages.size === 0}
+              className="rounded-md border border-gray-300 bg-white px-3 py-1 text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+            >
+              選択中の配置を消す
+            </button>
+          </div>
+        </div>
+
+        {/* ページサムネ（複数選択型 + 個別ページ詳細編集にもリンク） */}
         <div className="overflow-x-auto">
           <div className="flex gap-2">
             {pages.map((p) => {
               const has = placements.some((pl) => pl.pageNumber === p.pageNumber);
-              const active = activePage === p.pageNumber;
+              const isSelected = selectedPages.has(p.pageNumber);
+              const isActive = activePage === p.pageNumber;
               return (
-                <button
+                <div
                   key={p.pageNumber}
-                  type="button"
-                  onClick={() => setActivePage(p.pageNumber)}
                   className={
-                    "relative flex w-20 shrink-0 flex-col items-center gap-1 rounded-lg border-2 p-1 text-[10px] " +
-                    (active
+                    "relative w-24 shrink-0 rounded-lg border-2 p-1 text-[10px] transition " +
+                    (isActive
                       ? "border-brand-600 bg-brand-50"
-                      : "border-gray-200 hover:border-brand-400")
+                      : isSelected
+                        ? "border-pink-500 bg-pink-50"
+                        : "border-gray-200 bg-white")
                   }
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={p.dataUrl}
-                    alt={`p${p.pageNumber}`}
-                    className="aspect-[3/4] w-full rounded object-contain"
-                  />
-                  <span>P.{p.pageNumber}</span>
+                  {/* 上部チェックボックス（選択） */}
+                  <label className="absolute left-1 top-1 z-10 flex cursor-pointer items-center justify-center rounded bg-white/90 px-1 py-0.5">
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => togglePage(p.pageNumber)}
+                      className="h-3.5 w-3.5 accent-pink-600"
+                      aria-label={`ページ ${p.pageNumber} を選択`}
+                    />
+                  </label>
+                  {/* 配置済み印 */}
                   {has && (
-                    <span className="absolute right-0 top-0 rounded-full bg-pink-600 px-1.5 py-0.5 text-[9px] font-bold text-white">
+                    <span className="absolute right-1 top-1 z-10 rounded-full bg-pink-600 px-1.5 py-0.5 text-[9px] font-bold text-white">
                       ✓
                     </span>
                   )}
-                </button>
+                  {/* サムネ画像（タップで個別編集モードに） */}
+                  <button
+                    type="button"
+                    onClick={() => setActivePage(p.pageNumber)}
+                    className="block w-full text-center"
+                    aria-label={`ページ ${p.pageNumber} を編集`}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={p.dataUrl}
+                      alt={`p${p.pageNumber}`}
+                      className="aspect-[3/4] w-full rounded object-contain"
+                    />
+                    <span className="mt-1 block">P.{p.pageNumber}</span>
+                  </button>
+                </div>
               );
             })}
           </div>
@@ -689,12 +825,12 @@ function Step2Sign({
         )}
       </div>
 
-      {/* ページプレビュー（配置先） */}
+      {/* ページプレビュー（個別ページの位置調整用） */}
       {current && (
         <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-3">
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold text-gray-700">
-              ページ {current.pageNumber} に配置
+              ページ {current.pageNumber} の個別調整
             </p>
             {placement && (
               <button
@@ -736,7 +872,7 @@ function Step2Sign({
           </div>
           <p className="text-[11px] text-gray-400">
             ※ クリック/タップした位置を中心にサインが配置されます。
-            位置を変えたい場合はもう一度クリック/タップしてください。
+            ここで決めた位置は次回の「一括配置」のデフォルト位置になります。
           </p>
         </div>
       )}
@@ -755,6 +891,8 @@ function Step3Viewer({
   setViewerPage,
   zoom,
   setZoom,
+  fullscreen,
+  setFullscreen,
 }: {
   pages: PageRender[];
   placements: SignaturePlacement[];
@@ -764,6 +902,8 @@ function Step3Viewer({
   setViewerPage: (n: number) => void;
   zoom: number;
   setZoom: (n: number) => void;
+  fullscreen: boolean;
+  setFullscreen: (v: boolean) => void;
 }) {
   const placementMap = useMemo(() => {
     const m = new Map<number, SignaturePlacement>();
@@ -771,26 +911,57 @@ function Step3Viewer({
     return m;
   }, [placements]);
 
-  const containerRef = useRef<HTMLDivElement | null>(null);
+  const verticalContainerRef = useRef<HTMLDivElement | null>(null);
+  const [thumbOpen, setThumbOpen] = useState(false);
+  const [toolbarHidden, setToolbarHidden] = useState(false);
+  const toolbarHideTimer = useRef<number | null>(null);
 
-  // キーボード操作（見開きモード）
+  // めくりアニメ用
+  const [flipping, setFlipping] = useState<"none" | "next" | "prev">("none");
+
+  // ページめくりロジック（見開き）
+  const goPrev = useCallback(() => {
+    if (viewerMode === "spread") {
+      if (viewerPage <= 1 || flipping !== "none") return;
+      setFlipping("prev");
+      window.setTimeout(() => {
+        setViewerPage(Math.max(1, viewerPage - 2));
+        setFlipping("none");
+      }, 400);
+    } else {
+      setViewerPage(Math.max(1, viewerPage - 1));
+    }
+  }, [viewerMode, viewerPage, flipping, setViewerPage]);
+
+  const goNext = useCallback(() => {
+    if (viewerMode === "spread") {
+      if (viewerPage >= pages.length || flipping !== "none") return;
+      setFlipping("next");
+      window.setTimeout(() => {
+        setViewerPage(Math.min(pages.length, viewerPage + 2));
+        setFlipping("none");
+      }, 400);
+    } else {
+      setViewerPage(Math.min(pages.length, viewerPage + 1));
+    }
+  }, [viewerMode, viewerPage, pages.length, flipping, setViewerPage]);
+
+  // キーボード操作
   useEffect(() => {
     if (viewerMode !== "spread") return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "ArrowRight") {
-        setViewerPage(Math.min(pages.length, viewerPage + 2));
-      } else if (e.key === "ArrowLeft") {
-        setViewerPage(Math.max(1, viewerPage - 2));
-      }
+      if (e.key === "ArrowRight") goNext();
+      else if (e.key === "ArrowLeft") goPrev();
+      else if (e.key === "Escape" && fullscreen) setFullscreen(false);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [viewerMode, viewerPage, pages.length, setViewerPage]);
+  }, [viewerMode, goNext, goPrev, fullscreen, setFullscreen]);
 
   // 縦スクロール時、viewerPage に応じてスクロール
   useEffect(() => {
     if (viewerMode !== "vertical") return;
-    const el = containerRef.current?.querySelector(
+    const el = verticalContainerRef.current?.querySelector(
       `[data-page="${viewerPage}"]`,
     );
     if (el) {
@@ -798,34 +969,60 @@ function Step3Viewer({
     }
   }, [viewerMode, viewerPage]);
 
-  const goPrev = () => {
-    if (viewerMode === "spread") {
-      setViewerPage(Math.max(1, viewerPage - 2));
-    } else {
-      setViewerPage(Math.max(1, viewerPage - 1));
-    }
+  // スワイプ対応（見開き）
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const onTouchStart = (e: React.TouchEvent) => {
+    const t = e.touches[0];
+    touchStartRef.current = { x: t.clientX, y: t.clientY };
   };
-  const goNext = () => {
-    if (viewerMode === "spread") {
-      setViewerPage(Math.min(pages.length, viewerPage + 2));
-    } else {
-      setViewerPage(Math.min(pages.length, viewerPage + 1));
-    }
+  const onTouchEnd = (e: React.TouchEvent) => {
+    if (!touchStartRef.current) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - touchStartRef.current.x;
+    const dy = t.clientY - touchStartRef.current.y;
+    touchStartRef.current = null;
+    if (viewerMode !== "spread") return;
+    if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy)) return;
+    if (dx < 0) goNext();
+    else goPrev();
   };
 
+  // ツールバー自動非表示（操作後3秒）
+  const wakeToolbar = useCallback(() => {
+    setToolbarHidden(false);
+    if (toolbarHideTimer.current != null) {
+      window.clearTimeout(toolbarHideTimer.current);
+    }
+    if (fullscreen) {
+      toolbarHideTimer.current = window.setTimeout(() => {
+        setToolbarHidden(true);
+      }, 3000);
+    }
+  }, [fullscreen]);
+
+  useEffect(() => {
+    wakeToolbar();
+    return () => {
+      if (toolbarHideTimer.current != null) {
+        window.clearTimeout(toolbarHideTimer.current);
+      }
+    };
+  }, [wakeToolbar]);
+
+  // 1ページ描画ヘルパー
   const renderPage = (page: PageRender, key: string) => {
     const pm = placementMap.get(page.pageNumber);
     return (
       <div
         key={key}
         data-page={page.pageNumber}
-        className="relative shrink-0 overflow-hidden bg-white shadow-md"
+        className="relative h-full w-full overflow-hidden bg-white shadow-2xl"
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={page.dataUrl}
           alt={`page ${page.pageNumber}`}
-          className="block h-auto w-full select-none"
+          className="block h-full w-full select-none object-contain"
           draggable={false}
         />
         {pm && (
@@ -843,26 +1040,50 @@ function Step3Viewer({
             }}
           />
         )}
-        <p className="absolute bottom-1 right-2 rounded bg-black/40 px-2 py-0.5 text-[10px] text-white">
+        <p className="absolute bottom-2 right-3 rounded bg-black/40 px-2 py-0.5 text-[10px] text-white">
           P.{page.pageNumber}
         </p>
       </div>
     );
   };
 
-  return (
-    <section className="space-y-3">
-      {/* ツールバー */}
-      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-gray-200 bg-white p-3">
-        <div className="flex items-center gap-1 rounded-full bg-gray-100 p-1">
+  // ビューワ本体（全画面 / 通常を共通レイアウトに）
+  const viewerBody = (
+    <div
+      className={
+        fullscreen
+          ? "fixed inset-0 z-50 flex flex-col bg-zinc-900"
+          : "relative flex h-[80vh] flex-col rounded-2xl border border-gray-200 bg-zinc-900"
+      }
+      onMouseMove={wakeToolbar}
+      onTouchStart={(e) => {
+        wakeToolbar();
+        onTouchStart(e);
+      }}
+      onTouchEnd={onTouchEnd}
+    >
+      {/* 上部ツールバー */}
+      <div
+        className={
+          "z-20 flex flex-wrap items-center gap-2 border-b border-white/10 bg-zinc-800/95 px-3 py-2 text-white shadow transition-opacity " +
+          (toolbarHidden ? "opacity-0 hover:opacity-100" : "opacity-100")
+        }
+      >
+        <button
+          type="button"
+          onClick={() => setThumbOpen(!thumbOpen)}
+          className="rounded-md border border-white/20 px-2 py-1 text-xs hover:bg-white/10"
+          aria-label="サムネ一覧"
+        >
+          ☰
+        </button>
+        <div className="flex items-center gap-1 rounded-full bg-white/10 p-1">
           <button
             type="button"
             onClick={() => setViewerMode("spread")}
             className={
               "rounded-full px-3 py-1 text-xs font-medium " +
-              (viewerMode === "spread"
-                ? "bg-white shadow text-gray-900"
-                : "text-gray-500")
+              (viewerMode === "spread" ? "bg-white text-zinc-900" : "text-white/80")
             }
           >
             📖 見開き
@@ -873,166 +1094,265 @@ function Step3Viewer({
             className={
               "rounded-full px-3 py-1 text-xs font-medium " +
               (viewerMode === "vertical"
-                ? "bg-white shadow text-gray-900"
-                : "text-gray-500")
+                ? "bg-white text-zinc-900"
+                : "text-white/80")
             }
           >
-            📃 縦スクロール
+            📃 縦
           </button>
         </div>
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={() => setZoom(Math.max(0.5, zoom - 0.1))}
-            className="rounded-md border border-gray-300 px-2 py-1 text-xs"
+            className="rounded-md border border-white/20 px-2 py-1 text-xs"
           >
             ➖
           </button>
-          <span className="text-xs text-gray-600">{Math.round(zoom * 100)}%</span>
+          <span className="text-xs">{Math.round(zoom * 100)}%</span>
           <button
             type="button"
             onClick={() => setZoom(Math.min(2, zoom + 0.1))}
-            className="rounded-md border border-gray-300 px-2 py-1 text-xs"
+            className="rounded-md border border-white/20 px-2 py-1 text-xs"
           >
             ➕
           </button>
         </div>
-        <div className="ml-auto flex items-center gap-2 text-xs text-gray-500">
-          ページ {viewerPage} / {pages.length}
+        <div className="ml-auto flex items-center gap-2 text-xs text-white/80">
+          P.{viewerPage} / {pages.length}
         </div>
+        <button
+          type="button"
+          onClick={() => setFullscreen(!fullscreen)}
+          className="rounded-md border border-white/20 px-2 py-1 text-xs hover:bg-white/10"
+          aria-label="全画面切替"
+        >
+          {fullscreen ? "✕ 閉じる" : "⛶ 全画面"}
+        </button>
       </div>
 
-      {/* ビューワ本体 */}
+      <div className="relative flex flex-1 overflow-hidden">
+        {/* サムネサイドバー */}
+        {thumbOpen && (
+          <aside className="z-10 w-32 shrink-0 overflow-y-auto border-r border-white/10 bg-zinc-800/95 p-2">
+            <div className="space-y-2">
+              {pages.map((p) => {
+                const has = placementMap.has(p.pageNumber);
+                const active =
+                  viewerPage === p.pageNumber ||
+                  (viewerMode === "spread" &&
+                    p.pageNumber === viewerPage + 1);
+                return (
+                  <button
+                    key={p.pageNumber}
+                    type="button"
+                    onClick={() => {
+                      // 見開きは奇数開始に合わせる
+                      const target =
+                        viewerMode === "spread" && p.pageNumber > 1
+                          ? p.pageNumber - ((p.pageNumber + 1) % 2)
+                          : p.pageNumber;
+                      setViewerPage(Math.max(1, target));
+                    }}
+                    className={
+                      "relative block w-full overflow-hidden rounded border-2 p-0.5 text-[10px] text-white/90 " +
+                      (active
+                        ? "border-pink-500"
+                        : "border-transparent hover:border-white/30")
+                    }
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={p.dataUrl}
+                      alt={`p${p.pageNumber}`}
+                      className="aspect-[3/4] w-full rounded object-contain"
+                    />
+                    <span>P.{p.pageNumber}</span>
+                    {has && (
+                      <span className="absolute right-0.5 top-0.5 rounded-full bg-pink-600 px-1 text-[8px] font-bold text-white">
+                        ✓
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </aside>
+        )}
+
+        {/* ページコンテンツ */}
+        <div className="relative flex-1 overflow-hidden">
+          {viewerMode === "spread" ? (
+            <SpreadStage
+              pages={pages}
+              viewerPage={viewerPage}
+              zoom={zoom}
+              flipping={flipping}
+              renderPage={renderPage}
+              onPrev={goPrev}
+              onNext={goNext}
+            />
+          ) : (
+            <div
+              ref={verticalContainerRef}
+              className="h-full overflow-y-auto bg-zinc-900 p-4"
+            >
+              <div className="mx-auto flex flex-col items-center gap-4">
+                {pages.map((p) => (
+                  <div
+                    key={p.pageNumber}
+                    style={{
+                      width: `${70 * zoom}vw`,
+                      maxWidth: `${640 * zoom}px`,
+                      aspectRatio: `${p.width} / ${p.height}`,
+                    }}
+                  >
+                    {renderPage(p, `v-${p.pageNumber}`)}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ナビゲーション（左右） */}
+          {viewerMode === "spread" && (
+            <>
+              <button
+                type="button"
+                onClick={goPrev}
+                disabled={viewerPage <= 1 || flipping !== "none"}
+                className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/40 px-4 py-3 text-2xl text-white shadow hover:bg-black/60 disabled:opacity-20"
+                aria-label="前のページ"
+              >
+                ◀
+              </button>
+              <button
+                type="button"
+                onClick={goNext}
+                disabled={viewerPage >= pages.length || flipping !== "none"}
+                className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/40 px-4 py-3 text-2xl text-white shadow hover:bg-black/60 disabled:opacity-20"
+                aria-label="次のページ"
+              >
+                ▶
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <section className="space-y-3">
+      <p className="text-xs text-gray-500">
+        Step 3: 電子書籍ビューワー風に閲覧できます。「⛶ 全画面」で本物のリーダー
+        体験になります（Esc で戻る）。スワイプ／矢印キーでページめくり可能。
+      </p>
+      {viewerBody}
+    </section>
+  );
+}
+
+/* 見開きステージ：めくりアニメ込み */
+function SpreadStage({
+  pages,
+  viewerPage,
+  zoom,
+  flipping,
+  renderPage,
+  onPrev,
+  onNext,
+}: {
+  pages: PageRender[];
+  viewerPage: number;
+  zoom: number;
+  flipping: "none" | "next" | "prev";
+  renderPage: (p: PageRender, key: string) => React.ReactNode;
+  onPrev: () => void;
+  onNext: () => void;
+}) {
+  const leftPage = viewerPage === 1 ? null : pages.find((p) => p.pageNumber === viewerPage);
+  const rightPage =
+    viewerPage === 1
+      ? pages.find((p) => p.pageNumber === 1)
+      : pages.find((p) => p.pageNumber === viewerPage + 1);
+
+  // めくり中の対象ページを次/前から取得
+  const flipNextRight = pages.find((p) => p.pageNumber === viewerPage + 2);
+  const flipPrevLeft = pages.find((p) => p.pageNumber === viewerPage - 2);
+
+  // 見開きステージのサイズはアスペクト比3:4 を維持
+  const stageStyle: React.CSSProperties = {
+    width: `${72 * zoom}vmin`,
+    maxWidth: `${800 * zoom}px`,
+    aspectRatio: viewerPage === 1 ? "3 / 4" : "3 / 2",
+  };
+
+  return (
+    <div className="flex h-full w-full items-center justify-center bg-zinc-900 p-4">
       <div
-        ref={containerRef}
-        className={
-          "rounded-2xl border border-gray-200 bg-gray-100 p-3 " +
-          (viewerMode === "vertical" ? "max-h-[80vh] overflow-y-auto" : "")
-        }
+        className="relative"
+        style={{
+          ...stageStyle,
+          perspective: "2400px",
+        }}
+        onClick={(e) => {
+          // 左右半分どちらをタップしたかでめくる方向を判定（スマホ向け）
+          const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+          const half = rect.left + rect.width / 2;
+          if (e.clientX < half) onPrev();
+          else onNext();
+        }}
       >
-        {viewerMode === "spread" ? (
-          <div className="flex items-center justify-center gap-4 transition-transform">
-            {(() => {
-              // 見開き：偶数+奇数のペア。1ページ目だけ単独で表紙扱い。
-              const elems: React.ReactNode[] = [];
-              if (viewerPage === 1) {
-                const p1 = pages.find((p) => p.pageNumber === 1);
-                if (p1) {
-                  elems.push(
-                    <div
-                      key="cover"
-                      style={{
-                        width: `${30 * zoom}vw`,
-                        maxWidth: `${320 * zoom}px`,
-                      }}
-                    >
-                      {renderPage(p1, "cover")}
-                    </div>,
-                  );
-                }
-              } else {
-                const left = viewerPage;
-                const right = viewerPage + 1;
-                const pL = pages.find((p) => p.pageNumber === left);
-                const pR = pages.find((p) => p.pageNumber === right);
-                const w = `${28 * zoom}vw`;
-                const maxW = `${300 * zoom}px`;
-                if (pL)
-                  elems.push(
-                    <div key={`l-${left}`} style={{ width: w, maxWidth: maxW }}>
-                      {renderPage(pL, `l-${left}`)}
-                    </div>,
-                  );
-                if (pR)
-                  elems.push(
-                    <div
-                      key={`r-${right}`}
-                      style={{ width: w, maxWidth: maxW }}
-                    >
-                      {renderPage(pR, `r-${right}`)}
-                    </div>,
-                  );
-              }
-              return elems;
-            })()}
+        {viewerPage === 1 ? (
+          // 表紙：単独ページ
+          <div className="absolute inset-0 mx-auto" style={{ aspectRatio: "3/4" }}>
+            {rightPage && renderPage(rightPage, "cover")}
           </div>
         ) : (
-          <div className="mx-auto flex flex-col items-center gap-3">
-            {pages.map((p) => (
-              <div
-                key={p.pageNumber}
-                style={{
-                  width: `${60 * zoom}vw`,
-                  maxWidth: `${640 * zoom}px`,
-                }}
-              >
-                {renderPage(p, `v-${p.pageNumber}`)}
+          <div className="absolute inset-0 grid grid-cols-2 gap-0">
+            {/* 左ページ（裏側はめくり時に前ページが見える） */}
+            <div
+              className={
+                "relative origin-right transition-transform duration-[400ms] ease-in-out " +
+                (flipping === "prev" ? "[transform:rotateY(180deg)]" : "")
+              }
+              style={{ transformStyle: "preserve-3d" }}
+            >
+              <div className="absolute inset-0 [backface-visibility:hidden]">
+                {leftPage && renderPage(leftPage, `left-${leftPage.pageNumber}`)}
               </div>
-            ))}
+              <div
+                className="absolute inset-0 [backface-visibility:hidden]"
+                style={{ transform: "rotateY(180deg)" }}
+              >
+                {flipPrevLeft &&
+                  renderPage(flipPrevLeft, `flipPrevL-${flipPrevLeft.pageNumber}`)}
+              </div>
+            </div>
+
+            {/* 右ページ（めくると次ページが現れる） */}
+            <div
+              className={
+                "relative origin-left transition-transform duration-[400ms] ease-in-out " +
+                (flipping === "next" ? "[transform:rotateY(-180deg)]" : "")
+              }
+              style={{ transformStyle: "preserve-3d" }}
+            >
+              <div className="absolute inset-0 [backface-visibility:hidden]">
+                {rightPage && renderPage(rightPage, `right-${rightPage.pageNumber}`)}
+              </div>
+              <div
+                className="absolute inset-0 [backface-visibility:hidden]"
+                style={{ transform: "rotateY(180deg)" }}
+              >
+                {flipNextRight &&
+                  renderPage(flipNextRight, `flipNextR-${flipNextRight.pageNumber}`)}
+              </div>
+            </div>
           </div>
         )}
       </div>
-
-      {/* ナビゲーション（見開きモード） */}
-      {viewerMode === "spread" && (
-        <div className="flex items-center justify-center gap-3">
-          <button
-            type="button"
-            onClick={goPrev}
-            disabled={viewerPage <= 1}
-            className="rounded-full bg-gray-900 px-5 py-2 text-sm font-bold text-white hover:bg-gray-700 disabled:opacity-30"
-          >
-            ← 前
-          </button>
-          <button
-            type="button"
-            onClick={goNext}
-            disabled={viewerPage >= pages.length}
-            className="rounded-full bg-gray-900 px-5 py-2 text-sm font-bold text-white hover:bg-gray-700 disabled:opacity-30"
-          >
-            次 →
-          </button>
-        </div>
-      )}
-
-      {/* サムネ一覧 */}
-      <div className="rounded-2xl border border-gray-200 bg-white p-3">
-        <p className="mb-2 text-xs text-gray-500">サムネ一覧（タップで移動）</p>
-        <div className="flex gap-2 overflow-x-auto">
-          {pages.map((p) => {
-            const has = placementMap.has(p.pageNumber);
-            const active =
-              viewerPage === p.pageNumber ||
-              (viewerMode === "spread" && p.pageNumber === viewerPage + 1);
-            return (
-              <button
-                key={p.pageNumber}
-                type="button"
-                onClick={() => setViewerPage(p.pageNumber)}
-                className={
-                  "relative flex w-16 shrink-0 flex-col items-center gap-0.5 rounded border-2 p-0.5 text-[10px] " +
-                  (active
-                    ? "border-brand-600"
-                    : "border-gray-200 hover:border-brand-400")
-                }
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={p.dataUrl}
-                  alt={`p${p.pageNumber}`}
-                  className="aspect-[3/4] w-full rounded object-contain"
-                />
-                <span>P.{p.pageNumber}</span>
-                {has && (
-                  <span className="absolute right-0 top-0 rounded-full bg-pink-600 px-1 text-[9px] font-bold text-white">
-                    ✓
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    </section>
+    </div>
   );
 }
