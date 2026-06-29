@@ -55,7 +55,7 @@ export default async function KujiDetailPage({
   const bonusPrizes = campaign.prizes.filter((p) => p.bundleOnly);
 
   return (
-    <div className="bg-gray-50">
+    <div className="bg-gray-50 pb-32 sm:pb-24">
       <div className="mx-auto max-w-3xl bg-white">
         {/* ヘッダー：戻るリンク + バナー */}
         <div className="px-4 pt-4">
@@ -281,6 +281,66 @@ export default async function KujiDetailPage({
           )}
         </div>
       </div>
+
+      {/* 固定フッター（購入ボタン） */}
+      {campaign.bundles.length > 0 && (
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-gray-200 bg-white/95 px-3 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] backdrop-blur">
+          <div className="mx-auto max-w-3xl">
+            {!isOpen ? (
+              <p className="rounded-lg bg-gray-100 px-3 py-2 text-center text-xs text-gray-600">
+                現在は販売期間外です
+              </p>
+            ) : (
+              <div className="flex items-center gap-2 overflow-x-auto">
+                {campaign.bundles.map((b) => (
+                  <div
+                    key={b.id}
+                    className="min-w-[28%] flex-1 sm:min-w-[20%]"
+                  >
+                    {user ? (
+                      <form action={purchaseKujiBundle}>
+                        <input
+                          type="hidden"
+                          name="campaignId"
+                          value={campaign.id}
+                        />
+                        <input
+                          type="hidden"
+                          name="bundleId"
+                          value={b.id}
+                        />
+                        <button
+                          type="submit"
+                          className="w-full rounded-full bg-pink-600 px-3 py-2.5 text-center text-white shadow-md transition hover:bg-pink-700 active:scale-[0.98]"
+                        >
+                          <span className="block text-sm font-extrabold leading-tight">
+                            {b.drawCount}連購入
+                          </span>
+                          <span className="block text-[11px] opacity-90">
+                            {formatYen(b.priceTotal)}
+                          </span>
+                        </button>
+                      </form>
+                    ) : (
+                      <Link
+                        href={`/auth/login?callbackUrl=${encodeURIComponent(`/kuji/${campaign.id}`)}`}
+                        className="block w-full rounded-full border border-pink-400 bg-white px-3 py-2.5 text-center text-pink-700 shadow-md transition hover:bg-pink-50 active:scale-[0.98]"
+                      >
+                        <span className="block text-sm font-extrabold leading-tight">
+                          {b.drawCount}連購入
+                        </span>
+                        <span className="block text-[11px] opacity-90">
+                          {formatYen(b.priceTotal)}
+                        </span>
+                      </Link>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
