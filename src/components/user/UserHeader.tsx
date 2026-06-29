@@ -8,7 +8,8 @@ import { Drawer } from "@/components/ui/Drawer";
 
 const NAV_LINKS: { href: string; label: string }[] = [
   { href: "/events?type=MEET_GREET", label: "オンライン特典会" },
-  { href: "/lotteries", label: "アベリアくじ" },
+  { href: "/kuji", label: "アベリアくじ" },
+  { href: "/lotteries", label: "抽選販売" },
   { href: "/events?type=TRADING_CARD", label: "トレカ" },
   { href: "/faq", label: "よくある質問" },
 ];
