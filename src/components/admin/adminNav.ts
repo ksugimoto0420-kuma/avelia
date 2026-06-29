@@ -15,6 +15,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { href: "/admin/products", label: "商品", icon: "🎁" },
       { href: "/admin/inventories", label: "在庫", icon: "📦" },
       { href: "/admin/lotteries", label: "抽選", icon: "🎰" },
+      { href: "/admin/kuji", label: "アベリアくじ", icon: "🎲" },
     ],
   },
   {
