@@ -294,3 +294,80 @@ model KujiDraw {
 - 特典会グッズと一緒に「N連」をカートに入れてまとめ決済したいニーズあり
 - KujiBundle を CartItem に乗せられるよう ProductVariant 互換のシムが必要
 - 検討は次フェーズ以降。MVP は単体購入で良い。
+
+## 14. ⚠️ 未解決の重大設計課題：賞品と商品マスタの一本化
+
+**【必読】MVPでは「KujiPrize は独立した在庫管理」となっており、これは本番運用で
+破綻するため、本番化前に一本化が必要です。**
+
+### 14-1. 現状の問題
+
+```
+Product / ProductVariant / Inventory          ← 物販・特典会の在庫
+KujiPrize.remainingCount                       ← くじ専用の在庫（独立！）
+```
+
+くじの賞品は **商品マスタの外** に存在しているため、以下が壊れる:
+
+| ケース | 起きる事故 |
+|---|---|
+| 同じ商品（例: サイン入りポスター）を物販とくじ両方に出したい | 在庫が分裂、合計本数が制御不能 |
+| くじで余った賞品を在庫処分で売りたい | KujiPrize → Product への変換手段なし、人手で重複登録 |
+| 倉庫向け制作リスト CSV | くじ当選分は OrderItem を作らないので CSV に出ない |
+| 倉庫向け発送リスト CSV | 同上、当選品が出荷漏れる |
+| 倉庫区分 (IN_HOUSE / WAREHOUSE) | Product にはあるが KujiPrize にはない、振り分け不能 |
+| サイン納品が必要な賞品 | DigitalDelivery 連携が走らない |
+
+### 14-2. 一本化の設計案
+
+KujiPrize に「ProductVariant への参照」を持たせて、賞品の本体は商品マスタに置く:
+
+```prisma
+model KujiPrize {
+  id          String   @id
+  campaignId  String
+  rank        String
+  order       Int
+
+  // 賞の本体は ProductVariant を参照する
+  variantId   String?  // 物販と共有する場合は紐付け、くじ専用なら null
+
+  // 表示用（variant がある場合は variant のものを優先）
+  name        String
+  imageUrl    String?
+  variantNote String?
+
+  // くじキャンペーン内での割当
+  type              KujiPrizeType
+  allocatedCount    Int?    // このくじに割り当てた本数（LIMITED）
+  remainingCount    Int?    // 残数
+  probabilityWeight Int?
+  bundleOnly        Boolean
+
+  variant     ProductVariant? @relation(fields: [variantId], ...)
+}
+```
+
+### 14-3. 移行に必要な変更
+
+1. **抽選ロジック**: 当選時に
+   - KujiPrize.remainingCount を減らす
+   - variant がある場合は Inventory.quantity も減らす（StockReservation 経由）
+   - OrderItem を作成（既存の物販フローに乗せる）
+2. **管理画面**: 賞作成時に「既存の商品から選ぶ」or「くじ専用商品として登録」のスイッチ
+3. **発送リスト・制作リスト CSV**: 自動的にくじ当選品が乗るようになる（OrderItem 経由）
+4. **データ移行**: 既存のテスト用 KujiPrize を Product/ProductVariant に作り直す or 「くじ専用」フラグで温存
+5. **Stripe webhook 連携**: 13-2 の本番化変更と同時に実装
+
+### 14-4. 本番化タイミング
+
+- 13. の「Stripe webhook 経由の抽選」と一緒に着手する
+- 単独で進めると整合性が取れないので、本番化フェーズで一気に変更する
+- 仮にデモを延長する場合も、MVPの公開前には必ず対応する
+
+### 14-5. デモ段階での割り切り
+
+- 現状の独立在庫モデルは「ガチャの動作だけを見せる」用途には十分
+- 本番運用には不適切なので、本番化前に必ず再設計する
+- このメモを残しておくのは、本番化時に「なぜ KujiPrize.remainingCount が
+  あるのか」「なぜ OrderItem が空なのか」を読み解くため
