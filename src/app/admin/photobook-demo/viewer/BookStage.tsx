@@ -5,6 +5,7 @@ import {
   forwardRef,
   useEffect,
   useImperativeHandle,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -37,12 +38,58 @@ export type BookStageHandle = {
 };
 
 /**
+ * 内部ページ表現:
+ *   - kind: "page" → 実ページ（dataUrl + サイン）
+ *   - kind: "blank" → 白紙ページ（写真集の見開きを揃えるため）
+ *
+ * 写真集の標準的なページ並び:
+ *   1: 表紙（単独）
+ *   2: 白紙（自動挿入）
+ *   3: 本文P1（=元PDFのP2）
+ *   4: 本文P2（=元PDFのP3）
+ *   ...
+ *
+ * react-pageflip の onFlip が返すのは「めくった結果の左ページのインデックス」。
+ * 元PDFのページ番号に戻したいときは、白紙分を引いて求める。
+ */
+type InternalPage =
+  | { kind: "page"; page: ViewerPage }
+  | { kind: "blank" };
+
+function buildInternalPages(pages: ViewerPage[]): InternalPage[] {
+  if (pages.length === 0) return [];
+  const out: InternalPage[] = [];
+  out.push({ kind: "page", page: pages[0] }); // 表紙
+  if (pages.length > 1) {
+    out.push({ kind: "blank" }); // 表紙の裏（白紙）
+    for (let i = 1; i < pages.length; i++) {
+      out.push({ kind: "page", page: pages[i] });
+    }
+  }
+  return out;
+}
+
+/** 元PDFのページ番号 → 内部インデックス */
+function originalToInternalIndex(pageNumber: number): number {
+  if (pageNumber <= 1) return 0; // 表紙
+  // 1=表紙(internal 0), 2=本文P2(internal 2), 3=本文P3(internal 3) ...
+  return pageNumber; // pageNumber>=2 のとき internal index は pageNumber
+}
+
+/** 内部インデックス → 元PDFのページ番号 */
+function internalToOriginalPageNumber(internalIndex: number): number {
+  if (internalIndex <= 0) return 1;
+  if (internalIndex === 1) return 1; // 白紙 = 表紙裏として扱う
+  return internalIndex; // それ以外はそのままが本文ページ番号
+}
+
+/**
  * BookStage：本の見開きを表示するステージ。
  *
  * - 親要素のサイズを ResizeObserver で実測し、HTMLFlipBook に width/height を渡す
- * - showCover=true で 1ページ目を表紙（単独）扱い
- * - usePortrait で 768px 未満は自動的に1ページ縦書き表示に切替
- * - めくり影・ページの裏面表現は react-pageflip が描画
+ * - showCover=true で表紙を単独扱い、表紙の裏に白紙を入れて見開きを揃える
+ * - usePortrait で 768px 未満は自動的に1ページ縦長表示に切替
+ * - zoom (0.6〜2.5) は transform: scale で適用、ピンチ対応
  */
 export const BookStage = forwardRef<
   BookStageHandle,
@@ -50,18 +97,24 @@ export const BookStage = forwardRef<
     pages: ViewerPage[];
     signatures: Map<number, ViewerSignature>;
     watermark?: string | null;
-    /** 現在のページ番号（1始まり、見開きなら左ページ） */
+    /** 現在のページ番号（元PDFのページ番号、1始まり） */
     currentPage: number;
-    /** ページめくり完了時のコールバック（react-pageflip の onFlip） */
-    onFlipped: (newPageIndex: number) => void;
+    /** ページめくり完了時のコールバック（元PDFのページ番号） */
+    onFlipped: (newPageNumber: number) => void;
+    /** ズーム倍率（外部から制御） */
+    zoom: number;
+    /** ピンチ時に外部に通知して同期 */
+    onZoomChange: (z: number) => void;
   }
 >(function BookStage(
-  { pages, signatures, watermark, currentPage, onFlipped },
+  { pages, signatures, watermark, currentPage, onFlipped, zoom, onZoomChange },
   ref,
 ) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
   const flipBookRef = useRef<FlipBookApi | null>(null);
+
+  const internalPages = useMemo(() => buildInternalPages(pages), [pages]);
 
   // ページ縦横比を1ページ目で算出
   const refPage = pages[0];
@@ -73,23 +126,18 @@ export const BookStage = forwardRef<
     if (!el) return;
     const update = () => {
       const r = el.getBoundingClientRect();
-      // 余白として 6% を確保
       const availW = r.width * 0.94;
       const availH = r.height * 0.94;
-      // 見開きを想定。1ページの幅と高さを決める
-      // ステージ全体: 2ページ並んだ aspect (pageRatio * 2)
       const spreadAspect = pageRatio * 2;
       let stageW: number;
       let stageH: number;
       if (availW / availH > spreadAspect) {
-        // 高さ基準でフィット
         stageH = availH;
         stageW = stageH * spreadAspect;
       } else {
         stageW = availW;
         stageH = stageW / spreadAspect;
       }
-      // 1ページサイズ
       const w = Math.floor(stageW / 2);
       const h = Math.floor(stageH);
       setSize({ w, h });
@@ -106,7 +154,10 @@ export const BookStage = forwardRef<
     () => ({
       flipNext: () => flipBookRef.current?.pageFlip().flipNext(),
       flipPrev: () => flipBookRef.current?.pageFlip().flipPrev(),
-      turnTo: (idx: number) => flipBookRef.current?.pageFlip().turnToPage(idx),
+      turnTo: (originalPageNumber: number) => {
+        const idx = originalToInternalIndex(originalPageNumber);
+        flipBookRef.current?.pageFlip().turnToPage(idx);
+      },
     }),
     [],
   );
@@ -115,61 +166,116 @@ export const BookStage = forwardRef<
   useEffect(() => {
     const api = flipBookRef.current?.pageFlip();
     if (!api) return;
-    // pageFlip の page index は 0 始まり、showCover=true の場合は表紙が index 0
-    const targetIndex = Math.max(0, currentPage - 1);
+    const targetIndex = originalToInternalIndex(currentPage);
     const cur = api.getCurrentPageIndex();
     if (cur !== targetIndex) {
       api.turnToPage(targetIndex);
     }
   }, [currentPage]);
 
+  /* ----------------- ピンチズーム ----------------- */
+  // 2本指の距離を測ってズーム倍率に反映。clamp 0.6〜2.5
+  const pinchStartRef = useRef<{
+    distance: number;
+    zoom: number;
+  } | null>(null);
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      pinchStartRef.current = {
+        distance: Math.sqrt(dx * dx + dy * dy),
+        zoom,
+      };
+    }
+  };
+  const onTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2 && pinchStartRef.current) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const ratio = dist / pinchStartRef.current.distance;
+      const next = Math.min(
+        2.5,
+        Math.max(0.6, pinchStartRef.current.zoom * ratio),
+      );
+      onZoomChange(+next.toFixed(2));
+    }
+  };
+  const onTouchEnd = (e: React.TouchEvent) => {
+    if (e.touches.length < 2) pinchStartRef.current = null;
+  };
+
   return (
     <div
       ref={containerRef}
       className="flex h-full w-full items-center justify-center overflow-hidden"
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
     >
       {size.w > 0 && size.h > 0 && (
-        // HTMLFlipBook は React.MemoExoticComponent<ForwardRef> で、
-        // 型定義が厳密に必須props を強制してくる。実際は省略可能だが
-        // 型解決のためにすべて指定する。
-        <HTMLFlipBook
-          ref={(inst) => {
-            flipBookRef.current = inst as unknown as FlipBookApi | null;
+        <div
+          className="transition-transform duration-200"
+          style={{
+            transform: `scale(${zoom})`,
+            transformOrigin: "center center",
           }}
-          width={size.w}
-          height={size.h}
-          size="fixed"
-          minWidth={150}
-          maxWidth={2000}
-          minHeight={200}
-          maxHeight={3000}
-          drawShadow
-          flippingTime={550}
-          usePortrait
-          startZIndex={0}
-          autoSize={false}
-          maxShadowOpacity={0.5}
-          showCover
-          mobileScrollSupport
-          clickEventForward
-          useMouseEvents
-          swipeDistance={30}
-          showPageCorners
-          disableFlipByClick={false}
-          startPage={Math.max(0, currentPage - 1)}
-          className=""
-          style={{}}
-          onFlip={(e: { data: number }) => onFlipped(e.data + 1)}
         >
-          {pages.map((p) => (
-            <PageWrapper
-              key={p.pageNumber}
-              page={p}
-              signature={signatures.get(p.pageNumber) ?? null}
-              watermark={watermark}
-            />
-          ))}
-        </HTMLFlipBook>
+          <HTMLFlipBook
+            ref={(inst) => {
+              flipBookRef.current = inst as unknown as FlipBookApi | null;
+            }}
+            width={size.w}
+            height={size.h}
+            size="fixed"
+            minWidth={150}
+            maxWidth={2000}
+            minHeight={200}
+            maxHeight={3000}
+            drawShadow
+            flippingTime={550}
+            usePortrait
+            startZIndex={0}
+            autoSize={false}
+            maxShadowOpacity={0.5}
+            showCover
+            mobileScrollSupport
+            clickEventForward
+            useMouseEvents
+            swipeDistance={30}
+            showPageCorners
+            disableFlipByClick={false}
+            startPage={originalToInternalIndex(currentPage)}
+            className=""
+            style={{}}
+            onFlip={(e: { data: number }) =>
+              onFlipped(internalToOriginalPageNumber(e.data))
+            }
+          >
+            {internalPages.map((ip, idx) => {
+              if (ip.kind === "blank") {
+                return (
+                  <PageWrapper
+                    key={`blank-${idx}`}
+                    page={null}
+                    signature={null}
+                    watermark={watermark}
+                  />
+                );
+              }
+              return (
+                <PageWrapper
+                  key={`page-${ip.page.pageNumber}`}
+                  page={ip.page}
+                  signature={signatures.get(ip.page.pageNumber) ?? null}
+                  watermark={watermark}
+                />
+              );
+            })}
+          </HTMLFlipBook>
+        </div>
       )}
     </div>
   );
@@ -177,20 +283,18 @@ export const BookStage = forwardRef<
 
 /**
  * react-pageflip は子要素を「ページ」として直接扱うので、ref forward + クラス必須。
+ * page=null は白紙ページ。
  */
 const PageWrapper = forwardRef<
   HTMLDivElement,
   {
-    page: ViewerPage;
+    page: ViewerPage | null;
     signature: ViewerSignature | null;
     watermark?: string | null;
   }
 >(function PageWrapper({ page, signature, watermark }, ref) {
   return (
-    <div
-      ref={ref}
-      className="bg-zinc-950 [--page-shadow:0_2px_8px_rgba(0,0,0,0.4)]"
-    >
+    <div ref={ref} className="bg-zinc-950">
       <PageImage page={page} signature={signature} watermark={watermark} />
     </div>
   );

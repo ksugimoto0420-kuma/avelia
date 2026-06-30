@@ -48,6 +48,7 @@ export function PhotobookViewer({
   const [currentPage, setCurrentPage] = useState(1);
   const [isUiVisible, setIsUiVisible] = useState(true);
   const [isThumbnailOpen, setIsThumbnailOpen] = useState(false);
+  const [zoom, setZoom] = useState(1);
 
   const signatures = useMemo(() => {
     const m = new Map<number, ViewerSignature>();
@@ -111,6 +112,11 @@ export function PhotobookViewer({
       if (e.key === "ArrowRight") goNext();
       else if (e.key === "ArrowLeft") goPrev();
       else if (e.key === "Escape") onClose();
+      else if (e.key === "+" || e.key === "=")
+        setZoom((z) => Math.min(2.5, +(z + 0.1).toFixed(2)));
+      else if (e.key === "-" || e.key === "_")
+        setZoom((z) => Math.max(0.6, +(z - 0.1).toFixed(2)));
+      else if (e.key === "0") setZoom(1);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -151,13 +157,21 @@ export function PhotobookViewer({
     }
   }, [currentPage, pages]);
 
-  // ラベル: 見開きの場合は「2–3」のような範囲表示
-  // react-pageflip は usePortrait で自動切替するので、レイアウト依存ではなく
-  // 「ページ番号が偶数 = 見開き左ページ」とみなしてラベルを作る
-  const isPair = currentPage > 1 && currentPage < pages.length && canSpread;
-  const currentLabel = isPair
-    ? `${currentPage}–${currentPage + 1}`
-    : `${currentPage}`;
+  // ラベル: 写真集の並びを考慮:
+  //   1 ページ目 = 表紙単独 → "1"
+  //   2 ページ目 = 白紙との見開き右側 → "2"
+  //   3 ページ目以降 = 奇数ページが左、偶数ページが右の見開き → "3–4" "5–6" ...
+  // canSpread=false（スマホ縦持ち）の時は常に単一ページ番号
+  let currentLabel: string;
+  if (!canSpread || currentPage <= 2) {
+    currentLabel = `${currentPage}`;
+  } else if (currentPage % 2 === 1) {
+    // 奇数: 左ページ → "n–(n+1)"
+    currentLabel = `${currentPage}–${Math.min(pages.length, currentPage + 1)}`;
+  } else {
+    // 偶数: 右ページ → "(n-1)–n"
+    currentLabel = `${currentPage - 1}–${currentPage}`;
+  }
 
   return (
     <div
@@ -189,6 +203,8 @@ export function PhotobookViewer({
           watermark={watermark}
           currentPage={currentPage}
           onFlipped={(n) => setCurrentPage(n)}
+          zoom={zoom}
+          onZoomChange={(z) => setZoom(z)}
         />
       </div>
 
@@ -202,6 +218,10 @@ export function PhotobookViewer({
         currentLabel={currentLabel}
         totalPages={pages.length}
         visible={isUiVisible}
+        zoom={zoom}
+        onZoomIn={() => setZoom((z) => Math.min(2.5, +(z + 0.1).toFixed(2)))}
+        onZoomOut={() => setZoom((z) => Math.max(0.6, +(z - 0.1).toFixed(2)))}
+        onZoomReset={() => setZoom(1)}
         onOpenThumbs={() => setIsThumbnailOpen(true)}
       />
 

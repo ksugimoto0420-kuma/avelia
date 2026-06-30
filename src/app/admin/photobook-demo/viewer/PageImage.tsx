@@ -8,6 +8,7 @@ import type { ViewerPage, ViewerSignature } from "./types";
  * - サインがあれば右下寄りなど指定位置に重ねる
  * - 購入者透かしを薄く全面に重ねる（コピー対策）
  * - 右クリック・ドラッグ保存・選択を抑制
+ * - page が null の場合は「白紙ページ」として描画する
  */
 export function PageImage({
   page,
@@ -15,18 +16,26 @@ export function PageImage({
   watermark,
   isFirstFrame,
 }: {
-  page: ViewerPage;
+  page: ViewerPage | null;
   signature: ViewerSignature | null;
   watermark?: string | null;
   /** 初回読込時のフェード演出に使う */
   isFirstFrame?: boolean;
 }) {
+  // 白紙ページ：写真集の見開きを成立させるための裏面
+  if (!page) {
+    return (
+      <div
+        className="relative h-full w-full overflow-hidden bg-[#f6f3ed]"
+        onContextMenu={(e) => e.preventDefault()}
+      />
+    );
+  }
+
   return (
     <div
       className={
         "relative h-full w-full overflow-hidden bg-zinc-950 " +
-        // 影は react-pageflip 側で描画するので、ここでは付けない
-        "" +
         (isFirstFrame ? "animate-[fadeIn_400ms_ease-out_forwards]" : "")
       }
       onContextMenu={(e) => e.preventDefault()}
