@@ -56,12 +56,23 @@ type InternalPage =
   | { kind: "page"; page: ViewerPage }
   | { kind: "blank" };
 
-function buildInternalPages(pages: ViewerPage[]): InternalPage[] {
+/**
+ * 内部ページ列を構築する。
+ *  - insertCoverBack=true（見開きモード）: 表紙の裏に白紙を挟んで「表紙→見開き」
+ *  - insertCoverBack=false（1ページモード）: 白紙なし、元PDFそのまま
+ */
+function buildInternalPages(
+  pages: ViewerPage[],
+  insertCoverBack: boolean,
+): InternalPage[] {
   if (pages.length === 0) return [];
+  if (!insertCoverBack) {
+    return pages.map((page) => ({ kind: "page", page }));
+  }
   const out: InternalPage[] = [];
-  out.push({ kind: "page", page: pages[0] }); // 表紙
+  out.push({ kind: "page", page: pages[0] });
   if (pages.length > 1) {
-    out.push({ kind: "blank" }); // 表紙の裏（白紙）
+    out.push({ kind: "blank" });
     for (let i = 1; i < pages.length; i++) {
       out.push({ kind: "page", page: pages[i] });
     }
@@ -70,17 +81,24 @@ function buildInternalPages(pages: ViewerPage[]): InternalPage[] {
 }
 
 /** 元PDFのページ番号 → 内部インデックス */
-function originalToInternalIndex(pageNumber: number): number {
-  if (pageNumber <= 1) return 0; // 表紙
-  // 1=表紙(internal 0), 2=本文P2(internal 2), 3=本文P3(internal 3) ...
-  return pageNumber; // pageNumber>=2 のとき internal index は pageNumber
+function originalToInternalIndex(
+  pageNumber: number,
+  insertCoverBack: boolean,
+): number {
+  if (!insertCoverBack) return Math.max(0, pageNumber - 1);
+  if (pageNumber <= 1) return 0;
+  return pageNumber;
 }
 
 /** 内部インデックス → 元PDFのページ番号 */
-function internalToOriginalPageNumber(internalIndex: number): number {
+function internalToOriginalPageNumber(
+  internalIndex: number,
+  insertCoverBack: boolean,
+): number {
+  if (!insertCoverBack) return Math.max(1, internalIndex + 1);
   if (internalIndex <= 0) return 1;
-  if (internalIndex === 1) return 1; // 白紙 = 表紙裏として扱う
-  return internalIndex; // それ以外はそのままが本文ページ番号
+  if (internalIndex === 1) return 1; // 白紙は表紙裏として扱う
+  return internalIndex;
 }
 
 /**
@@ -114,7 +132,21 @@ export const BookStage = forwardRef<
   const [size, setSize] = useState({ w: 0, h: 0 });
   const flipBookRef = useRef<FlipBookApi | null>(null);
 
-  const internalPages = useMemo(() => buildInternalPages(pages), [pages]);
+  // 画面幅でレイアウトを切り替える。
+  //   >= 768px: 見開きモード（白紙挿入で「表紙→見開き」）
+  //   < 768px:  1ページモード（白紙なし、元PDFそのまま）
+  const [insertCoverBack, setInsertCoverBack] = useState(false);
+  useEffect(() => {
+    const detect = () => setInsertCoverBack(window.innerWidth >= 768);
+    detect();
+    window.addEventListener("resize", detect);
+    return () => window.removeEventListener("resize", detect);
+  }, []);
+
+  const internalPages = useMemo(
+    () => buildInternalPages(pages, insertCoverBack),
+    [pages, insertCoverBack],
+  );
 
   // ページ縦横比を1ページ目で算出
   const refPage = pages[0];
@@ -155,23 +187,26 @@ export const BookStage = forwardRef<
       flipNext: () => flipBookRef.current?.pageFlip().flipNext(),
       flipPrev: () => flipBookRef.current?.pageFlip().flipPrev(),
       turnTo: (originalPageNumber: number) => {
-        const idx = originalToInternalIndex(originalPageNumber);
+        const idx = originalToInternalIndex(
+          originalPageNumber,
+          insertCoverBack,
+        );
         flipBookRef.current?.pageFlip().turnToPage(idx);
       },
     }),
-    [],
+    [insertCoverBack],
   );
 
   // 外から currentPage が変わった場合（サムネからのジャンプ等）、ライブラリ側にも反映
   useEffect(() => {
     const api = flipBookRef.current?.pageFlip();
     if (!api) return;
-    const targetIndex = originalToInternalIndex(currentPage);
+    const targetIndex = originalToInternalIndex(currentPage, insertCoverBack);
     const cur = api.getCurrentPageIndex();
     if (cur !== targetIndex) {
       api.turnToPage(targetIndex);
     }
-  }, [currentPage]);
+  }, [currentPage, insertCoverBack]);
 
   /* ----------------- ピンチズーム ----------------- */
   // 2本指の距離を測ってズーム倍率に反映。clamp 0.6〜2.5
@@ -247,11 +282,11 @@ export const BookStage = forwardRef<
             swipeDistance={30}
             showPageCorners
             disableFlipByClick={false}
-            startPage={originalToInternalIndex(currentPage)}
+            startPage={originalToInternalIndex(currentPage, insertCoverBack)}
             className=""
             style={{}}
             onFlip={(e: { data: number }) =>
-              onFlipped(internalToOriginalPageNumber(e.data))
+              onFlipped(internalToOriginalPageNumber(e.data, insertCoverBack))
             }
           >
             {internalPages.map((ip, idx) => {
