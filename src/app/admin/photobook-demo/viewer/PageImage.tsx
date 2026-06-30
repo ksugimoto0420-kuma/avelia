@@ -25,8 +25,8 @@ export function PageImage({
     <div
       className={
         "relative h-full w-full overflow-hidden bg-zinc-950 " +
-        // 紙のような薄い影
-        "shadow-[0_8px_32px_rgba(0,0,0,0.5),0_2px_6px_rgba(0,0,0,0.4)] " +
+        // 影は react-pageflip 側で描画するので、ここでは付けない
+        "" +
         (isFirstFrame ? "animate-[fadeIn_400ms_ease-out_forwards]" : "")
       }
       onContextMenu={(e) => e.preventDefault()}

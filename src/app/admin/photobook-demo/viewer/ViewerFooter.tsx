@@ -3,30 +3,21 @@
 /**
  * 下部バー。
  * - ページ番号（常に控えめに表示）
- * - 拡大/縮小、サムネ一覧ボタン、見開き切替
+ * - サムネ一覧ボタン
  * - 操作がないと薄れて消える
+ *
+ * 見開き切替・拡大縮小は react-pageflip が usePortrait で自動切替するため、
+ * ボタンとしては露出させない。
  */
 export function ViewerFooter({
   currentLabel,
   totalPages,
   visible,
-  isSpread,
-  canSpread,
-  onToggleSpread,
-  onZoomIn,
-  onZoomOut,
-  zoom,
   onOpenThumbs,
 }: {
   currentLabel: string;
   totalPages: number;
   visible: boolean;
-  isSpread: boolean;
-  canSpread: boolean;
-  onToggleSpread: () => void;
-  onZoomIn: () => void;
-  onZoomOut: () => void;
-  zoom: number;
   onOpenThumbs: () => void;
 }) {
   return (
@@ -56,40 +47,6 @@ export function ViewerFooter({
           title="サムネイル一覧"
         >
           ☰
-        </button>
-        {canSpread && (
-          <button
-            type="button"
-            onClick={onToggleSpread}
-            className={
-              "inline-flex items-center gap-1 rounded-full px-3 text-[11px] hover:bg-white/10 h-8 " +
-              (isSpread ? "bg-white/10" : "")
-            }
-            aria-label="見開き切替"
-            title="見開き切替"
-          >
-            {isSpread ? "見開き" : "1ページ"}
-          </button>
-        )}
-        <div className="mx-1 h-4 w-px bg-white/15" />
-        <button
-          type="button"
-          onClick={onZoomOut}
-          className="inline-flex h-8 w-8 items-center justify-center rounded-full hover:bg-white/10"
-          aria-label="縮小"
-        >
-          −
-        </button>
-        <span className="min-w-12 text-center text-[11px] text-white/70">
-          {Math.round(zoom * 100)}%
-        </span>
-        <button
-          type="button"
-          onClick={onZoomIn}
-          className="inline-flex h-8 w-8 items-center justify-center rounded-full hover:bg-white/10"
-          aria-label="拡大"
-        >
-          +
         </button>
       </div>
     </div>

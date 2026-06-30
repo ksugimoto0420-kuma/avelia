@@ -1,16 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { PageStage } from "./PageStage";
+import { BookStage, type BookStageHandle } from "./BookStage";
 import { PageNavigationHitArea } from "./PageNavigationHitArea";
 import { ThumbnailStrip } from "./ThumbnailStrip";
 import { ViewerFooter } from "./ViewerFooter";
 import { ViewerHeader } from "./ViewerHeader";
-import type {
-  ViewerMode,
-  ViewerPage,
-  ViewerSignature,
-} from "./types";
+import type { ViewerPage, ViewerSignature } from "./types";
 
 /**
  * デジタル写真集ビューア本体。
@@ -47,15 +43,11 @@ export function PhotobookViewer({
   /** 閉じる時のコールバック（ESCで発火、ヘッダーの戻るで発火） */
   onClose: () => void;
 }) {
-  // currentPage は「現在表示中の先頭ページ番号」。見開きの場合は左ページ番号。
+  // currentPage は「現在の左ページ番号（1始まり）」。
+  // react-pageflip の onFlip が真実の状態管理を担う。
   const [currentPage, setCurrentPage] = useState(1);
-  const [mode, setMode] = useState<ViewerMode>("single");
-  const [zoom, setZoom] = useState(1);
   const [isUiVisible, setIsUiVisible] = useState(true);
   const [isThumbnailOpen, setIsThumbnailOpen] = useState(false);
-  const [transition, setTransition] = useState<"none" | "next" | "prev">(
-    "none",
-  );
 
   const signatures = useMemo(() => {
     const m = new Map<number, ViewerSignature>();
@@ -63,61 +55,32 @@ export function PhotobookViewer({
     return m;
   }, [signatureList]);
 
-  // 画面幅でモード初期値を決める（1024px以上は見開きを優先）
+  // ステージへの ref（外部からめくり操作するため）
+  const stageRef = useRef<BookStageHandle | null>(null);
+
+  // 1024px以上は見開き優先（react-pageflip の usePortrait が幅で自動切替）
+  // canSpread は Footer の見開き切替表示のため、念のため保持
+  const [canSpread, setCanSpread] = useState(false);
   useEffect(() => {
-    const detect = () => {
-      const isWide = window.innerWidth >= 1024;
-      setMode(isWide ? "spread" : "single");
-    };
+    const detect = () => setCanSpread(window.innerWidth >= 768);
     detect();
     window.addEventListener("resize", detect);
     return () => window.removeEventListener("resize", detect);
   }, []);
 
-  const canSpread = useMemo(() => {
-    if (typeof window === "undefined") return false;
-    return window.innerWidth >= 768;
-  }, []);
-
-  /* ----------------- ページ送り ----------------- */
+  /* ----------------- ページ送り（BookStage に委譲） ----------------- */
   const goNext = useCallback(() => {
-    setCurrentPage((cp) => {
-      if (mode === "spread") {
-        // 表紙(1) → 2 → 4 → 6 ...
-        const target = cp === 1 ? 2 : cp + 2;
-        if (target > pages.length) return cp;
-        return target;
-      }
-      return Math.min(pages.length, cp + 1);
-    });
-    setTransition("next");
-    window.setTimeout(() => setTransition("none"), 240);
-  }, [mode, pages.length]);
-
+    stageRef.current?.flipNext();
+  }, []);
   const goPrev = useCallback(() => {
-    setCurrentPage((cp) => {
-      if (mode === "spread") {
-        if (cp <= 1) return cp;
-        return cp <= 2 ? 1 : cp - 2;
-      }
-      return Math.max(1, cp - 1);
-    });
-    setTransition("prev");
-    window.setTimeout(() => setTransition("none"), 240);
-  }, [mode]);
-
+    stageRef.current?.flipPrev();
+  }, []);
   const goTo = useCallback(
     (pageNumber: number) => {
       const safe = Math.max(1, Math.min(pages.length, pageNumber));
-      if (mode === "spread" && safe > 1) {
-        // 偶数開始の見開きにスナップ
-        const target = safe - (safe % 2);
-        setCurrentPage(Math.max(1, target));
-      } else {
-        setCurrentPage(safe);
-      }
+      stageRef.current?.turnTo(safe - 1);
     },
-    [mode, pages.length],
+    [pages.length],
   );
 
   /* ----------------- UI 自動隠し ----------------- */
@@ -153,33 +116,6 @@ export function PhotobookViewer({
     return () => window.removeEventListener("keydown", onKey);
   }, [goNext, goPrev, onClose, wakeUi]);
 
-  /* ----------------- スワイプ ----------------- */
-  const touchStartRef = useRef<{ x: number; y: number; t: number } | null>(
-    null,
-  );
-  const onTouchStart = (e: React.TouchEvent) => {
-    const t = e.touches[0];
-    touchStartRef.current = { x: t.clientX, y: t.clientY, t: Date.now() };
-  };
-  const onTouchEnd = (e: React.TouchEvent) => {
-    if (!touchStartRef.current) return;
-    const t = e.changedTouches[0];
-    const dx = t.clientX - touchStartRef.current.x;
-    const dy = t.clientY - touchStartRef.current.y;
-    const dt = Date.now() - touchStartRef.current.t;
-    touchStartRef.current = null;
-    // タップ判定（指の移動が小さく、時間が短い）
-    if (Math.abs(dx) < 10 && Math.abs(dy) < 10 && dt < 250) {
-      setIsUiVisible((v) => !v);
-      return;
-    }
-    // スワイプ判定
-    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
-      if (dx < 0) goNext();
-      else goPrev();
-    }
-  };
-
   /* ----------------- Mac トラックパッド対策 ----------------- */
   const rootRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -198,29 +134,30 @@ export function PhotobookViewer({
   }, []);
 
   /* ----------------- プリロード ----------------- */
-  // 次/前のページ画像を img の HTTP リクエストとして事前ロード（dataUrl は即時）
-  // dataUrl は文字列なのでロード待ちはないが、img onload を発火させて
-  // ブラウザ内デコードを促す。
+  // 次/前のページ画像を Image で事前デコード
   useEffect(() => {
-    const preloadPages: number[] = [];
-    if (mode === "single") {
-      preloadPages.push(currentPage + 1, currentPage - 1);
-    } else {
-      preloadPages.push(currentPage + 2, currentPage - 2);
-    }
-    for (const n of preloadPages) {
+    const targets = [
+      currentPage + 1,
+      currentPage + 2,
+      currentPage - 1,
+      currentPage - 2,
+    ];
+    for (const n of targets) {
       const p = pages.find((x) => x.pageNumber === n);
       if (p) {
         const img = new Image();
         img.src = p.dataUrl;
       }
     }
-  }, [currentPage, mode, pages]);
+  }, [currentPage, pages]);
 
-  const currentLabel =
-    mode === "spread" && currentPage > 1
-      ? `${currentPage}–${Math.min(pages.length, currentPage + 1)}`
-      : `${currentPage}`;
+  // ラベル: 見開きの場合は「2–3」のような範囲表示
+  // react-pageflip は usePortrait で自動切替するので、レイアウト依存ではなく
+  // 「ページ番号が偶数 = 見開き左ページ」とみなしてラベルを作る
+  const isPair = currentPage > 1 && currentPage < pages.length && canSpread;
+  const currentLabel = isPair
+    ? `${currentPage}–${currentPage + 1}`
+    : `${currentPage}`;
 
   return (
     <div
@@ -239,23 +176,19 @@ export function PhotobookViewer({
         wakeUi();
       }}
       onMouseMove={wakeUi}
-      onTouchStart={(e) => {
-        wakeUi();
-        onTouchStart(e);
-      }}
-      onTouchEnd={onTouchEnd}
+      onTouchStart={wakeUi}
       onContextMenu={(e) => e.preventDefault()}
     >
       <ViewerHeader title={title} visible={isUiVisible} onClose={onClose} />
 
       <div className="absolute inset-0">
-        <PageStage
+        <BookStage
+          ref={stageRef}
           pages={pages}
-          currentPage={currentPage}
-          mode={mode}
           signatures={signatures}
           watermark={watermark}
-          transition={transition}
+          currentPage={currentPage}
+          onFlipped={(n) => setCurrentPage(n)}
         />
       </div>
 
@@ -269,12 +202,6 @@ export function PhotobookViewer({
         currentLabel={currentLabel}
         totalPages={pages.length}
         visible={isUiVisible}
-        isSpread={mode === "spread"}
-        canSpread={canSpread}
-        onToggleSpread={() => setMode(mode === "spread" ? "single" : "spread")}
-        onZoomIn={() => setZoom(Math.min(2.5, +(zoom + 0.1).toFixed(2)))}
-        onZoomOut={() => setZoom(Math.max(0.6, +(zoom - 0.1).toFixed(2)))}
-        zoom={zoom}
         onOpenThumbs={() => setIsThumbnailOpen(true)}
       />
 
