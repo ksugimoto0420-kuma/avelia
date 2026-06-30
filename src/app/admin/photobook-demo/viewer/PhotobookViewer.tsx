@@ -157,19 +157,21 @@ export function PhotobookViewer({
     }
   }, [currentPage, pages]);
 
-  // ラベル: 写真集の並びを考慮:
-  //   1 ページ目 = 表紙単独 → "1"
-  //   2 ページ目 = 白紙との見開き右側 → "2"
-  //   3 ページ目以降 = 奇数ページが左、偶数ページが右の見開き → "3–4" "5–6" ...
+  // ラベル: 写真集の並び（[白紙|表紙] [P2|P3] [P4|P5] ...）を考慮:
+  //   表紙の見開き (currentPage=1) → "1"
+  //   それ以降は偶数ページが左、奇数ページが右 → "2–3" "4–5" ...
+  //   末尾が奇数で [Pn|白紙] になる場合は "n"
   // canSpread=false（スマホ縦持ち）の時は常に単一ページ番号
   let currentLabel: string;
-  if (!canSpread || currentPage <= 2) {
+  if (!canSpread || currentPage === 1) {
     currentLabel = `${currentPage}`;
-  } else if (currentPage % 2 === 1) {
-    // 奇数: 左ページ → "n–(n+1)"
-    currentLabel = `${currentPage}–${Math.min(pages.length, currentPage + 1)}`;
+  } else if (currentPage % 2 === 0) {
+    // 偶数: 左ページ → "n–(n+1)"。次が存在しなければ単独
+    const right = currentPage + 1;
+    currentLabel =
+      right <= pages.length ? `${currentPage}–${right}` : `${currentPage}`;
   } else {
-    // 偶数: 右ページ → "(n-1)–n"
+    // 奇数（右ページ）→ "(n-1)–n"
     currentLabel = `${currentPage - 1}–${currentPage}`;
   }
 

@@ -22,11 +22,13 @@ export function PageImage({
   /** 初回読込時のフェード演出に使う */
   isFirstFrame?: boolean;
 }) {
-  // 白紙ページ：写真集の見開きを成立させるための裏面
+  // 白紙ページ：写真集の見開きを成立させるための裏面・先頭/末尾の余りページ。
+  // ビューワー背景（#000）に溶け込ませて、隣接する実ページが
+  // 中央に大きく見えるようにする。
   if (!page) {
     return (
       <div
-        className="relative h-full w-full overflow-hidden bg-[#f6f3ed]"
+        className="relative h-full w-full overflow-hidden bg-black"
         onContextMenu={(e) => e.preventDefault()}
       />
     );

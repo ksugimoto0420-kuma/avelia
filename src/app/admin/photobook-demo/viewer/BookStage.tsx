@@ -58,24 +58,32 @@ type InternalPage =
 
 /**
  * 内部ページ列を構築する。
- *  - insertCoverBack=true（見開きモード）: 表紙の裏に白紙を挟んで「表紙→見開き」
- *  - insertCoverBack=false（1ページモード）: 白紙なし、元PDFそのまま
+ *
+ *  spreadLayout=true（PC/タブレット, 見開き）:
+ *    [白紙 | 表紙] [P2 | P3] [P4 | P5] ... (末尾が奇数なら [Pn | 白紙])
+ *    showCover=false で先頭から見開き表示。先頭白紙は背景に溶け込ませることで
+ *    「表紙が中央に1枚あるように見える」体験を作る。
+ *    めくると [P2 | P3] [P4 | P5] と本文だけの見開きが続く。
+ *
+ *  spreadLayout=false（スマホ縦持ち, 1ページモード）:
+ *    元PDF をそのまま順番に表示。白紙なし。
  */
 function buildInternalPages(
   pages: ViewerPage[],
-  insertCoverBack: boolean,
+  spreadLayout: boolean,
 ): InternalPage[] {
   if (pages.length === 0) return [];
-  if (!insertCoverBack) {
+  if (!spreadLayout) {
     return pages.map((page) => ({ kind: "page", page }));
   }
   const out: InternalPage[] = [];
-  out.push({ kind: "page", page: pages[0] });
-  if (pages.length > 1) {
+  out.push({ kind: "blank" }); // 表紙の左に置く白紙
+  for (const page of pages) {
+    out.push({ kind: "page", page });
+  }
+  // 末尾を必ず偶数枚にする（最後が見開きで完結するように）
+  if (out.length % 2 === 1) {
     out.push({ kind: "blank" });
-    for (let i = 1; i < pages.length; i++) {
-      out.push({ kind: "page", page: pages[i] });
-    }
   }
   return out;
 }
@@ -83,22 +91,21 @@ function buildInternalPages(
 /** 元PDFのページ番号 → 内部インデックス */
 function originalToInternalIndex(
   pageNumber: number,
-  insertCoverBack: boolean,
+  spreadLayout: boolean,
 ): number {
-  if (!insertCoverBack) return Math.max(0, pageNumber - 1);
-  if (pageNumber <= 1) return 0;
-  return pageNumber;
+  if (!spreadLayout) return Math.max(0, pageNumber - 1);
+  // 先頭に白紙が1枚ある: PDFのP1 = 内部 index 1
+  return Math.max(0, pageNumber);
 }
 
 /** 内部インデックス → 元PDFのページ番号 */
 function internalToOriginalPageNumber(
   internalIndex: number,
-  insertCoverBack: boolean,
+  spreadLayout: boolean,
 ): number {
-  if (!insertCoverBack) return Math.max(1, internalIndex + 1);
-  if (internalIndex <= 0) return 1;
-  if (internalIndex === 1) return 1; // 白紙は表紙裏として扱う
-  return internalIndex;
+  if (!spreadLayout) return Math.max(1, internalIndex + 1);
+  if (internalIndex <= 0) return 1; // 先頭白紙 → 表紙扱い
+  return internalIndex; // P1 = index 1, P2 = index 2 ...
 }
 
 /**
@@ -275,7 +282,7 @@ export const BookStage = forwardRef<
             startZIndex={0}
             autoSize={false}
             maxShadowOpacity={0.5}
-            showCover
+            showCover={false}
             mobileScrollSupport
             clickEventForward
             useMouseEvents
