@@ -8,6 +8,8 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
 } from "react";
+import { PhotobookViewer } from "./viewer/PhotobookViewer";
+import type { ViewerSignature } from "./viewer/types";
 
 /**
  * サイン入り写真集 デモ（ブラウザ完結）。
@@ -84,9 +86,6 @@ export function PhotobookDemo() {
   const [defaultYRatio, setDefaultYRatio] = useState(0.85);
 
   // 4. ビューワ
-  const [viewerMode, setViewerMode] = useState<"spread" | "vertical">("spread");
-  const [viewerPage, setViewerPage] = useState(1);
-  const [zoom, setZoom] = useState(1);
   const [fullscreen, setFullscreen] = useState(false);
 
   // 共通
@@ -166,11 +165,6 @@ export function PhotobookDemo() {
       return;
     }
     if (step < 3) setStep((s) => ((s + 1) as Step));
-    if (step === 2) {
-      // ビューワ初期化
-      setViewerPage(1);
-      setZoom(1);
-    }
   };
   const goBack = () => {
     setError(null);
@@ -240,12 +234,6 @@ export function PhotobookDemo() {
         <Step3Viewer
           pages={pages}
           placements={placements}
-          viewerMode={viewerMode}
-          setViewerMode={setViewerMode}
-          viewerPage={viewerPage}
-          setViewerPage={setViewerPage}
-          zoom={zoom}
-          setZoom={setZoom}
           fullscreen={fullscreen}
           setFullscreen={setFullscreen}
         />
@@ -917,553 +905,67 @@ function Step2Sign({
   );
 }
 
-/* ----------------------- Step 3 電子書籍ビューワ ----------------------- */
+
+/* ----------------------- Step 3 デジタル写真集ビューワ呼び出し ----------------------- */
 
 function Step3Viewer({
   pages,
   placements,
-  viewerMode,
-  setViewerMode,
-  viewerPage,
-  setViewerPage,
-  zoom,
-  setZoom,
   fullscreen,
   setFullscreen,
 }: {
   pages: PageRender[];
   placements: SignaturePlacement[];
-  viewerMode: "spread" | "vertical";
-  setViewerMode: (v: "spread" | "vertical") => void;
-  viewerPage: number;
-  setViewerPage: (n: number) => void;
-  zoom: number;
-  setZoom: (n: number) => void;
   fullscreen: boolean;
   setFullscreen: (v: boolean) => void;
 }) {
-  const placementMap = useMemo(() => {
-    const m = new Map<number, SignaturePlacement>();
-    placements.forEach((p) => m.set(p.pageNumber, p));
-    return m;
-  }, [placements]);
+  // viewer 形式に変換
+  const sigList: ViewerSignature[] = placements.map((p) => ({
+    pageNumber: p.pageNumber,
+    xRatio: p.xRatio,
+    yRatio: p.yRatio,
+    widthRatio: p.widthRatio,
+    imagePng: p.imagePng,
+  }));
 
-  const verticalContainerRef = useRef<HTMLDivElement | null>(null);
-  const viewerRootRef = useRef<HTMLDivElement | null>(null);
-  const [thumbOpen, setThumbOpen] = useState(false);
-  const [toolbarHidden, setToolbarHidden] = useState(false);
-  const toolbarHideTimer = useRef<number | null>(null);
-
-  // めくりアニメ用
-  const [flipping, setFlipping] = useState<"none" | "next" | "prev">("none");
-
-  /**
-   * 見開きナビゲーション設計:
-   *   viewerPage は「現在のスプレッドの左ページ番号」を表す。
-   *     - 1: 表紙だけ単独表示
-   *     - 2: [2, 3] の見開き
-   *     - 4: [4, 5] の見開き
-   *     ...
-   *   表紙(1) → [2,3] → [4,5] → ... と進む。
-   *   表紙以降は常に偶数開始ページ。
-   */
-  const goPrev = useCallback(() => {
-    if (viewerMode === "spread") {
-      if (viewerPage <= 1 || flipping !== "none") return;
-      setFlipping("prev");
-      window.setTimeout(() => {
-        // 表紙へ戻る or 偶数ページへ
-        const target = viewerPage <= 2 ? 1 : viewerPage - 2;
-        setViewerPage(target);
-        setFlipping("none");
-      }, 400);
-    } else {
-      setViewerPage(Math.max(1, viewerPage - 1));
-    }
-  }, [viewerMode, viewerPage, flipping, setViewerPage]);
-
-  const goNext = useCallback(() => {
-    if (viewerMode === "spread") {
-      if (flipping !== "none") return;
-      // 表紙(1) からは [2,3] へ
-      const target = viewerPage === 1 ? 2 : viewerPage + 2;
-      if (target > pages.length) return;
-      setFlipping("next");
-      window.setTimeout(() => {
-        setViewerPage(target);
-        setFlipping("none");
-      }, 400);
-    } else {
-      setViewerPage(Math.min(pages.length, viewerPage + 1));
-    }
-  }, [viewerMode, viewerPage, pages.length, flipping, setViewerPage]);
-
-  // キーボード操作
+  // 全画面オープン時のスクロール抑制
   useEffect(() => {
-    if (viewerMode !== "spread") return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "ArrowRight") goNext();
-      else if (e.key === "ArrowLeft") goPrev();
-      else if (e.key === "Escape" && fullscreen) setFullscreen(false);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [viewerMode, goNext, goPrev, fullscreen, setFullscreen]);
-
-  // 縦スクロール時、viewerPage に応じてスクロール
-  useEffect(() => {
-    if (viewerMode !== "vertical") return;
-    const el = verticalContainerRef.current?.querySelector(
-      `[data-page="${viewerPage}"]`,
-    );
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  }, [viewerMode, viewerPage]);
-
-  // スワイプ対応（見開き）
-  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
-  const onTouchStart = (e: React.TouchEvent) => {
-    const t = e.touches[0];
-    touchStartRef.current = { x: t.clientX, y: t.clientY };
-  };
-  const onTouchEnd = (e: React.TouchEvent) => {
-    if (!touchStartRef.current) return;
-    const t = e.changedTouches[0];
-    const dx = t.clientX - touchStartRef.current.x;
-    const dy = t.clientY - touchStartRef.current.y;
-    touchStartRef.current = null;
-    if (viewerMode !== "spread") return;
-    if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy)) return;
-    if (dx < 0) goNext();
-    else goPrev();
-  };
-
-  // ツールバー自動非表示（操作後3秒）
-  const wakeToolbar = useCallback(() => {
-    setToolbarHidden(false);
-    if (toolbarHideTimer.current != null) {
-      window.clearTimeout(toolbarHideTimer.current);
-    }
-    if (fullscreen) {
-      toolbarHideTimer.current = window.setTimeout(() => {
-        setToolbarHidden(true);
-      }, 3000);
-    }
-  }, [fullscreen]);
-
-  useEffect(() => {
-    wakeToolbar();
+    if (!fullscreen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     return () => {
-      if (toolbarHideTimer.current != null) {
-        window.clearTimeout(toolbarHideTimer.current);
-      }
+      document.body.style.overflow = prev;
     };
-  }, [wakeToolbar]);
-
-  // PC: Mac トラックパッドの水平スクロールでブラウザバックが発火するのを防ぐ。
-  // React の onWheel は passive なので preventDefault が効かない → native event を addEventListener する。
-  useEffect(() => {
-    const el = viewerRootRef.current;
-    if (!el) return;
-    const onWheel = (e: WheelEvent) => {
-      if (viewerMode !== "spread") return;
-      // 水平方向の方が大きいときだけ抑制
-      if (Math.abs(e.deltaX) > Math.abs(e.deltaY) && Math.abs(e.deltaX) > 10) {
-        e.preventDefault();
-      }
-    };
-    el.addEventListener("wheel", onWheel, { passive: false });
-    return () => el.removeEventListener("wheel", onWheel);
-  }, [viewerMode]);
-
-  // 1ページ描画ヘルパー
-  const renderPage = (page: PageRender, key: string) => {
-    const pm = placementMap.get(page.pageNumber);
-    return (
-      <div
-        key={key}
-        data-page={page.pageNumber}
-        className="relative h-full w-full overflow-hidden bg-white shadow-2xl"
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={page.dataUrl}
-          alt={`page ${page.pageNumber}`}
-          className="block h-full w-full select-none object-contain"
-          draggable={false}
-        />
-        {pm && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={pm.imagePng}
-            alt="signature"
-            draggable={false}
-            className="pointer-events-none absolute select-none"
-            style={{
-              left: `${pm.xRatio * 100}%`,
-              top: `${pm.yRatio * 100}%`,
-              width: `${pm.widthRatio * 100}%`,
-              height: "auto",
-            }}
-          />
-        )}
-        <p className="absolute bottom-2 right-3 rounded bg-black/40 px-2 py-0.5 text-[10px] text-white">
-          P.{page.pageNumber}
-        </p>
-      </div>
-    );
-  };
-
-  // ビューワ本体（全画面 / 通常を共通レイアウトに）
-  // touch-action: pan-y で水平スワイプをブラウザに渡さず、ブラウザバックを抑制
-  // overscroll-behavior: contain で過剰スクロールも親に伝播させない
-  const viewerBody = (
-    <div
-      ref={viewerRootRef}
-      className={
-        (fullscreen
-          ? "fixed inset-0 z-50 flex flex-col bg-zinc-900"
-          : "relative flex h-[80vh] flex-col rounded-2xl border border-gray-200 bg-zinc-900") +
-        " [touch-action:pan-y] [overscroll-behavior:contain]"
-      }
-      onMouseMove={wakeToolbar}
-      onTouchStart={(e) => {
-        wakeToolbar();
-        onTouchStart(e);
-      }}
-      onTouchEnd={onTouchEnd}
-    >
-      {/* 上部ツールバー */}
-      <div
-        className={
-          "z-20 flex flex-wrap items-center gap-2 border-b border-white/10 bg-zinc-800/95 px-3 py-2 text-white shadow transition-opacity " +
-          (toolbarHidden ? "opacity-0 hover:opacity-100" : "opacity-100")
-        }
-      >
-        <button
-          type="button"
-          onClick={() => setThumbOpen(!thumbOpen)}
-          className="rounded-md border border-white/20 px-2 py-1 text-xs hover:bg-white/10"
-          aria-label="サムネ一覧"
-        >
-          ☰
-        </button>
-        <div className="flex items-center gap-1 rounded-full bg-white/10 p-1">
-          <button
-            type="button"
-            onClick={() => setViewerMode("spread")}
-            className={
-              "rounded-full px-3 py-1 text-xs font-medium " +
-              (viewerMode === "spread" ? "bg-white text-zinc-900" : "text-white/80")
-            }
-          >
-            📖 見開き
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewerMode("vertical")}
-            className={
-              "rounded-full px-3 py-1 text-xs font-medium " +
-              (viewerMode === "vertical"
-                ? "bg-white text-zinc-900"
-                : "text-white/80")
-            }
-          >
-            📃 縦
-          </button>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setZoom(Math.max(0.5, zoom - 0.1))}
-            className="rounded-md border border-white/20 px-2 py-1 text-xs"
-          >
-            ➖
-          </button>
-          <span className="text-xs">{Math.round(zoom * 100)}%</span>
-          <button
-            type="button"
-            onClick={() => setZoom(Math.min(2, zoom + 0.1))}
-            className="rounded-md border border-white/20 px-2 py-1 text-xs"
-          >
-            ➕
-          </button>
-        </div>
-        <div className="ml-auto flex items-center gap-2 text-xs text-white/80">
-          P.{viewerPage} / {pages.length}
-        </div>
-        <button
-          type="button"
-          onClick={() => setFullscreen(!fullscreen)}
-          className="rounded-md border border-white/20 px-2 py-1 text-xs hover:bg-white/10"
-          aria-label="全画面切替"
-        >
-          {fullscreen ? "✕ 閉じる" : "⛶ 全画面"}
-        </button>
-      </div>
-
-      <div className="relative flex flex-1 overflow-hidden">
-        {/* サムネサイドバー */}
-        {thumbOpen && (
-          <aside className="z-10 w-32 shrink-0 overflow-y-auto border-r border-white/10 bg-zinc-800/95 p-2">
-            <div className="space-y-2">
-              {pages.map((p) => {
-                const has = placementMap.has(p.pageNumber);
-                const active =
-                  viewerMode === "spread"
-                    ? viewerPage === 1
-                      ? p.pageNumber === 1
-                      : p.pageNumber === viewerPage ||
-                        p.pageNumber === viewerPage + 1
-                    : viewerPage === p.pageNumber;
-                return (
-                  <button
-                    key={p.pageNumber}
-                    type="button"
-                    onClick={() => {
-                      // 表紙以降は偶数開始の見開き、表紙(1)は単独
-                      const target =
-                        viewerMode === "spread" && p.pageNumber > 1
-                          ? p.pageNumber - (p.pageNumber % 2)
-                          : p.pageNumber;
-                      setViewerPage(Math.max(1, target));
-                    }}
-                    className={
-                      "relative block w-full overflow-hidden rounded border-2 p-0.5 text-[10px] text-white/90 " +
-                      (active
-                        ? "border-pink-500"
-                        : "border-transparent hover:border-white/30")
-                    }
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={p.dataUrl}
-                      alt={`p${p.pageNumber}`}
-                      className="aspect-[3/4] w-full rounded object-contain"
-                    />
-                    <span>P.{p.pageNumber}</span>
-                    {has && (
-                      <span className="absolute right-0.5 top-0.5 rounded-full bg-pink-600 px-1 text-[8px] font-bold text-white">
-                        ✓
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </aside>
-        )}
-
-        {/* ページコンテンツ */}
-        <div className="relative flex-1 overflow-hidden">
-          {viewerMode === "spread" ? (
-            <SpreadStage
-              pages={pages}
-              viewerPage={viewerPage}
-              zoom={zoom}
-              flipping={flipping}
-              renderPage={renderPage}
-              onPrev={goPrev}
-              onNext={goNext}
-            />
-          ) : (
-            <div
-              ref={verticalContainerRef}
-              className="h-full overflow-y-auto bg-zinc-900 p-4"
-            >
-              <div className="mx-auto flex flex-col items-center gap-4">
-                {pages.map((p) => (
-                  <div
-                    key={p.pageNumber}
-                    style={{
-                      width: `${70 * zoom}vw`,
-                      maxWidth: `${640 * zoom}px`,
-                      aspectRatio: `${p.width} / ${p.height}`,
-                    }}
-                  >
-                    {renderPage(p, `v-${p.pageNumber}`)}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* ナビゲーション（左右） */}
-          {viewerMode === "spread" && (
-            <>
-              <button
-                type="button"
-                onClick={goPrev}
-                disabled={viewerPage <= 1 || flipping !== "none"}
-                className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/40 px-4 py-3 text-2xl text-white shadow hover:bg-black/60 disabled:opacity-20"
-                aria-label="前のページ"
-              >
-                ◀
-              </button>
-              <button
-                type="button"
-                onClick={goNext}
-                disabled={viewerPage >= pages.length || flipping !== "none"}
-                className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/40 px-4 py-3 text-2xl text-white shadow hover:bg-black/60 disabled:opacity-20"
-                aria-label="次のページ"
-              >
-                ▶
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+  }, [fullscreen]);
 
   return (
     <section className="space-y-3">
       <p className="text-xs text-gray-500">
-        Step 3: 電子書籍ビューワー風に閲覧できます。「⛶ 全画面」で本物のリーダー
-        体験になります（Esc で戻る）。スワイプ／矢印キーでページめくり可能。
+        Step 3: 「ビューワを開く」でフルスクリーンの写真集ビューワを起動します。
+        ESC で閉じる、矢印キー／クリック／スワイプでページめくり。
+        画面中央タップでツールバー表示切替。
       </p>
-      {viewerBody}
-    </section>
-  );
-}
-
-/* 見開きステージ：めくりアニメ込み */
-function SpreadStage({
-  pages,
-  viewerPage,
-  zoom,
-  flipping,
-  renderPage,
-  onPrev,
-  onNext,
-}: {
-  pages: PageRender[];
-  viewerPage: number;
-  zoom: number;
-  flipping: "none" | "next" | "prev";
-  renderPage: (p: PageRender, key: string) => React.ReactNode;
-  onPrev: () => void;
-  onNext: () => void;
-}) {
-  const leftPage = viewerPage === 1 ? null : pages.find((p) => p.pageNumber === viewerPage);
-  const rightPage =
-    viewerPage === 1
-      ? pages.find((p) => p.pageNumber === 1)
-      : pages.find((p) => p.pageNumber === viewerPage + 1);
-
-  // めくり中の対象ページを次/前から取得
-  const flipNextRight = pages.find((p) => p.pageNumber === viewerPage + 2);
-  const flipPrevLeft = pages.find((p) => p.pageNumber === viewerPage - 2);
-
-  // 元PDFのアスペクト比を取得（1ページ目を基準）
-  const refPage = pages[0];
-  const pageRatio = refPage ? refPage.width / refPage.height : 0.7;
-
-  // ステージサイズ:
-  //   表紙(単独): 縦長 (aspect = pageRatio = width/height ≒ 0.7)
-  //   見開き: 横長 (aspect = pageRatio × 2 ≒ 1.4)
-  //
-  // 親領域に「高さ・幅どちらかでフィット」させる。CSS の aspect-ratio だけだと
-  // 挙動が不安定なので、ResizeObserver で親サイズをピクセルで測って計算する。
-  const aspect = viewerPage === 1 ? pageRatio : pageRatio * 2;
-  const stageContainerRef = useRef<HTMLDivElement | null>(null);
-  const [stageSize, setStageSize] = useState({ w: 0, h: 0 });
-
-  useEffect(() => {
-    const el = stageContainerRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(() => {
-      const r = el.getBoundingClientRect();
-      // 親の 95% にマージンを取りつつ、aspect に合わせてフィット
-      const availW = r.width * 0.95 * zoom;
-      const availH = r.height * 0.95 * zoom;
-      // 「高さ基準で計算した幅」と「幅基準で計算した高さ」のうち、両方収まるサイズ
-      const wByH = availH * aspect;
-      if (wByH <= availW) {
-        setStageSize({ w: wByH, h: availH });
-      } else {
-        setStageSize({ w: availW, h: availW / aspect });
-      }
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [aspect, zoom]);
-
-  const stageStyle: React.CSSProperties = {
-    width: stageSize.w > 0 ? `${stageSize.w}px` : "70%",
-    height: stageSize.h > 0 ? `${stageSize.h}px` : "auto",
-    aspectRatio: `${aspect}`,
-  };
-
-  return (
-    <div
-      ref={stageContainerRef}
-      className="flex h-full w-full items-center justify-center bg-zinc-900 p-4"
-    >
-      <div
-        className="relative"
-        style={{
-          ...stageStyle,
-          perspective: "2400px",
-        }}
-        onClick={(e) => {
-          // 左右半分どちらをタップしたかでめくる方向を判定（スマホ向け）
-          const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
-          const half = rect.left + rect.width / 2;
-          if (e.clientX < half) onPrev();
-          else onNext();
-        }}
-      >
-        {viewerPage === 1 ? (
-          // 表紙：単独ページ
-          <div className="absolute inset-0 mx-auto">
-            {rightPage && renderPage(rightPage, "cover")}
-          </div>
-        ) : (
-          <div className="absolute inset-0 grid grid-cols-2 gap-0">
-            {/* 左ページ（裏側はめくり時に前ページが見える） */}
-            <div
-              className={
-                "relative origin-right transition-transform duration-[400ms] ease-in-out " +
-                (flipping === "prev" ? "[transform:rotateY(180deg)]" : "")
-              }
-              style={{ transformStyle: "preserve-3d" }}
-            >
-              <div className="absolute inset-0 [backface-visibility:hidden]">
-                {leftPage && renderPage(leftPage, `left-${leftPage.pageNumber}`)}
-              </div>
-              <div
-                className="absolute inset-0 [backface-visibility:hidden]"
-                style={{ transform: "rotateY(180deg)" }}
-              >
-                {flipPrevLeft &&
-                  renderPage(flipPrevLeft, `flipPrevL-${flipPrevLeft.pageNumber}`)}
-              </div>
-            </div>
-
-            {/* 右ページ（めくると次ページが現れる） */}
-            <div
-              className={
-                "relative origin-left transition-transform duration-[400ms] ease-in-out " +
-                (flipping === "next" ? "[transform:rotateY(-180deg)]" : "")
-              }
-              style={{ transformStyle: "preserve-3d" }}
-            >
-              <div className="absolute inset-0 [backface-visibility:hidden]">
-                {rightPage && renderPage(rightPage, `right-${rightPage.pageNumber}`)}
-              </div>
-              <div
-                className="absolute inset-0 [backface-visibility:hidden]"
-                style={{ transform: "rotateY(180deg)" }}
-              >
-                {flipNextRight &&
-                  renderPage(flipNextRight, `flipNextR-${flipNextRight.pageNumber}`)}
-              </div>
-            </div>
-          </div>
-        )}
+      <div className="flex justify-center">
+        <button
+          type="button"
+          onClick={() => setFullscreen(true)}
+          className="rounded-full bg-zinc-900 px-6 py-3 text-sm font-bold text-white shadow-md hover:bg-zinc-700"
+        >
+          📖 ビューワを開く
+        </button>
       </div>
-    </div>
+
+      {fullscreen && (
+        <div className="fixed inset-0 z-40 bg-black">
+          <PhotobookViewer
+            pages={pages}
+            signatures={sigList}
+            title="サイン入り写真集（プレビュー）"
+            watermark={null}
+            onClose={() => setFullscreen(false)}
+          />
+        </div>
+      )}
+    </section>
   );
 }
