@@ -11,7 +11,7 @@ Status:
 
 ## Avelia kuji（オンラインくじ）
 
-### [ ] Stripe決済 → 抽選のフロー本番化 (`type: feature`, `scope: kuji`, `priority: high`)
+### [x] Stripe決済 → 抽選のフロー本番化 (`type: feature`, `scope: kuji`, `priority: high`) — #2
 
 **概要**
 現状デモ版は「ガチャを回すと同時に PAID 扱い」で動いており、実売にはならない。
@@ -34,7 +34,7 @@ Status:
 
 ---
 
-### [ ] 商品マスタとくじ賞品の統合検討 (`type: spike`, `scope: kuji`)
+### [x] 商品マスタとくじ賞品の統合検討 (`type: spike`, `scope: kuji`) — #3
 
 **概要**
 現状 KujiPrize は自前でタイトル・画像・数量を持ち、既存の Product とは切り離されている。
@@ -52,7 +52,7 @@ Status:
 
 ## 注文管理（Orders）
 
-### [ ] 管理画面：イベント別注文フィルタ (`type: feature`, `scope: orders`)
+### [x] 管理画面：イベント別注文フィルタ (`type: feature`, `scope: orders`) — #4
 
 **概要**
 注文一覧をイベントで絞り込めるようにする。
@@ -67,7 +67,7 @@ Status:
 
 ---
 
-### [ ] 注文書PDF生成（@react-pdf/renderer） (`type: feature`, `scope: orders`)
+### [x] 注文書PDF生成（@react-pdf/renderer） (`type: feature`, `scope: orders`) — #5
 
 **概要**
 注文単位で「注文書 / 領収書」相当のPDFを発行する。
@@ -79,7 +79,7 @@ Status:
 
 ---
 
-### [ ] 注文ステータス一括変更 (`type: feature`, `scope: orders`)
+### [x] 注文ステータス一括変更 (`type: feature`, `scope: orders`) — #6
 
 **概要**
 複数注文を選択して「発送済」などにまとめて変更できるようにする。
@@ -94,7 +94,7 @@ Status:
 
 ## デジタル写真集
 
-### [ ] Kiss stamp デモ（唇型スタンプ配置） (`type: feature`, `scope: photobook`)
+### [x] Kiss stamp デモ（唇型スタンプ配置） (`type: feature`, `scope: photobook`) — #7
 
 **概要**
 写真集のページに「キススタンプ（唇マーク）」を配置できるデモ機能。
@@ -111,7 +111,7 @@ Status:
 
 ---
 
-### [ ] 写真集ビューア - シェア用リンク発行 (`type: feature`, `scope: photobook`)
+### [x] 写真集ビューア - シェア用リンク発行 (`type: feature`, `scope: photobook`) — #8
 
 **概要**
 サイン済み写真集を購入者にシェアリンクで見せる仕組み。
@@ -125,7 +125,7 @@ Status:
 
 ## 抽選（Lottery）
 
-### [ ] 抽選結果通知メール (`type: feature`, `scope: lottery`)
+### [x] 抽選結果通知メール (`type: feature`, `scope: lottery`) — #9
 
 **概要**
 抽選確定後、当選者・落選者にメール通知する。
@@ -140,7 +140,7 @@ Status:
 
 ## インフラ / 運用
 
-### [ ] Vercel Preview 用 DB ブランチの分離 (`type: chore`, `scope: infra`)
+### [x] Vercel Preview 用 DB ブランチの分離 (`type: chore`, `scope: infra`) — #10
 
 **概要**
 現状 develop / feature プレビューも本番 DB を参照している可能性がある。
@@ -153,7 +153,7 @@ Neon の DB ブランチ機能を使い、Preview 環境は別ブランチ DB �
 
 ---
 
-### [ ] CI: 型チェック + lint の自動実行 (`type: chore`, `scope: ci`)
+### [x] CI: 型チェック + lint の自動実行 (`type: chore`, `scope: ci`) — #11
 
 **概要**
 PR 作成時に GitHub Actions で型チェック・lint を自動実行し、ステータスチェックとして表示する。
@@ -166,7 +166,7 @@ PR 作成時に GitHub Actions で型チェック・lint を自動実行し、�
 
 ---
 
-### [ ] Prisma マイグレーションの安全な適用手順を文書化 (`type: docs`, `scope: infra`)
+### [x] Prisma マイグレーションの安全な適用手順を文書化 (`type: docs`, `scope: infra`) — #12
 
 **概要**
 Vercel の advisory lock 事故を踏まえ、本番 DB へのマイグレーション適用手順を明文化する。
