@@ -123,6 +123,14 @@ stripe listen --forward-to localhost:3000/api/webhooks/stripe
 - 制作リスト・発送リスト・注文・R/S の CSV 出力（UTF-8 BOM 付き）
 - 管理者操作の監査ログ（`operation_logs`）
 
+## 開発参加
+
+**初めて参加するメンバーは [docs/onboarding.md](docs/onboarding.md) を読んでください。** Git Flow + Issue駆動 + PR経由の開発フローを採用しています。
+
+- [docs/onboarding.md](docs/onboarding.md) — オンボーディングガイド（初日に読む）
+- [docs/dev-workflow.md](docs/dev-workflow.md) — 開発ワークフロー詳細版
+- [Issues](https://github.com/how-collect/avelia-funclub/issues) — タスク一覧
+
 ## デプロイ（Vercel）
 
 - GitHub 連携で `main` を Production、PR を Preview に。
