@@ -279,7 +279,62 @@ Vercel ダッシュボードから追加。Production / Preview / Development �
 
 ---
 
-## 9. リンク集
+## 9. ファイルストレージ（Vercel Blob）
+
+画像・PDF・動画は `src/lib/storage/` のドライバー経由で扱います。**必ず `bucket` を指定**します。
+
+```ts
+import { storage, StoragePaths } from "@/lib/storage";
+
+const stored = await storage.put(buffer, file.name, {
+  bucket: "private-digital",              // 用途に合った bucket
+  pathnamePrefix: StoragePaths.photobookSigned(orderId),
+});
+```
+
+### バケット選択の指針
+
+| 保存物 | 使う bucket |
+| --- | --- |
+| 商品画像・公開バナー | `public-assets` |
+| 購入者向け写真集PDF・動画 | `private-digital` |
+| 管理者作業素材（ベース画像・CSV） | `private-admin` |
+| 一時ファイル | `private-temp` |
+
+### 開発時のセットアップ
+
+**ローカルでファイルシステム保存で済ませる場合（デフォルト）:**
+
+```
+STORAGE_DRIVER=local
+```
+
+**個人 Vercel Blob に接続してテストしたい場合:**
+
+1. Vercel ダッシュボード → Storage → Create → Blob
+2. Region: **Tokyo (hnd1)** / Access mode: **Private** で作成（後から変更不可）
+3. ストア画面の Quickstart → `.env.local` タブでトークンをコピー
+4. `.env.local` に追記:
+   ```
+   STORAGE_DRIVER=vercel-blob
+   BLOB_READ_WRITE_TOKEN=vercel_blob_rw_xxxxx
+   ```
+
+### やってはいけないこと
+
+- **同じ pathname に上書きしない**（Vercel Blob にバックアップ機能がないため）
+- **`STORAGE_DRIVER` を変えても DB の bucket 列は変えない**（マイグレーションで対応）
+- **アクセスモード（public/private）を後から変えない**（ストア作成時に確定）
+- **トークンをコミットしない**（`.env.local` は Git 管理外なので安全）
+
+### 参考
+
+- 設計仕様: [docs/storage-strategy.md](storage-strategy.md)
+- Vercel Blob 公式: https://vercel.com/docs/vercel-blob
+
+---
+
+## 10. リンク集
 
 ### 開発ドキュメント
 
@@ -292,6 +347,7 @@ Vercel ダッシュボードから追加。Production / Preview / Development �
 | `docs/signed-photobook-research.md`| 写真集ビューアの技術調査                 |
 | `docs/signed-video-spec.md`        | サイン付き動画の仕様                     |
 | `docs/issue-backlog.md`            | 起票済みバックログの一覧                 |
+| `docs/storage-strategy.md`         | ファイルストレージ設計仕様               |
 
 ### 外部サービス
 
@@ -300,11 +356,12 @@ Vercel ダッシュボードから追加。Production / Preview / Development �
 | GitHub      | ソース管理・Issue・PR    | https://github.com/how-collect/avelia-funclub |
 | Vercel      | デプロイ                 | Vercel ダッシュボード                       |
 | Neon        | PostgreSQL DB            | Neon ダッシュボード                         |
+| Vercel Blob | 画像・PDF・動画ストレージ| Vercel ダッシュボード → Storage             |
 | Stripe      | 決済                     | Stripe ダッシュボード                       |
 
 ---
 
-## 10. 困ったら
+## 11. 困ったら
 
 - **Issue でコメント** — 質問・相談・仕様確認
 - **Slack** — リアルタイムで話したいとき

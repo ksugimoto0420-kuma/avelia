@@ -3,8 +3,9 @@
 **関連 Issue:** #15（Vercel Blob ドライバー実装）、#10（Vercel Preview 用 DB ブランチの分離）と連動
 
 **作成日:** 2026-07-09
-**対象読者:** 実装者（明日以降着手）、レビュワー
-**ステータス:** ドラフト → 実装開始で確定
+**最終更新:** 2026-07-10（PR-1〜PR-3 実装完了 + 実接続確認）
+**対象読者:** 実装者、レビュワー、新規参加メンバー
+**ステータス:** **実装完了（開発 Hobby 接続まで）**。会社 Pro Team への移行は保留
 
 ---
 
@@ -549,76 +550,144 @@ Hobby は超過しても課金されず、**30日間ロックされるだけ**�
 
 ### 11.1 タスク分割（Issue 化する単位）
 
-| # | タスク | 想定サイズ |
-|---|---|---|
-| 1 | `src/lib/storage/` ディレクトリ構造への移設 + Driver 抽象化 | S |
-| 2 | LocalDriver 実装（既存ロジックの移設） | S |
-| 3 | VercelBlobDriver 実装 | M |
-| 4 | 既存 Route Handler / Page の facade 使用への差し替え | M |
-| 5 | Hobby アカウントで Blob ストア作成 + 環境変数設定 | S |
-| 6 | 動作確認（管理画面から画像アップ → 表示） | S |
-| 7 | README・.env.example・onboarding.md への追記 | S |
+| # | タスク | ステータス | 参照 PR |
+|---|---|---|---|
+| 1 | `src/lib/storage/` ディレクトリ構造への移設 + Driver 抽象化 | ✅ 完了 | #17 |
+| 2 | LocalDriver 実装（既存ロジックの移設） | ✅ 完了 | #17 |
+| 3 | VercelBlobDriver 実装 | ✅ 完了 | #18 |
+| 4 | 既存 Route Handler / Page の facade 使用への差し替え | ✅ 完了 | #17 + #19 |
+| 5 | Hobby アカウントで Blob ストア作成 + 環境変数設定 | ✅ 完了（1ストア運用に統合） | 手動作業 |
+| 6 | 動作確認（管理画面から画像アップ → 表示） | ✅ スモークで確認済 | Blob 実接続 |
+| 7 | README・.env.example・onboarding.md への追記 | ✅ 完了 | 本 PR |
 
-### 11.2 実装順序
+### 11.2 実装順序（実績）
 
-1. **PR-1: 抽象化基盤**（タスク 1, 2）
-   - 既存挙動は変えずに、ディレクトリ構造とインターフェースだけ導入
+1. **PR-1 (#17): 抽象化基盤 + LocalDriver 移設** ✅
+   - 既存挙動を保ったまま `src/lib/storage/` 配下にドライバー抽象を導入
    - LocalDriver で既存動作を再現
-   - この時点で全既存機能が引き続き動くことを確認
 
-2. **PR-2: VercelBlobDriver 追加**（タスク 3）
-   - `@vercel/blob` パッケージ導入
-   - Driver 実装
-   - 単体テストで put / del / head の動作確認（Vercel Blob 実接続テスト）
+2. **PR-2 (#18): VercelBlobDriver 追加** ✅
+   - `@vercel/blob@^2.6.1` 導入
+   - Driver 実装、`STORAGE_DRIVER=vercel-blob` 切替可能に
+   - 単一トークン運用でスモーク通過
 
-3. **PR-3: 既存呼び出し部分の driver 経由化**（タスク 4）
-   - `putFile` → `storage.put()` の書き換え
-   - `localFilePath` → `driver.getFilePath()` の書き換え
-   - 全ての呼び出し箇所を facade 経由に統一
+3. **PR-3 (#19): bucket 分割導入** ✅
+   - `StorageBucket` 型、`StoragePaths` ヘルパ、DB スキーマ拡張
+   - 既存呼び出し 5 箇所を bucket 明示指定に統一
+   - Hobby ストア `avelia-dev-blob` で `private-digital` / `private-admin` の実接続テスト成功
 
-4. **PR-4: Blob ストア接続と環境変数**（タスク 5, 6, 7）
-   - Hobby で 4 ストア作成
-   - Vercel プロジェクトに環境変数登録
-   - Preview デプロイで動作確認
-   - ドキュメント更新
+4. **PR-4 (本 PR): ドキュメント整備 + 本番接続手順**
+   - README・onboarding.md・.env.example に反映
+   - 本番 (Pro Team) 移行手順を Section 12 に確定
+   - 会社 Pro 契約後の設定タスクを明記
 
-### 11.3 テスト観点
+### 11.4 Hobby 開発における簡略化
 
-**必須:**
-- [ ] `STORAGE_DRIVER=local` で既存動作が壊れない
-- [ ] `STORAGE_DRIVER=vercel-blob` で管理画面から画像アップ → 商品ページで表示できる
-- [ ] private バケットの Route Handler 経由配信が動く
-- [ ] 未認可アクセスが 403 になる
-- [ ] `del()` で削除できる
+仕様書当初 4 ストア構成を想定していたが、Hobby 開発時点では **1 ストア (avelia-dev-blob) 上に pathname prefix で bucket を分ける** 運用を採用した。理由:
 
-**任意:**
-- [ ] `addRandomSuffix: true` で同名アップロードが上書きされない
+- Hobby ストア上限 (100) の枠内でも運用に影響はないが、初期開発では 1 ストアの方が接続確認・トークン管理が単純
+- Vercel Blob 側の access mode は「private」のみで統一（呼び出し側は Route Handler 経由で認可制御）
+- 将来的に会社 Pro Team に移った際、`public-assets` 用のストアを追加で作れば従来の 4 ストア構成に段階移行可能
+  - コードは `isPrivateBucket(bucket)` の分岐で自動対応（VercelBlobDriver.accessFor 参照）
+
+### 11.3 テスト実績
+
+**PR-2 スモーク（単一 bucket）:**
+- ✅ `put()` / `getFile()` / `getSignedUrl()` の往復成功（Hobby avelia-dev-blob）
+- ✅ addRandomSuffix でユニーク key 生成
+- ✅ トークン検出・認証成功
+
+**PR-3 スモーク（bucket 分割）:**
+- ✅ `private-digital` bucket で put→getFile→del 成功
+- ✅ `private-admin` bucket で put→getFile→del 成功
+- ✅ pathname prefix に bucket 名が正しく含まれる
+- ✅ `del()` 動作確認
+
+**未実施（次回のPreview デプロイ以降で実施推奨）:**
+- [ ] 管理画面 UI からのアップロード動線
+- [ ] 未認可アクセスが 403 で拒否される
 - [ ] ファイルサイズ 100MB 超のときに Multipart Upload が使われる
+- [ ] 期限切れ / DL上限超過時の 403 挙動
 - [ ] エラー時のフォールバック挙動
 
 ---
 
 ## 12. Hobby → Pro 移行手順（将来）
 
-会社 Pro Team が用意できた時点で:
+会社 Pro Team が用意できた時点で以下を実施する。**コード変更は 0 行** で、環境変数と接続先の切替のみで完了する。
 
-1. **個人アカウントを会社 Pro Team のメンバーに招待してもらう**
-2. Vercel ダッシュボードで各 Blob ストアの Settings → Transfer Store → 会社 Pro Team を選択
-3. 環境変数を Pro Team 側に再設定（値は同じでOK、トークンも保持される）
-4. GitHub の Vercel プロジェクトを会社 Team に移す
-5. 動作確認
+### 12.1 事前準備
 
-**コード変更は0行**。DB 内の URL や key もそのまま生きる。
+- [ ] 個人 Vercel アカウントを会社 Pro Team のメンバーに招待してもらう
+- [ ] 会社側で `avelia-funclub` プロジェクトを Pro Team に作成 or Transfer 済みにする
+- [ ] Neon の本番 DB が Pro Team の Vercel プロジェクトに接続済みになっている
+
+### 12.2 Blob ストアの構成方針
+
+現状 `avelia-dev-blob` 1 ストア運用だが、本番では用途別に分ける。
+
+| 環境 | 構成 |
+|---|---|
+| 開発 (Hobby) | `avelia-dev-blob` 1 ストア（すべて private） |
+| Preview (Pro) | 開発と同一 or 別途 `avelia-preview-blob` を Pro に切る |
+| Production (Pro) | 用途別 2〜4 ストア（Section 3.2 参照） |
+
+**現時点で最小のストア数:**
+- `avelia-private` (private) — private-digital / private-admin / private-temp を pathname prefix で分ける
+- `avelia-public`  (public)  — public-assets 用（商品画像を Public 化する時点で追加）
+
+### 12.3 移行フロー（開発 Hobby → Pro Production）
+
+**方針A: データを引き継ぐ (Transfer Store)**
+
+1. Vercel ダッシュボード → Storage → `avelia-dev-blob` → Settings → Transfer Store
+2. Destination: 会社 Pro Team を選択 → Transfer 実行
+3. 数分で完了、Blob URL は変化しない
+4. Vercel Project 側の環境変数はストアに紐付いたまま新 Team に引き継がれる
+
+**方針B: 新規に作り直す**（**アベリア本番はこちら**。開発用データを本番に持ち込まないため）
+
+1. Pro Team で新規 Blob ストアを作成（用途別に 2〜4 個）
+2. 各ストアの `BLOB_READ_WRITE_TOKEN` を取得し、Production 環境変数として登録
+3. `STORAGE_DRIVER=vercel-blob` を Production スコープに設定
+4. Neon の本番 DB を空の状態で用意（既存レコードがある場合は Section 12.4 参照）
+5. デプロイ、動作確認
+
+### 12.4 DB との整合
+
+- 開発 DB の `DigitalContent.fileKey` / `baseImageKey` / `DigitalDelivery.fileKey` は **開発 Blob ストアの pathname を指している**
+- 本番の Blob ストアはそれとは別なので、開発 DB のレコードを本番にコピーしても Blob にはファイルが存在しない
+- 本番運用開始時は「本番 DB は空で始め、正規のアップロードフローで積んでいく」のが自然
+- Preview 環境でも同様に、Preview 用 DB (Issue #10) と Preview 用 Blob を接続する
+
+### 12.5 移行後の環境変数
+
+会社 Pro Team の Vercel プロジェクト設定で以下を Environment ごとに設定:
+
+| 変数 | Development | Preview | Production |
+|---|---|---|---|
+| `STORAGE_DRIVER` | `local` | `vercel-blob` | `vercel-blob` |
+| `BLOB_READ_WRITE_TOKEN` | (unset) | Preview ストアのトークン | Production ストアのトークン |
+
+**注意:** Vercel Blob ストアを Vercel Project に Connect すると、`BLOB_READ_WRITE_TOKEN` は自動注入される。手動設定は不要になる。
 
 ---
 
-## 13. 決めきれていない事項（実装時に判断）
+## 13. 決めきれていない事項（今後の議論）
 
+**PR-1〜PR-4 の実装で確定した:**
+- ✅ 開発時は 1 ストア (avelia-dev-blob) 運用、pathname prefix で bucket 分離
+- ✅ 全 bucket を private access で扱う（呼び出し側は Route Handler 経由で配信）
+- ✅ DB マイグレーションは既存レコード互換のため default 値で補完
+- ✅ 既存 `./storage/` のデータは Hobby Blob に投入しない（Section 12.4 参照）
+
+**未決（次アクション時に決める）:**
 - [ ] **CSV出力のストレージ配置**: private-admin か、Route Handler で直接ストリームか
 - [ ] **一時ファイルの TTL**: Cron で自動削除する場合の閾値（24時間? 7日? デフォルト設定）
 - [ ] **管理画面のClient Upload**: 大きなファイル（数百MB動画）を管理画面から上げる場合、Client Upload に切り替えるか
 - [ ] **バックアップの頻度と方式**: 重要ファイル（写真集マスターPDF等）を R2 に週1同期するか、それとも Immutable 運用のみで十分か
-- [ ] **既存 `./storage/` のデータ移行**: 開発ローカルにある既存データを Hobby Blob に投入するかどうか
+- [ ] **public-assets ストア導入タイミング**: 商品画像を CDN で高速配信したくなった時に切る
+- [ ] **本番 DB マイグレーション適用手順**: Issue #12 でドキュメント化予定
 
 ---
 
