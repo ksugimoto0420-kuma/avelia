@@ -1,8 +1,11 @@
 import type { OrderStatus, PaymentStatus, Prisma } from "@prisma/client";
+import { env } from "@/lib/env";
 import { confirmStock, releaseStock } from "@/lib/inventory";
-import { sendMail } from "@/lib/mail";
+import { sendMailTemplate } from "@/lib/mail";
+import { OrderConfirmationMail } from "@/lib/mail/templates/OrderConfirmationMail";
 import { normalizeUnitNicknames } from "@/lib/nickname";
 import { prisma } from "@/lib/prisma";
+import { formatDate } from "@/lib/utils";
 
 /**
  * 注文を支払済みにする（決済成功 Webhook から呼ばれる）。
@@ -144,17 +147,10 @@ export async function markOrderPaid(params: {
 
   // メール送信（トランザクション外）
   if (result.changed && result.order) {
-    const user = await prisma.user.findUnique({
-      where: { id: result.order.userId },
-      select: { email: true, name: true },
+    await sendOrderConfirmationMail(result.order.id).catch((err) => {
+      // メール失敗で注文完了フロー自体を止めない
+      console.error("[order-status] 注文確認メール送信失敗", err);
     });
-    if (user) {
-      await sendMail({
-        to: user.email,
-        subject: `【Avelia FunClub】ご注文ありがとうございます（${result.order.orderNumber}）`,
-        text: `${user.name ?? "お客"}様\n\nご注文 ${result.order.orderNumber} の決済が完了しました。\n合計: ¥${result.order.total.toLocaleString("ja-JP")}\n\nマイページからご注文内容・デジタルコンテンツをご確認いただけます。`,
-      });
-    }
   }
 
   return result;
@@ -206,5 +202,82 @@ export async function releaseOrder(params: {
     });
 
     return { changed: true as const, order };
+  });
+}
+
+/**
+ * 注文確認メール送信 (Stripe webhook から呼ばれる markOrderPaid の後段)。
+ * 冪等性は呼び出し元 (result.changed) 側で担保されているため、ここでは
+ * 送信のみを実施する。運営宛 Bcc は ALERT_EMAIL_TO を活用する。
+ */
+async function sendOrderConfirmationMail(orderId: string): Promise<void> {
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: {
+      items: {
+        include: {
+          variant: {
+            include: {
+              product: { select: { name: true, deliveryDate: true } },
+            },
+          },
+        },
+      },
+      user: { select: { email: true, name: true } },
+    },
+  });
+  if (!order || !order.user) return;
+
+  const lines = order.items.map((item) => ({
+    productName: item.variant.product.name,
+    variantName:
+      item.variant.name && item.variant.name !== "標準"
+        ? item.variant.name
+        : null,
+    quantity: item.quantity,
+    unitPrice: item.unitPrice,
+  }));
+
+  // 最も遅い deliveryDate を目安として提示 (物販/デジタルどちらでも product に紐づく)。
+  const deliveryDates = order.items
+    .map((i) => i.variant.product.deliveryDate)
+    .filter((d): d is Date => d instanceof Date);
+  const latestDeliveryDate =
+    deliveryDates.length > 0
+      ? new Date(Math.max(...deliveryDates.map((d) => d.getTime())))
+      : null;
+
+  const shippingAddress =
+    order.recipientAddress || order.recipientPostal
+      ? {
+          name: order.recipientName ?? order.user.name,
+          postalCode: order.recipientPostal,
+          address: order.recipientAddress,
+        }
+      : null;
+
+  const paidAt = formatDate(order.paidAt ?? new Date());
+  const mypageUrl = `${env.appUrl}/mypage/orders/${order.id}`;
+
+  const bcc = env.alertEmailTo
+    ? env.alertEmailTo.split(",").map((s) => s.trim()).filter(Boolean)
+    : undefined;
+
+  await sendMailTemplate({
+    to: order.user.email,
+    subject: `【Avelia FunClub】ご注文ありがとうございます (${order.orderNumber})`,
+    bcc,
+    template: (
+      <OrderConfirmationMail
+        orderNumber={order.orderNumber}
+        paidAt={paidAt}
+        customerName={order.user.name}
+        lines={lines}
+        totalAmount={order.total}
+        deliveryEta={latestDeliveryDate ? formatDate(latestDeliveryDate) : null}
+        shippingAddress={shippingAddress}
+        mypageUrl={mypageUrl}
+      />
+    ),
   });
 }
