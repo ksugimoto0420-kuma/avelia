@@ -9,6 +9,7 @@ import { FileUploader } from "@/components/ui/FileUploader";
 import { Input, Select, Textarea } from "@/components/ui/Input";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { useToast } from "@/components/ui/Toast";
+import { ImageUploadField } from "./ImageUploadField";
 
 export type DigitalContentInitial = {
   id: string;
@@ -177,20 +178,25 @@ export function DigitalContentForm({
               </p>
               <div>
                 <p className="mb-1 text-xs font-medium text-gray-600">
-                  ① 外部画像URL（MVP / モック向け）
+                  ① 画像URL / アップロード（サイン合成用の原本画像）
                 </p>
-                <Input
+                <ImageUploadField
+                  name="baseImageUrl"
                   value={form.baseImageUrl}
-                  placeholder="https://… 例: 写真集の表紙画像URL"
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, baseImageUrl: e.target.value }))
+                  onChange={(url) =>
+                    setForm((f) => ({ ...f, baseImageUrl: url }))
                   }
-                  hint="picsum.photos などのテスト用URLでも、本物のCDN URLでもOK"
+                  bucket="private-admin"
+                  purpose="delivery-base-image"
+                  targetId={initial?.id ?? null}
+                  label=""
+                  hint="picsum.photos 等のテストURLでも、実CDNのURLでもOK。private-admin バケットにアップロードします。"
+                  previewAspect="auto"
                 />
               </div>
               <div>
                 <p className="mb-1 text-xs font-medium text-gray-600">
-                  ② ファイルアップロード（ローカル保存・本番想定）
+                  ② ファイルキー方式でアップロード（既存互換）
                 </p>
                 <FileUploader
                   onUploaded={(r) =>
