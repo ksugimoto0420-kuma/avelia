@@ -13,9 +13,10 @@ export const runtime = "nodejs";
  *
  * FormData:
  *   file       : Blob 本体 (必須)
- *   bucket     : "private-digital" | "private-admin" (任意、既定は private-admin)
- *   purpose    : "delivery-base-image" | "content" | "generic" (任意、path prefix 決定用)
+ *   bucket     : "public-assets" | "private-digital" | "private-admin" (任意、既定 private-admin)
+ *   purpose    : "delivery-base-image" | "content" | "product" | "event" | "generic" (path prefix 決定用)
  *   contentId  : delivery-base-image / content 用のエンティティID (任意)
+ *   entityId   : product / event 用のエンティティID (任意)
  */
 export async function POST(req: Request) {
   try {
@@ -29,7 +30,13 @@ export async function POST(req: Request) {
     const bucket = normalizeBucket(form.get("bucket"));
     const purpose = String(form.get("purpose") ?? "generic");
     const contentId = String(form.get("contentId") ?? "");
-    const pathnamePrefix = resolvePathnamePrefix(purpose, contentId, admin.id);
+    const entityId = String(form.get("entityId") ?? "");
+    const pathnamePrefix = resolvePathnamePrefix({
+      purpose,
+      contentId,
+      entityId,
+      adminId: admin.id,
+    });
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const stored = await storage.put(buffer, file.name, {
@@ -43,6 +50,7 @@ export async function POST(req: Request) {
 }
 
 const ALLOWED_BUCKETS: readonly StorageBucket[] = [
+  "public-assets",
   "private-digital",
   "private-admin",
 ] as const;
@@ -54,19 +62,27 @@ function normalizeBucket(raw: FormDataEntryValue | null): StorageBucket {
     : "private-admin";
 }
 
-function resolvePathnamePrefix(
-  purpose: string,
-  contentId: string,
-  adminId: string,
-): string {
-  switch (purpose) {
+function resolvePathnamePrefix(args: {
+  purpose: string;
+  contentId: string;
+  entityId: string;
+  adminId: string;
+}): string {
+  switch (args.purpose) {
     case "delivery-base-image":
-      if (contentId) return StoragePaths.deliveryBaseImage(contentId);
+      if (args.contentId) return StoragePaths.deliveryBaseImage(args.contentId);
       break;
     case "content":
-      if (contentId) return `contents/${contentId}`;
+      if (args.contentId) return `contents/${args.contentId}`;
       break;
+    case "product":
+      // 新規作成時は entityId 未定なので new/{yyyymmdd} で受ける
+      if (args.entityId) return StoragePaths.productThumbnail(args.entityId);
+      return StoragePaths.productThumbnail("new");
+    case "event":
+      if (args.entityId) return StoragePaths.eventBanner(args.entityId);
+      return StoragePaths.eventBanner("new");
   }
   const yyyymmdd = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-  return StoragePaths.adminUpload(adminId, yyyymmdd);
+  return StoragePaths.adminUpload(args.adminId, yyyymmdd);
 }
