@@ -11,6 +11,11 @@ export async function POST(req: Request) {
     const input = productInputSchema.parse(await req.json());
 
     const product = await prisma.$transaction(async (tx) => {
+      // productKind 未指定なら type から推測 (下位互換)。
+      const kind = input.productKind ?? (input.type === "DIGITAL" ? "DIGITAL_PHOTO_SIGN" : "PHYSICAL");
+      const isDigitalSign =
+        kind === "DIGITAL_PHOTO_SIGN" || kind === "DIGITAL_VIDEO_SIGN";
+
       const created = await tx.product.create({
         data: {
           eventId: input.eventId,
@@ -18,6 +23,7 @@ export async function POST(req: Request) {
           name: input.name,
           description: input.description ?? null,
           type: input.type,
+          productKind: kind,
           fulfillmentSource: input.fulfillmentSource ?? "IN_HOUSE",
           basePrice: input.basePrice,
           imageUrl: input.imageUrl ?? null,
@@ -46,6 +52,24 @@ export async function POST(req: Request) {
             isDefault: v.isDefault ?? false,
             requiresNickname: v.requiresNickname ?? false,
             inventory: { create: { quantity: v.quantity } },
+          },
+        });
+      }
+
+      // デジタルサイン系は個別サイン納品 (PERSONALIZED) の DigitalContent を1件自動作成する。
+      // タレントは決済後の DigitalDelivery を対象にサインを描き、完了で即配信される。
+      if (isDigitalSign) {
+        const digitalType = kind === "DIGITAL_VIDEO_SIGN" ? "FILE" : "IMAGE";
+        await tx.digitalContent.create({
+          data: {
+            productId: created.id,
+            title: input.digitalSign?.title || `${created.name} のサイン納品`,
+            description: input.digitalSign?.description ?? null,
+            type: digitalType,
+            deliveryType: "PERSONALIZED",
+            baseImageUrl: input.digitalSign?.baseImageUrl ?? null,
+            viewLimitDays: input.digitalSign?.viewLimitDays ?? null,
+            downloadLimit: input.digitalSign?.downloadLimit ?? null,
           },
         });
       }
