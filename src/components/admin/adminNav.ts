@@ -9,8 +9,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
   {
     title: "販売管理",
     items: [
-      // デモ段階では非表示（運用開始後に復活）
-      // { href: "/admin/artists", label: "アーティスト", icon: "🎤" },
+      { href: "/admin/artists", label: "アーティスト", icon: "🎤" },
       { href: "/admin/events", label: "イベント", icon: "🎫" },
       { href: "/admin/products", label: "商品", icon: "🎁" },
       { href: "/admin/inventories", label: "在庫", icon: "📦" },
@@ -30,9 +29,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     items: [
       { href: "/admin/digital-contents", label: "デジタルコンテンツ", icon: "🎬" },
       { href: "/admin/digital-deliveries", label: "サイン納品", icon: "✍️" },
-      // 動画フレーム デモは社内検証中のため一旦メニュー非表示
-      // URLは生きているので /admin/video-demo に直接アクセスして確認可能
-      // { href: "/admin/video-demo", label: "動画フレーム デモ", icon: "📹" },
+      { href: "/admin/video-demo", label: "動画フレーム デモ", icon: "📹" },
     ],
   },
   {
@@ -40,8 +37,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     items: [
       { href: "/admin/exports/production-list", label: "制作リスト", icon: "🛠" },
       { href: "/admin/exports/shipping-list", label: "発送リスト", icon: "🚚" },
-      // デモ段階では非表示（運用開始後に復活）
-      // { href: "/admin/revenue-shares", label: "R/S売上", icon: "💴" },
+      { href: "/admin/revenue-shares", label: "R/S売上", icon: "💴" },
     ],
   },
   {
