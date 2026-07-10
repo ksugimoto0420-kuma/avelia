@@ -40,7 +40,8 @@ export function DigitalContentForm({
     title: initial?.title ?? "",
     description: initial?.description ?? "",
     type: (initial?.type ?? "IMAGE") as "IMAGE" | "FILE",
-    deliveryType: (initial?.deliveryType ?? "SHARED") as "SHARED" | "PERSONALIZED",
+    // Phase 1 では PERSONALIZED のみを扱うため既定を PERSONALIZED に変更。
+    deliveryType: (initial?.deliveryType ?? "PERSONALIZED") as "SHARED" | "PERSONALIZED",
     fileKey: initial?.fileKey ?? "",
     baseImageKey: initial?.baseImageKey ?? "",
     baseImageUrl: initial?.baseImageUrl ?? "",
@@ -156,7 +157,14 @@ export function DigitalContentForm({
                 }))
               }
             >
-              <option value="SHARED">共通即DL（全員同一ファイル）</option>
+              {/*
+                Phase 1 では個別サイン納品 (PERSONALIZED) のみを扱う。
+                共通即DL (SHARED) は Phase 2 で復活予定。
+                既存レコードで SHARED が選ばれていた場合の互換性のため option を残す。
+              */}
+              {form.deliveryType === "SHARED" && (
+                <option value="SHARED">共通即DL（全員同一ファイル）</option>
+              )}
               <option value="PERSONALIZED">個別サイン納品（購入後に制作）</option>
             </Select>
           </div>

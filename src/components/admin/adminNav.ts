@@ -1,6 +1,10 @@
 export type AdminNavItem = { href: string; label: string; icon: string };
 export type AdminNavGroup = { title: string; items: AdminNavItem[] };
 
+// Phase 1 (オンライン特典会 = 雑誌サイン / デジタル写真サイン / デジタル動画サイン)
+// の運用に不要なメニューはコメントアウトで隠している。
+// 該当ページはURL経由では引き続きアクセス可能。
+// Phase 2 以降で必要になったらコメントを外すだけで戻せる。
 export const ADMIN_NAV: AdminNavGroup[] = [
   {
     title: "概要",
@@ -14,7 +18,8 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { href: "/admin/products", label: "商品", icon: "🎁" },
       { href: "/admin/inventories", label: "在庫", icon: "📦" },
       { href: "/admin/lotteries", label: "抽選", icon: "🎰" },
-      { href: "/admin/kuji", label: "アベリアくじ", icon: "🎲" },
+      // Phase 1 では非表示。アベリアくじ運用を再開する際にコメントを外す。
+      // { href: "/admin/kuji", label: "アベリアくじ", icon: "🎲" },
     ],
   },
   {
@@ -27,9 +32,12 @@ export const ADMIN_NAV: AdminNavGroup[] = [
   {
     title: "コンテンツ",
     items: [
-      { href: "/admin/digital-contents", label: "デジタルコンテンツ", icon: "🎬" },
+      // Phase 1 ではデジタルコンテンツは商品作成時に自動生成されるため直接管理しない。
+      // 1商品に複数デジタル成果物を紐付ける運用を再開する際にコメントを外す。
+      // { href: "/admin/digital-contents", label: "デジタルコンテンツ", icon: "🎬" },
       { href: "/admin/digital-deliveries", label: "サイン納品", icon: "✍️" },
-      { href: "/admin/video-demo", label: "動画フレーム デモ", icon: "📹" },
+      // 検証用のデモページ。Phase 2 で正式機能化する際にコメントを外す。
+      // { href: "/admin/video-demo", label: "動画フレーム デモ", icon: "📹" },
     ],
   },
   {
@@ -37,7 +45,8 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     items: [
       { href: "/admin/exports/production-list", label: "制作リスト", icon: "🛠" },
       { href: "/admin/exports/shipping-list", label: "発送リスト", icon: "🚚" },
-      { href: "/admin/revenue-shares", label: "R/S売上", icon: "💴" },
+      // Phase 1 では R/S 売上分配運用は行わない。設定・集計は保持している。
+      // { href: "/admin/revenue-shares", label: "R/S売上", icon: "💴" },
     ],
   },
   {
@@ -55,7 +64,8 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { href: "/admin/admins", label: "管理者", icon: "🔑" },
       { href: "/admin/settings", label: "サイト設定", icon: "⚙️" },
       { href: "/admin/operation-logs", label: "操作ログ", icon: "📝" },
-      { href: "/admin/mail-debug", label: "メール送信テスト", icon: "📧" },
+      // デバッグ用。Phase 1 運用中は非表示。障害調査時に一時的に戻す。
+      // { href: "/admin/mail-debug", label: "メール送信テスト", icon: "📧" },
     ],
   },
 ];
