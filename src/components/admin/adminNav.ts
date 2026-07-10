@@ -43,6 +43,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
   {
     title: "サイト運営",
     items: [
+      { href: "/admin/news", label: "NEWS", icon: "📰" },
       { href: "/admin/faqs", label: "FAQ", icon: "❓" },
       { href: "/admin/contact-messages", label: "お問い合わせ", icon: "✉️" },
     ],

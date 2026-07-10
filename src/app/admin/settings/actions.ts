@@ -22,6 +22,7 @@ const STRING_KEYS: SettingKey[] = [
   "supportEmail",
   "siteName",
   "heroImageUrl",
+  "heroImages",
 ];
 
 export async function saveSettings(formData: FormData) {
