@@ -50,7 +50,9 @@ export class LocalDriver implements StorageDriver {
     return {
       bucket: opts.bucket,
       key,
-      url: `/api/user/digital-contents/file/${encodeURIComponent(key)}`,
+      // put 直後の URL は管理画面プレビュー用途を想定 (認可付き管理者ルート経由)。
+      // 購入者向け配信は getSignedUrl(bucket, key) を別途呼んで生成する。
+      url: `/api/admin/blob/${opts.bucket}/${encodeURIComponent(key)}`,
     };
   }
 
