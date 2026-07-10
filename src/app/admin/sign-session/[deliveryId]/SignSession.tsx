@@ -11,7 +11,12 @@ type Props = {
   productName: string;
   eventTitle: string;
   unitLabel: string; // 例: "1/3個目" / ""
-  baseImageUrl: string | null; // 原本（背景）画像のURL
+  /** 原本（背景）素材のURL。動画/画像どちらでも可。 */
+  baseImageUrl: string | null;
+  /** 背景素材の種別。DIGITAL_VIDEO_SIGN のときは video、それ以外は image。 */
+  baseMediaKind?: "image" | "video";
+  /** 原本未登録時に案内する商品編集ページのURL。null なら未案内。 */
+  productEditHref?: string | null;
   pendingCount: number;
   nextDeliveryId: string | null;
   /** 「← 終了」リンクの行き先（既定: 管理画面の納品一覧） */
@@ -55,6 +60,8 @@ export function SignSession({
   eventTitle,
   unitLabel,
   baseImageUrl,
+  baseMediaKind = "image",
+  productEditHref = null,
   pendingCount,
   nextDeliveryId,
   exitHref = "/admin/digital-deliveries",
@@ -185,14 +192,41 @@ export function SignSession({
         ref={containerRef}
         className="relative mt-5 aspect-[4/3] w-full overflow-hidden rounded-2xl border border-gray-200 bg-gray-100"
       >
-        {baseImageUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={baseImageUrl}
-            alt="原本"
-            className="absolute inset-0 h-full w-full object-contain"
-            draggable={false}
-          />
+        {baseImageUrl ? (
+          baseMediaKind === "video" ? (
+            <video
+              src={baseImageUrl}
+              controls
+              playsInline
+              className="absolute inset-0 h-full w-full object-contain"
+            />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={baseImageUrl}
+              alt="原本"
+              className="absolute inset-0 h-full w-full object-contain"
+              draggable={false}
+            />
+          )
+        ) : (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4 text-center">
+            <p className="text-sm font-semibold text-amber-700">
+              サイン用ベース素材が未登録です
+            </p>
+            <p className="max-w-xs text-xs text-gray-600">
+              背景にする写真や動画が商品に登録されていません。
+              商品ページから「サイン用ベース画像/動画」を登録してください。
+            </p>
+            {productEditHref && (
+              <Link
+                href={productEditHref}
+                className="rounded-lg border border-amber-400 bg-white px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-50"
+              >
+                商品を編集する
+              </Link>
+            )}
+          </div>
         )}
         <canvas
           ref={canvasRef}
