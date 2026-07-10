@@ -28,6 +28,16 @@ enum ProductType {
   DIGITAL // デジタルコンテンツ
 }
 
+/// 商品の運用種別。#33 (Phase 1-B) で追加。
+/// - PHYSICAL           : 物品（配送あり）
+/// - DIGITAL_PHOTO_SIGN : オンラインイベント中にタレントが写真にサイン → 即配信
+/// - DIGITAL_VIDEO_SIGN : オンラインイベント中にタレントが動画にサイン → 即配信
+enum ProductKind {
+  PHYSICAL
+  DIGITAL_PHOTO_SIGN
+  DIGITAL_VIDEO_SIGN
+}
+
 // 物販の発送元区分。CSV 出力時にどちらに含めるかを分けるために利用する。
 // IN_HOUSE  : 手元出荷（ポストカード等、社内で印字して発送）
 // WAREHOUSE : 倉庫出荷（写真集等、新潟倉庫から佐川急便で発送）
@@ -237,6 +247,8 @@ model Product {
   name         String
   description  String?
   type         ProductType @default(PHYSICAL)
+  // #33 で追加。物品/写真サイン/動画サインの3値。既存レコードは PHYSICAL でフォールバック。
+  productKind  ProductKind @default(PHYSICAL)
   // 物販の発送元（type=PHYSICAL 時のみ参照）。デフォルトは IN_HOUSE。
   fulfillmentSource FulfillmentSource @default(IN_HOUSE)
   basePrice    Int // 表示用基準価格（円）。実価格は variant.price

@@ -29,6 +29,8 @@ export default async function EditProductPage({
           },
           orderBy: { createdAt: "asc" },
         },
+        // #33 デジタルサイン商品では埋め込みで DigitalContent を編集する
+        digitalContents: { orderBy: { createdAt: "asc" }, take: 1 },
       },
     }),
     prisma.event.findMany({
@@ -51,6 +53,7 @@ export default async function EditProductPage({
     name: product.name,
     description: product.description ?? "",
     type: product.type,
+    productKind: product.productKind,
     fulfillmentSource: product.fulfillmentSource,
     basePrice: product.basePrice,
     imageUrl: product.imageUrl ?? "",
@@ -73,6 +76,15 @@ export default async function EditProductPage({
       isDefault: v.isDefault,
       requiresNickname: v.requiresNickname,
     })),
+    digitalSign: {
+      title: product.digitalContents[0]?.title ?? "",
+      description: product.digitalContents[0]?.description ?? "",
+      baseImageUrl: product.digitalContents[0]?.baseImageUrl ?? "",
+      viewLimitDays:
+        product.digitalContents[0]?.viewLimitDays?.toString() ?? "",
+      downloadLimit:
+        product.digitalContents[0]?.downloadLimit?.toString() ?? "",
+    },
   };
 
   return (
