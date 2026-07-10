@@ -3,9 +3,17 @@
 **関連 Issue:** #15（Vercel Blob ドライバー実装）、#10（Vercel Preview 用 DB ブランチの分離）と連動
 
 **作成日:** 2026-07-09
-**最終更新:** 2026-07-10（PR-1〜PR-3 実装完了 + 実接続確認）
+**最終更新:** 2026-07-10（Preview 環境 Blob 接続完了）
 **対象読者:** 実装者、レビュワー、新規参加メンバー
-**ステータス:** **実装完了（開発 Hobby 接続まで）**。会社 Pro Team への移行は保留
+**ステータス:** **Preview 環境接続完了**。Production 移行は会社 Pro Team 契約後
+
+## ステータス履歴
+
+| 日付 | 内容 |
+|---|---|
+| 2026-07-09 | 仕様書ドラフト作成 |
+| 2026-07-10 | PR-1〜PR-4 実装完了、Hobby avelia-dev-blob と CLI 接続確認 |
+| 2026-07-10 | avelia-dev-blob を Vercel Project (avelia-funclub) に Connect、Preview 環境変数登録完了 |
 
 ---
 
