@@ -1,6 +1,6 @@
-import { createHash } from "node:crypto";
 import { AppError, handleError, ok } from "@/lib/api";
 import { hashPassword } from "@/lib/auth/password";
+import { hashToken } from "@/lib/auth/tokens";
 import { prisma } from "@/lib/prisma";
 import { resetPasswordSchema } from "@/lib/validators";
 
@@ -8,7 +8,7 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const { token, password } = resetPasswordSchema.parse(body);
-    const tokenHash = createHash("sha256").update(token).digest("hex");
+    const tokenHash = hashToken(token);
 
     const record = await prisma.passwordResetToken.findUnique({
       where: { tokenHash },
