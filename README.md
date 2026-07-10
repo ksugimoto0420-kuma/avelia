@@ -15,7 +15,7 @@
 | DB | PostgreSQL + Prisma |
 | 認証 | Auth.js（NextAuth v5）— user / admin 分離、admin はロール（owner/manager/operator/viewer） |
 | 決済 | Stripe Checkout + Webhook（PAY.JP は拡張用スタブ） |
-| ストレージ | ローカル（`./storage`）。本番は S3 互換に差し替え |
+| ストレージ | ローカル（`./storage`）／ Vercel Blob（`@vercel/blob`） |
 | メール | Resend（未設定時はコンソール出力にフォールバック） |
 
 ## ディレクトリ構成
@@ -61,7 +61,8 @@ cp .env.example .env
 | `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | Stripe 決済（未設定ならローカル疑似決済） |
 | `RESERVATION_TTL_MINUTES` | 在庫仮確保の有効期限（分）。既定15 |
 | `CRON_SECRET` | Cron エンドポイント保護トークン |
-| `STORAGE_DRIVER` | `local`（既定）/ S3互換 |
+| `STORAGE_DRIVER` | `local`（既定）/ `vercel-blob` |
+| `BLOB_READ_WRITE_TOKEN` | Vercel Blob 用トークン（Vercel が自動注入。ローカルは `.env.local` に設定） |
 | `MAIL_DRIVER` | `console`（既定）/ `resend` |
 
 ### 3. データベース（Docker）
@@ -122,6 +123,56 @@ stripe listen --forward-to localhost:3000/api/webhooks/stripe
 - 管理画面：ダッシュボード / イベント / 商品 / 在庫 / 注文 / 決済 / 抽選 / デジタルコンテンツ / R/S / 操作ログ
 - 制作リスト・発送リスト・注文・R/S の CSV 出力（UTF-8 BOM 付き）
 - 管理者操作の監査ログ（`operation_logs`）
+
+## ストレージ（画像・PDF・動画）
+
+デジタルコンテンツや管理素材は `src/lib/storage/` のドライバー抽象を通して扱います。呼び出し側は必ず `bucket` を指定します。
+
+```ts
+import { storage, StoragePaths } from "@/lib/storage";
+
+const stored = await storage.put(buffer, file.name, {
+  bucket: "private-digital",
+  pathnamePrefix: StoragePaths.photobookSigned(orderId),
+});
+```
+
+**ドライバー:**
+
+| `STORAGE_DRIVER` | 保存先 | 用途 |
+| --- | --- | --- |
+| `local`（既定） | `./storage/<bucket>/` | ローカル開発 |
+| `vercel-blob` | Vercel Blob | Preview / 本番 |
+
+**バケット一覧:**
+
+| バケット名 | アクセス | 用途 |
+| --- | --- | --- |
+| `public-assets` | public | 商品画像・イベントバナー等（型として定義。実利用は今後） |
+| `private-digital` | private | 購入者向けデジタルコンテンツ（写真集PDF・サイン動画等） |
+| `private-admin` | private | 管理者作業用素材（サイン用ベース画像・CSV出力等） |
+| `private-temp` | private | 一時ファイル（型として定義。将来 Cron で自動削除想定） |
+
+**Vercel Blob 接続（開発ローカル）:**
+
+1. Vercel ダッシュボード → Storage → Create → Blob
+2. Name: 任意 / Region: **Tokyo (hnd1)** / Access mode: **Private** で作成（**変更不可**）
+3. ストア画面の Quickstart → `.env.local` タブから `BLOB_READ_WRITE_TOKEN` をコピー
+4. `.env.local` に貼り付け:
+   ```
+   STORAGE_DRIVER=vercel-blob
+   BLOB_READ_WRITE_TOKEN=vercel_blob_rw_xxx
+   ```
+
+**設計詳細:** [docs/storage-strategy.md](docs/storage-strategy.md)
+
+## 開発参加
+
+**初めて参加するメンバーは [docs/onboarding.md](docs/onboarding.md) を読んでください。** Git Flow + Issue駆動 + PR経由の開発フローを採用しています。
+
+- [docs/onboarding.md](docs/onboarding.md) — オンボーディングガイド（初日に読む）
+- [docs/dev-workflow.md](docs/dev-workflow.md) — 開発ワークフロー詳細版
+- [Issues](https://github.com/how-collect/avelia-funclub/issues) — タスク一覧
 
 ## デプロイ（Vercel）
 

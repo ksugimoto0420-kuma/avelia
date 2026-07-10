@@ -1,9 +1,12 @@
-import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { requireUser } from "@/lib/auth/guards";
 import { contentTypeFor } from "@/lib/mime";
 import { prisma } from "@/lib/prisma";
-import { localFilePath } from "@/lib/storage";
+import {
+  storage,
+  StorageNotFoundError,
+  type StorageBucket,
+} from "@/lib/storage";
 
 export const runtime = "nodejs";
 
@@ -29,6 +32,7 @@ export async function GET(
         order: { select: { orderNumber: true } },
       },
     });
+    // delivery.storageBucket は PR-3 の新カラム。既存レコードは default で埋まる。
     if (!delivery || delivery.userId !== user.id) {
       return new Response("Not found", { status: 404 });
     }
@@ -58,10 +62,12 @@ export async function GET(
     // 通常ファイル配信
     let buffer: Buffer;
     try {
-      buffer = await readFile(localFilePath(delivery.fileKey));
+      ({ buffer } = await storage.getFile(
+        delivery.storageBucket as StorageBucket,
+        delivery.fileKey,
+      ));
     } catch (e) {
-      const code = (e as NodeJS.ErrnoException)?.code;
-      if (code === "ENOENT") {
+      if (e instanceof StorageNotFoundError) {
         // ファイル実体が消えている／古いシードデータ等で参照先が無いケース。
         // ユーザー側はエラーではなく「準備中」扱いにする方が体験として穏当。
         return new Response(

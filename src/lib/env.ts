@@ -11,7 +11,9 @@ export const env = {
     currency: process.env.STRIPE_CURRENCY ?? "jpy",
   },
   storage: {
-    driver: process.env.STORAGE_DRIVER ?? "local",
+    driver: (process.env.STORAGE_DRIVER ?? "local") as
+      | "local"
+      | "vercel-blob",
   },
   mail: {
     driver: process.env.MAIL_DRIVER ?? "console",

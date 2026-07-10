@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 開発ワークフローについて
+    url: https://github.com/how-collect/avelia-funclub/blob/main/docs/dev-workflow.md
+    about: Issueを立てる前に開発ワークフローを確認してください

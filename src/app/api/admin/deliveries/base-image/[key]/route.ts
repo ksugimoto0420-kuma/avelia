@@ -1,7 +1,10 @@
-import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { requireAdmin } from "@/lib/auth/guards";
-import { localFilePath } from "@/lib/storage";
+import {
+  storage,
+  StorageNotFoundError,
+  type StorageBucket,
+} from "@/lib/storage";
 import { contentTypeFor } from "@/lib/mime";
 import { prisma } from "@/lib/prisma";
 
@@ -22,26 +25,35 @@ export async function GET(
     const { key: rawKey } = await params;
     const key = decodeURIComponent(rawKey);
 
-    // 1. ローカルストレージから読む
-    try {
-      const buffer = await readFile(localFilePath(key));
-      return new Response(new Uint8Array(buffer), {
-        status: 200,
-        headers: {
-          "Content-Type": contentTypeFor(key),
-          "Content-Disposition": `attachment; filename="${path.basename(key)}"`,
-          "Cache-Control": "private, no-store",
-        },
-      });
-    } catch {
-      // 続けて外部URLを試す
+    // 該当 key を持つ DigitalContent を先に引いて bucket を確定する。
+    // 見つからなければ「未登録の key」なので 404。
+    const dc = await prisma.digitalContent.findFirst({
+      where: { baseImageKey: key },
+      select: { baseImageBucket: true, baseImageUrl: true },
+    });
+
+    // 1. ストレージから読む (Local / Vercel Blob 共通)
+    if (dc) {
+      try {
+        const { buffer } = await storage.getFile(
+          dc.baseImageBucket as StorageBucket,
+          key,
+        );
+        return new Response(new Uint8Array(buffer), {
+          status: 200,
+          headers: {
+            "Content-Type": contentTypeFor(key),
+            "Content-Disposition": `attachment; filename="${path.basename(key)}"`,
+            "Cache-Control": "private, no-store",
+          },
+        });
+      } catch (e) {
+        if (!(e instanceof StorageNotFoundError)) throw e;
+        // 見つからない場合は続けて外部URLを試す
+      }
     }
 
     // 2. baseImageKey に紐づく DigitalContent.baseImageUrl があればそれを使う
-    const dc = await prisma.digitalContent.findFirst({
-      where: { baseImageKey: key, baseImageUrl: { not: null } },
-      select: { baseImageUrl: true },
-    });
     if (dc?.baseImageUrl) {
       const res = await fetch(dc.baseImageUrl);
       if (res.ok) {
