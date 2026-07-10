@@ -1,52 +1,91 @@
-import { get, put, BlobNotFoundError } from "@vercel/blob";
+import {
+  BlobNotFoundError,
+  del,
+  get,
+  put,
+  type BlobAccessType,
+} from "@vercel/blob";
 import type { StorageDriver } from "../driver";
-import { StorageNotFoundError, type FetchedFile, type StoredFile } from "../types";
+import {
+  StorageNotFoundError,
+  isPrivateBucket,
+  type FetchedFile,
+  type PutOptions,
+  type StorageBucket,
+  type StoredFile,
+} from "../types";
 
 /**
  * Vercel Blob をバックエンドに使うドライバー。
  *
- * PR-2 では既存の LocalDriver と同じ interface で最小限の実装を提供する。
- * bucket 分割 (public / private) や複数トークン対応、bucket 別命名規約は PR-3 で導入する。
+ * 現状は単一ストア (BLOB_READ_WRITE_TOKEN) 運用で、bucket は pathname の
+ * prefix (bucketName/pathnamePrefix/...) で表現する:
+ *   private-digital/photobooks/<orderId>/<random>.pdf
+ *   private-admin/deliveries/base-image/<contentId>/<random>.jpg
  *
- * 現時点は全ての blob を private access で扱う:
- *   - 直URL公開しない
- *   - 配信は Route Handler (認可付き) 経由で getFile() する
- *   - 既存の LocalDriver と挙動が一致するため、切替時の副作用がない
- *
- * トークンは環境変数 BLOB_READ_WRITE_TOKEN を Vercel Blob SDK が自動で読む。
+ * bucket ごとに別ストア (別トークン) に分けるのは PR-4 で導入予定。
+ * その際も呼び出し側の API (bucket 指定) は変わらない。
  */
 export class VercelBlobDriver implements StorageDriver {
-  async put(buffer: Buffer, filename: string): Promise<StoredFile> {
-    // ファイル名は英数記号のみを許容し、addRandomSuffix でユニーク化する。
-    const safe = filename.replace(/[^\w.\-]+/g, "_");
-    const result = await put(safe, buffer, {
-      access: "private",
+  /**
+   * bucket ごとに Vercel Blob 側の access mode を決定する。
+   *
+   * 現在は同一ストア (private) 上で全て運用しているため、
+   * public-assets を選んでも実質 private access になる。
+   * PR-4 で public-assets 専用ストアを追加する際に本来の "public" が使える。
+   */
+  private accessFor(bucket: StorageBucket): BlobAccessType {
+    return isPrivateBucket(bucket) ? "private" : "public";
+  }
+
+  /** Blob 上の実 pathname を組み立てる。 */
+  private makePathname(bucket: StorageBucket, prefix: string): string {
+    return `${bucket}/${prefix}`;
+  }
+
+  async put(
+    buffer: Buffer,
+    filename: string,
+    opts: PutOptions,
+  ): Promise<StoredFile> {
+    const safeName = filename.replace(/[^\w.\-]+/g, "_");
+    const pathname = `${this.makePathname(opts.bucket, opts.pathnamePrefix)}-${safeName}`;
+
+    const result = await put(pathname, buffer, {
+      access: this.accessFor(opts.bucket),
       addRandomSuffix: true,
     });
+
     return {
+      bucket: opts.bucket,
       key: result.pathname,
-      // private blob の url は SDK 経由でしか使えない参考値。
-      // 呼び出し側は getSignedUrl(key) で認可済み Route Handler の URL を得るのが前提。
-      url: `/api/user/digital-contents/file/${encodeURIComponent(result.pathname)}`,
+      // 呼び出し側は基本的に getSignedUrl(bucket, key) を使う想定。
+      // ここで返す url は public バケットに切り替わったときのフォールバック値。
+      url: isPrivateBucket(opts.bucket)
+        ? `/api/user/digital-contents/file/${encodeURIComponent(result.pathname)}`
+        : result.url,
     };
   }
 
-  async getSignedUrl(key: string, _expiresSeconds?: number): Promise<string> {
-    // ローカルと同じく、認可チェック済みの Route Handler 経由で返す。
-    // PR-3 で public バケットを導入した際は、バケットに応じて直URL / プロキシ URL を切り替える。
+  async getSignedUrl(
+    _bucket: StorageBucket,
+    key: string,
+    _expiresSeconds?: number,
+  ): Promise<string> {
+    // 現状は全 bucket を Route Handler 経由で配信する。
+    // PR-4 で public バケットを分けたら、そこだけ blob.url を DB 保存済みの
+    // ものから直接使う形に変える。
     return `/api/user/digital-contents/file/${encodeURIComponent(key)}`;
   }
 
-  async getFile(key: string): Promise<FetchedFile> {
+  async getFile(bucket: StorageBucket, key: string): Promise<FetchedFile> {
     try {
-      const result = await get(key, { access: "private" });
+      const result = await get(key, { access: this.accessFor(bucket) });
       if (!result || result.statusCode !== 200) {
-        throw new StorageNotFoundError(key);
+        throw new StorageNotFoundError(bucket, key);
       }
       const chunks: Uint8Array[] = [];
       const reader = result.stream.getReader();
-      // Web Streams から Buffer に変換する。動画などの巨大ファイルは PR-3 以降で
-      // ストリームのまま Response に流すよう最適化する余地あり。
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -56,9 +95,18 @@ export class VercelBlobDriver implements StorageDriver {
       return { buffer };
     } catch (e) {
       if (e instanceof BlobNotFoundError) {
-        throw new StorageNotFoundError(key);
+        throw new StorageNotFoundError(bucket, key);
       }
       throw e;
     }
+  }
+
+  /**
+   * 補助メソッド: 明示的な削除。Driver interface には入れず、
+   * 呼び出し側は必要ならこのクラスにキャストして使う。
+   * (Cron や管理者操作向け。del は無料。)
+   */
+  async del(key: string): Promise<void> {
+    await del(key);
   }
 }
