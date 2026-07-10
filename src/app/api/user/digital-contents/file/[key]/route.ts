@@ -1,7 +1,11 @@
 import path from "node:path";
 import { requireUser } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
-import { storage, StorageNotFoundError } from "@/lib/storage";
+import {
+  storage,
+  StorageNotFoundError,
+  type StorageBucket,
+} from "@/lib/storage";
 
 export const runtime = "nodejs";
 
@@ -34,6 +38,14 @@ export async function GET(
 
     const content = await prisma.digitalContent.findFirst({
       where: { fileKey: key },
+      select: {
+        id: true,
+        publishAt: true,
+        downloadLimit: true,
+        storageBucket: true,
+        baseImageKey: true,
+        baseImageBucket: true,
+      },
     });
     if (!content) return new Response("Not found", { status: 404 });
 
@@ -63,9 +75,14 @@ export async function GET(
       });
     }
 
+    // fileKey は content.storageBucket、baseImageKey は content.baseImageBucket を
+    // それぞれ参照する。ここでは fileKey ヒット時の bucket を使う。
     let buffer: Buffer;
     try {
-      ({ buffer } = await storage.getFile(key));
+      ({ buffer } = await storage.getFile(
+        content.storageBucket as StorageBucket,
+        key,
+      ));
     } catch (e) {
       if (e instanceof StorageNotFoundError) {
         return new Response("Not found", { status: 404 });

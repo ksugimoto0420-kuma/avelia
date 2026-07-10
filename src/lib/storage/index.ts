@@ -1,14 +1,9 @@
 // ストレージのエントリポイント。
 //
 // 呼び出し側は必ずこの facade 経由で使う:
-//   import { storage } from "@/lib/storage";
+//   import { storage, StoragePaths, type StorageBucket } from "@/lib/storage";
 //
-// PR-1 では local ドライバーのみ実装。PR-2 で VercelBlobDriver を追加した際も、
-// この facade の型・関数シグネチャは変わらない。
-//
-// 旧 src/lib/storage.ts から putFile / getSignedUrl / localFilePath を提供していたが、
-// localFilePath は Route Handler から使う readFile と密結合していたので、
-// ドライバー内部に閉じ込め、代わりに storage.getFile(key) を公開する。
+// PR-3 で bucket 対応に拡張済み。呼び出し時は bucket を必ず明示する。
 
 import { env } from "@/lib/env";
 import type { StorageDriver } from "./driver";
@@ -22,14 +17,19 @@ function createDriver(): StorageDriver {
     case "vercel-blob":
       return new VercelBlobDriver();
     default:
-      // 未対応ドライバーは起動時に気づけるように投げる。
       throw new Error(`storage driver "${env.storage.driver}" は未実装です`);
   }
 }
 
 export const storage: StorageDriver = createDriver();
 
-// 型は必要に応じて呼び出し側でも import できるように再エクスポート。
+export { StoragePaths } from "./path";
 export type { StorageDriver } from "./driver";
-export type { FetchedFile, StoredFile } from "./types";
-export { StorageNotFoundError } from "./types";
+export {
+  StorageNotFoundError,
+  isPrivateBucket,
+  type FetchedFile,
+  type PutOptions,
+  type StorageBucket,
+  type StoredFile,
+} from "./types";

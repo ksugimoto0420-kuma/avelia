@@ -517,7 +517,11 @@ model DigitalContent {
   // 配信方式（SHARED=共通即DL / PERSONALIZED=個別サイン納品）
   deliveryType   DigitalDeliveryType @default(SHARED)
   fileKey        String? // SHARED時の配信ファイルキー
+  // fileKey が指すバケット。#15 PR-3 で追加。既存レコード互換のため private-digital 既定。
+  storageBucket  String             @default("private-digital")
   baseImageKey   String? // PERSONALIZED時の原本画像キー（ローカルストレージ）
+  // baseImageKey が指すバケット。管理者専用素材扱いで private-admin 既定。
+  baseImageBucket String            @default("private-admin")
   baseImageUrl   String? // PERSONALIZED時の原本画像URL（外部CDN等。MVP・モック向け）
   publishAt      DateTime? // 公開開始日時
   viewLimitDays  Int? // 付与/納品から閲覧可能な日数
@@ -548,6 +552,8 @@ model DigitalDelivery {
   note             String?
   status           DigitalDeliveryStatus @default(PENDING)
   fileKey          String? // サイン済み成果物のキー（READY時に必須）
+  // fileKey が指すバケット。#15 PR-3 で追加。既存レコード互換のため private-digital 既定。
+  storageBucket    String                @default("private-digital")
   originalFilename String? // アップロード元ファイル名（Content-Disposition用）
   deliveredAt      DateTime?
   downloadCount    Int                   @default(0)
