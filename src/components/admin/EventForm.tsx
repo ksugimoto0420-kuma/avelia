@@ -57,9 +57,21 @@ export function EventForm({
                 className={inputCls}
               >
                 <option value="MEET_GREET">オンライン特典会</option>
-                <option value="KUJI">アベリアくじ（抽選くじ）</option>
-                <option value="TRADING_CARD">トレカ</option>
-                <option value="GOODS">グッズ</option>
+                {/*
+                  Phase 1 では「オンライン特典会」のみを扱う。
+                  くじ / トレカ / グッズ は Phase 2 以降で復活予定。
+                  既存レコードで選ばれていた場合の互換性のため、defaultValue が
+                  これらのいずれかであれば option を表示する。
+                */}
+                {event?.eventType === "KUJI" && (
+                  <option value="KUJI">アベリアくじ（抽選くじ）</option>
+                )}
+                {event?.eventType === "TRADING_CARD" && (
+                  <option value="TRADING_CARD">トレカ</option>
+                )}
+                {event?.eventType === "GOODS" && (
+                  <option value="GOODS">グッズ</option>
+                )}
               </select>
             </div>
             <div>

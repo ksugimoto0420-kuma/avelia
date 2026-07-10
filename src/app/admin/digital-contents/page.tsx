@@ -167,7 +167,8 @@ export default async function AdminDigitalContentsPage({
             className="w-40"
             options={[
               { value: "", label: "すべて" },
-              { value: "SHARED", label: DELIVERY_LABEL.SHARED },
+              // Phase 1 では SHARED は非表示。Phase 2 で復活予定。
+              // { value: "SHARED", label: DELIVERY_LABEL.SHARED },
               { value: "PERSONALIZED", label: DELIVERY_LABEL.PERSONALIZED },
             ]}
           />
