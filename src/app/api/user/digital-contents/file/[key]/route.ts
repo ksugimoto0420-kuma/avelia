@@ -1,8 +1,7 @@
-import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { requireUser } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
-import { localFilePath } from "@/lib/storage";
+import { storage, StorageNotFoundError } from "@/lib/storage";
 
 export const runtime = "nodejs";
 
@@ -64,7 +63,15 @@ export async function GET(
       });
     }
 
-    const buffer = await readFile(localFilePath(key));
+    let buffer: Buffer;
+    try {
+      ({ buffer } = await storage.getFile(key));
+    } catch (e) {
+      if (e instanceof StorageNotFoundError) {
+        return new Response("Not found", { status: 404 });
+      }
+      throw e;
+    }
     await prisma.userDigitalContent.update({
       where: { id: grant.id },
       data: { downloadCount: { increment: 1 }, viewCount: { increment: 1 } },

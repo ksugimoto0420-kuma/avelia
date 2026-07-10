@@ -4,7 +4,7 @@ import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { requireUserPage } from "@/lib/auth/user-page";
 import { prisma } from "@/lib/prisma";
-import { getSignedUrl } from "@/lib/storage";
+import { storage } from "@/lib/storage";
 import { formatDate } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -30,7 +30,7 @@ export default async function DigitalContentViewer({
   const now = new Date();
   const expired = Boolean(grant.expiresAt && grant.expiresAt < now);
   const notPublished = Boolean(content.publishAt && content.publishAt > now);
-  const url = content.fileKey ? await getSignedUrl(content.fileKey) : null;
+  const url = content.fileKey ? await storage.getSignedUrl(content.fileKey) : null;
 
   return (
     <div className="space-y-5">
