@@ -70,11 +70,14 @@ export class VercelBlobDriver implements StorageDriver {
       bucket: opts.bucket,
       key: result.pathname,
       // public バケットの場合は CDN 直リンクを返す (未ログインでも表示可能)。
-      // private バケットは Route Handler 経由の認可付きURLを返す。
+      // private バケットは管理者向け Route Handler 経由の URL を返す
+      // (管理画面のプレビュー・編集時再表示で使う)。
+      // 購入者向け配信は /api/user/digital-contents/file/[key] で
+      // 別途 DB 上の bucket 情報を参照して認可判定する。
       url:
         opts.bucket === "public-assets"
           ? result.url
-          : `/api/user/digital-contents/file/${encodeURIComponent(result.pathname)}`,
+          : buildAdminBlobUrl(opts.bucket, result.pathname),
     };
   }
 
@@ -90,6 +93,7 @@ export class VercelBlobDriver implements StorageDriver {
         "public-assets バケットは put 時の url を DB に保存して直接使ってください",
       );
     }
+    // 購入者向けの認可付き配信ルート。呼び出し元は通常こちらを使う。
     return `/api/user/digital-contents/file/${encodeURIComponent(key)}`;
   }
 
@@ -128,4 +132,16 @@ export class VercelBlobDriver implements StorageDriver {
     const token = this.tokenFor(bucket);
     await del(key, { token });
   }
+}
+
+/**
+ * private バケットの blob を管理画面から参照するための URL を組み立てる。
+ * /api/admin/blob/[bucket]/[...key] (Route Handler の catch-all) 経由。
+ *
+ * key の中に "/" が含まれるが、Next の catch-all は "/" ごとに segment を作る仕様。
+ * そのままエンコードすると "%2F" になってしまうため、segment を分けて encodeURIComponent する。
+ */
+function buildAdminBlobUrl(bucket: StorageBucket, key: string): string {
+  const segments = key.split("/").map((s) => encodeURIComponent(s));
+  return `/api/admin/blob/${bucket}/${segments.join("/")}`;
 }
