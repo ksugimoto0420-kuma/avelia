@@ -42,12 +42,15 @@ export default async function TalentHomePage() {
       : {};
 
   // 自分宛のサイン待ち（PENDING で signature が未作成 or REJECTED）をイベント単位で集計
+  // #70: 写真 / 動画 の内訳もあわせて返す (productKind 別カウント)。
   const groups = await prisma.$queryRaw<
     Array<{
       eventId: string;
       eventTitle: string;
       artistName: string | null;
       pendingCount: number;
+      photoCount: number;
+      videoCount: number;
       firstDeliveryId: string;
     }>
   >`
@@ -56,6 +59,8 @@ export default async function TalentHomePage() {
       e.title AS "eventTitle",
       e."artistName" AS "artistName",
       COUNT(dd.id)::int AS "pendingCount",
+      SUM(CASE WHEN p."productKind" = 'DIGITAL_PHOTO_SIGN' THEN 1 ELSE 0 END)::int AS "photoCount",
+      SUM(CASE WHEN p."productKind" = 'DIGITAL_VIDEO_SIGN' THEN 1 ELSE 0 END)::int AS "videoCount",
       (
         SELECT dd2.id FROM digital_deliveries dd2
         JOIN digital_contents dc2 ON dc2.id = dd2."digitalContentId"
@@ -116,6 +121,13 @@ export default async function TalentHomePage() {
                 title={
                   <span className="flex flex-wrap items-center gap-2">
                     <Badge color="yellow">サイン待ち {g.pendingCount}件</Badge>
+                    {/* #70: 写真/動画の内訳バッジ */}
+                    {g.photoCount > 0 && (
+                      <Badge color="blue">📷 写真 {g.photoCount}件</Badge>
+                    )}
+                    {g.videoCount > 0 && (
+                      <Badge color="purple">🎬 動画 {g.videoCount}件</Badge>
+                    )}
                     {g.eventTitle}
                   </span>
                 }

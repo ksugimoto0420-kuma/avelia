@@ -179,8 +179,20 @@ export function SignSession({
       </div>
 
       <div className="mt-4 rounded-2xl bg-brand-50 px-5 py-4">
-        <p className="text-xs text-brand-500">{eventTitle}</p>
-        <h1 className="text-2xl font-bold text-brand-900">
+        <div className="flex items-center gap-2 text-xs text-brand-500">
+          <span>{eventTitle}</span>
+          {/* #70: メディア種別バッジ (写真 / 動画) */}
+          {baseMediaKind === "video" ? (
+            <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-semibold text-purple-700">
+              🎬 動画サイン
+            </span>
+          ) : (
+            <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700">
+              📷 写真サイン
+            </span>
+          )}
+        </div>
+        <h1 className="mt-1 text-2xl font-bold text-brand-900">
           「{nickname ?? "宛名なし"}」さんへ
         </h1>
         <p className="mt-1 text-sm text-brand-700">
