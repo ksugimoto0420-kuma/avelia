@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Card, CardBody } from "@/components/ui/Card";
+import { UnverifiedEmailBanner } from "@/components/user/UnverifiedEmailBanner";
 import { requireUserPage } from "@/lib/auth/user-page";
 import { prisma } from "@/lib/prisma";
 import { formatYen } from "@/lib/utils";
@@ -10,6 +11,7 @@ export default async function MypageOverview() {
   const user = await requireUserPage();
 
   const [
+    me,
     orderCount,
     paidAgg,
     grantCount,
@@ -17,6 +19,10 @@ export default async function MypageOverview() {
     wonCount,
     kujiDrawCount,
   ] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: user.id },
+      select: { email: true, emailVerified: true },
+    }),
     // アベリアくじの Order（KujiDraw 紐づき）はマイページ「注文数」から除外
     prisma.order.count({
       where: { userId: user.id, kujiDraws: { none: {} } },
@@ -60,6 +66,7 @@ export default async function MypageOverview() {
 
   return (
     <div className="space-y-6">
+      {me && !me.emailVerified && <UnverifiedEmailBanner email={me.email} />}
       <p className="text-sm text-gray-500">{user.email} でログイン中</p>
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
         {stats.map((s) => (

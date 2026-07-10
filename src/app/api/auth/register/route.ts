@@ -1,4 +1,5 @@
 import { AppError, handleError, ok } from "@/lib/api";
+import { issueEmailVerificationAndSend } from "@/lib/auth/email-verification";
 import { hashPassword } from "@/lib/auth/password";
 import { prisma } from "@/lib/prisma";
 import { registerSchema } from "@/lib/validators";
@@ -24,6 +25,9 @@ export async function POST(req: Request) {
       },
       select: { id: true, email: true, name: true },
     });
+
+    // #34: メール確認トークンを発行してメール送信 (失敗しても登録は成功扱い)
+    await issueEmailVerificationAndSend(user.id);
 
     return ok(user, 201);
   } catch (err) {
