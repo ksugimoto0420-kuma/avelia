@@ -178,7 +178,7 @@ export function DigitalContentForm({
               </p>
               <div>
                 <p className="mb-1 text-xs font-medium text-gray-600">
-                  ① 画像URL / アップロード（サイン合成用の原本画像）
+                  ① 画像アップロード（サイン合成用の原本画像）
                 </p>
                 <ImageUploadField
                   name="baseImageUrl"
@@ -190,7 +190,8 @@ export function DigitalContentForm({
                   purpose="delivery-base-image"
                   targetId={initial?.id ?? null}
                   label=""
-                  hint="picsum.photos 等のテストURLでも、実CDNのURLでもOK。private-admin バケットにアップロードします。"
+                  hint="private-admin バケットにアップロードします。"
+                  showUrlInput={false}
                   previewAspect="auto"
                 />
               </div>

@@ -42,6 +42,11 @@ export type ImageUploadFieldProps = {
   previewAspect?: "cover-16-9" | "square" | "auto" | "none";
   /** input が受け付ける MIME (デフォルト image/*)。 */
   accept?: string;
+  /**
+   * URL 手入力欄を表示するかどうか。デフォルト true。
+   * サイン用ベース画像/動画のようにアップロード専用で運用する項目では false にする。
+   */
+  showUrlInput?: boolean;
   /** ラッパの追加クラス。 */
   className?: string;
 };
@@ -50,12 +55,15 @@ export type ImageUploadFieldProps = {
  * 管理画面用の統一画像入力フィールド。
  *
  * 上段: ドラッグ&ドロップ or クリックでアップロード
- * 下段: URL 手入力 (補助)
+ * 下段: URL 手入力 (補助、showUrlInput=false で無効化)
  * 排他制御: どちらか一方を使うと、もう一方は disabled になる。
  * クリアボタンで両方リセット可能。
  *
  * form 送信用に hidden input[name={name}] を出力する。
  * Server Action ベースのフォームでも FormData でこの URL が受け取れる。
+ *
+ * アップロード済みの場合、URL 手入力欄には内部URL (/api/admin/blob/...) を
+ * そのまま出さず、「アップロード済み」バッジで済ませる (UX / URLバリデーション対策)。
  */
 export function ImageUploadField({
   name,
@@ -69,6 +77,7 @@ export function ImageUploadField({
   hint = "JPG / PNG / WebP に対応。",
   previewAspect = "cover-16-9",
   accept = "image/*",
+  showUrlInput = true,
   className,
 }: ImageUploadFieldProps) {
   const [uncontrolled, setUncontrolled] = useState(defaultValue);
@@ -78,14 +87,18 @@ export function ImageUploadField({
     else setUncontrolled(v);
   };
 
-  // "uploaded" / "url-input" / null (未確定 or クリア済み)
-  const [mode, setMode] = useState<"uploaded" | "url-input" | null>(() => {
-    if (!defaultValue) return null;
-    return defaultValue.startsWith("http") &&
-      !defaultValue.includes("blob.vercel-storage.com")
-      ? "url-input"
-      : "uploaded";
-  });
+  // モード判定は「初期値がアップロード成果物 (内部URL) っぽいか外部URLか」で決める。
+  // 内部URLの見た目: /api/admin/blob/... または /api/user/... または Vercel Blob CDN URL
+  const detectMode = (v: string): "uploaded" | "url-input" | null => {
+    if (!v) return null;
+    if (v.startsWith("/api/")) return "uploaded";
+    if (v.includes(".blob.vercel-storage.com")) return "uploaded";
+    return "url-input";
+  };
+  const [mode, setMode] = useState<"uploaded" | "url-input" | null>(() =>
+    detectMode(defaultValue),
+  );
+  const [uploadedFilename, setUploadedFilename] = useState<string | null>(null);
 
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -131,6 +144,7 @@ export function ImageUploadField({
       if (!uploadedUrl) throw new Error("URLが取得できませんでした");
       setUrl(uploadedUrl);
       setMode("uploaded");
+      setUploadedFilename(file.name);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -154,6 +168,7 @@ export function ImageUploadField({
   const clearAll = () => {
     setUrl("");
     setMode(null);
+    setUploadedFilename(null);
     setError(null);
   };
 
@@ -206,9 +221,11 @@ export function ImageUploadField({
           "flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-4 py-6 text-center transition " +
           (isUploadDisabled
             ? "cursor-not-allowed border-gray-200 bg-gray-50 text-gray-400"
-            : dragging
-              ? "border-brand-500 bg-brand-50 text-brand-700"
-              : "cursor-pointer border-gray-300 bg-white text-gray-600 hover:border-brand-400 hover:bg-brand-50/40")
+            : mode === "uploaded"
+              ? "cursor-pointer border-green-300 bg-green-50/40 text-green-700 hover:border-green-400"
+              : dragging
+                ? "border-brand-500 bg-brand-50 text-brand-700"
+                : "cursor-pointer border-gray-300 bg-white text-gray-600 hover:border-brand-400 hover:bg-brand-50/40")
         }
       >
         <input
@@ -226,6 +243,17 @@ export function ImageUploadField({
             <span className="h-5 w-5 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
             <span className="text-sm">アップロード中...</span>
           </>
+        ) : mode === "uploaded" ? (
+          <>
+            <span className="text-2xl leading-none">✅</span>
+            <span className="text-sm font-medium">
+              アップロード済み
+              {uploadedFilename ? `: ${uploadedFilename}` : ""}
+            </span>
+            <span className="text-xs">
+              差し替えるには、ここをクリック / ドロップしてください
+            </span>
+          </>
         ) : (
           <>
             <span className="text-2xl leading-none">
@@ -241,34 +269,36 @@ export function ImageUploadField({
         )}
       </div>
 
-      {/* 排他ヒント */}
-      <div className="mt-3 text-center text-xs text-gray-500">
-        — または、URL を貼り付ける —
-      </div>
-
-      {/* URL 手入力 */}
-      <input
-        type="url"
-        value={mode === "uploaded" ? "" : url}
-        onChange={(e) => {
-          const v = e.target.value;
-          setUrl(v);
-          setMode(v ? "url-input" : null);
-          setError(null);
-        }}
-        disabled={isUrlInputDisabled}
-        placeholder={
-          isUrlInputDisabled
-            ? "アップロード済みのため無効化されています"
-            : "https://…"
-        }
-        className={
-          "mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 " +
-          (isUrlInputDisabled
-            ? "cursor-not-allowed border-gray-200 bg-gray-50 text-gray-400"
-            : "border-gray-300 focus:border-brand-500 focus:ring-brand-200")
-        }
-      />
+      {/* 排他ヒント + URL 手入力 (showUrlInput=false のとき非表示) */}
+      {showUrlInput && (
+        <>
+          <div className="mt-3 text-center text-xs text-gray-500">
+            — または、URL を貼り付ける —
+          </div>
+          <input
+            type="url"
+            value={mode === "uploaded" ? "" : url}
+            onChange={(e) => {
+              const v = e.target.value;
+              setUrl(v);
+              setMode(v ? "url-input" : null);
+              setError(null);
+            }}
+            disabled={isUrlInputDisabled}
+            placeholder={
+              isUrlInputDisabled
+                ? "アップロード済みのため無効化されています"
+                : "https://…"
+            }
+            className={
+              "mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 " +
+              (isUrlInputDisabled
+                ? "cursor-not-allowed border-gray-200 bg-gray-50 text-gray-400"
+                : "border-gray-300 focus:border-brand-500 focus:ring-brand-200")
+            }
+          />
+        </>
+      )}
 
       {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
 

@@ -138,10 +138,13 @@ export class VercelBlobDriver implements StorageDriver {
  * private バケットの blob を管理画面から参照するための URL を組み立てる。
  * /api/admin/blob/[bucket]/[...key] (Route Handler の catch-all) 経由。
  *
- * key の中に "/" が含まれるが、Next の catch-all は "/" ごとに segment を作る仕様。
- * そのままエンコードすると "%2F" になってしまうため、segment を分けて encodeURIComponent する。
+ * key の pathname には bucket プレフィックス (例: "private-admin/…") が
+ * 既に含まれているため、URL 生成時に取り除いて二重化を防ぐ。
+ * Next の catch-all は "/" ごとに segment を作る仕様なので、segment を
+ * 分けて encodeURIComponent する。
  */
 function buildAdminBlobUrl(bucket: StorageBucket, key: string): string {
-  const segments = key.split("/").map((s) => encodeURIComponent(s));
+  const stripped = key.startsWith(`${bucket}/`) ? key.slice(bucket.length + 1) : key;
+  const segments = stripped.split("/").map((s) => encodeURIComponent(s));
   return `/api/admin/blob/${bucket}/${segments.join("/")}`;
 }
