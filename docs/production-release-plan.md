@@ -74,14 +74,29 @@ Product 側で「デジタル写真サイン」「デジタル動画サイン」
 
 ### 2.3 イベント当日（タレント）
 
+**タレントは専用ログインページから入る** (`/talent/login`)。すでに `TALENT` ロールとルートは実装済み。タブレット + Apple Pencil を想定した専用UIで進める。
+
 1. タレントは配信でファンに向けてトーク開始
-2. 管理画面「サインセッション」を開く
-3. 全 `DigitalDelivery(status=PENDING)` が一覧表示される
+2. `/talent/login` からログイン → `/talent` に遷移
+3. サイン待ち一覧が **担当アーティスト単位で** 表示される（既存実装あり）
 4. 1件ずつ処理:
    - ファンの宛名・ニックネームを確認
    - 原本の上にサインを描く（既存の `Signature` テーブルに保存）
    - **「完了」ボタンを押す** → `DigitalDelivery.status = READY` + サイン付き画像/動画を生成 + Blob 保存
 5. 完了と同時にファンにメール送信 + マイページで閲覧可能に
+
+**既存資産の活用:**
+- `AdminRole = TALENT` （ロール定義済み）
+- `/talent/login`, `/talent`, `/talent/sign/[deliveryId]`, `/talent/done` （ページ骨格あり）
+- `requireTalentPage()` （ガード実装済み）
+- `Admin.assignedArtistId` （タレント⇔アーティストの紐付け）
+- `Signature.status = WRITTEN | COMPLETED | REJECTED` （既存フロー）
+
+**Phase 1 で強化すること:**
+- **サイン画面の本番化**: タブレット + Pencil に最適化した描画 UI、動画用オーバーレイ再生 UI
+- **「完了」ボタンで即メール送信**: サーバー側で `DigitalDelivery.status = READY` にして Resend でメール
+- **配信中の効率化**: 次の対象への高速遷移、押し忘れ検知
+- **写真サイン vs 動画サイン のUI分岐**
 
 ### 2.4 イベント終了後
 
@@ -180,7 +195,7 @@ Product 側で「デジタル写真サイン」「デジタル動画サイン」
 | C | Auth: メール確認フロー (Verification Token + メール送信) | M | A |
 | D | Auth: パスワードリセット (Reset Token + メール送信) | S | A |
 | E | 注文確認メール送信 (Stripe webhook から) | S | A |
-| F | サインセッションの本番化 (タレント用UIの実装 + 完了ボタン) | L | B |
+| F | タレント専用サイン画面の本番化 (写真/動画用UI分岐、Pencil対応強化、完了→次への遷移) | L | B |
 | G | サイン完了 → 即メール送信 (デジタル配信URL付き) | M | A, F |
 | H | 発送完了メール (物品) + 管理者UI | S | A |
 | I | 決済失敗通知メール | S | A |
