@@ -87,6 +87,10 @@ export const productInputSchema = z.object({
   name: z.string().min(1),
   description: z.string().optional().nullable(),
   type: z.enum(["PHYSICAL", "DIGITAL"]),
+  /** #33 (Phase 1-B) 追加。既存互換のため optional で、未指定なら PHYSICAL 扱い。 */
+  productKind: z
+    .enum(["PHYSICAL", "DIGITAL_PHOTO_SIGN", "DIGITAL_VIDEO_SIGN"])
+    .optional(),
   fulfillmentSource: z.enum(["IN_HOUSE", "WAREHOUSE"]).optional(),
   basePrice: z.number().int().min(0),
   imageUrl: z.string().optional().nullable(),
@@ -114,6 +118,23 @@ export const productInputSchema = z.object({
       }),
     )
     .min(1, "バリエーションを1つ以上登録してください"),
+  /**
+   * デジタルサイン商品(DIGITAL_PHOTO_SIGN / DIGITAL_VIDEO_SIGN)向けの
+   * DigitalContent 埋め込み情報。商品保存と同時に個別サイン納品 (PERSONALIZED)
+   * の DigitalContent レコードを1件作成する。#33 で追加。
+   */
+  digitalSign: z
+    .object({
+      title: z.string().optional(),
+      description: z.string().optional().nullable(),
+      /** サイン用の原本画像/動画のURL (public でも private でも可)。 */
+      baseImageUrl: z.string().optional().nullable(),
+      /** 閲覧可能日数 (null なら無期限)。 */
+      viewLimitDays: z.number().int().min(1).optional().nullable(),
+      /** ダウンロード上限。写真サインでは意味あり、動画はストリーミング前提で通常 null。 */
+      downloadLimit: z.number().int().min(1).optional().nullable(),
+    })
+    .optional(),
 });
 
 // ---- 管理: 在庫調整 ----

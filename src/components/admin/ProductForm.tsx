@@ -28,6 +28,8 @@ export type ProductFormData = {
   name: string;
   description: string;
   type: "PHYSICAL" | "DIGITAL";
+  /** #33 (Phase 1-B) 追加。物品/写真サイン/動画サインの3値。 */
+  productKind: "PHYSICAL" | "DIGITAL_PHOTO_SIGN" | "DIGITAL_VIDEO_SIGN";
   fulfillmentSource: "IN_HOUSE" | "WAREHOUSE";
   basePrice: number;
   imageUrl: string;
@@ -42,6 +44,14 @@ export type ProductFormData = {
   maxPerUser: string;
   lotteryOnly: boolean;
   variants: VariantRow[];
+  /** #33 デジタルサイン商品のとき、DigitalContent 埋め込み情報 */
+  digitalSign: {
+    title: string;
+    description: string;
+    baseImageUrl: string;
+    viewLimitDays: string;
+    downloadLimit: string;
+  };
 };
 
 export function ProductForm({
@@ -94,12 +104,16 @@ export function ProductForm({
     setSaving(true);
     setError(null);
     try {
+      const isDigitalSign =
+        form.productKind === "DIGITAL_PHOTO_SIGN" ||
+        form.productKind === "DIGITAL_VIDEO_SIGN";
       const payload = {
         eventId: form.eventId,
         slug: form.slug || form.name,
         name: form.name,
         description: form.description || null,
         type: form.type,
+        productKind: form.productKind,
         basePrice: Number(form.basePrice),
         imageUrl: form.imageUrl || null,
         benefit: form.benefit || null,
@@ -128,6 +142,19 @@ export function ProductForm({
           isDefault: v.isDefault,
           requiresNickname: v.requiresNickname,
         })),
+        digitalSign: isDigitalSign
+          ? {
+              title: form.digitalSign.title || undefined,
+              description: form.digitalSign.description || null,
+              baseImageUrl: form.digitalSign.baseImageUrl || null,
+              viewLimitDays: form.digitalSign.viewLimitDays
+                ? Number(form.digitalSign.viewLimitDays)
+                : null,
+              downloadLimit: form.digitalSign.downloadLimit
+                ? Number(form.digitalSign.downloadLimit)
+                : null,
+            }
+          : undefined,
       };
 
       const url = form.id
@@ -185,14 +212,22 @@ export function ProductForm({
           />
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Select
-              label="区分"
-              value={form.type}
-              onChange={(e) =>
-                set("type", e.target.value as "PHYSICAL" | "DIGITAL")
-              }
+              label="種別"
+              value={form.productKind}
+              onChange={(e) => {
+                const kind = e.target.value as ProductFormData["productKind"];
+                setForm((f) => ({
+                  ...f,
+                  productKind: kind,
+                  // 内部の type は productKind から自動決定 (下位互換のため保持)
+                  type: kind === "PHYSICAL" ? "PHYSICAL" : "DIGITAL",
+                }));
+              }}
+              hint="物品は配送、デジタル写真/動画サインはオンラインイベント中にタレントがその場でサイン → 即配信"
             >
-              <option value="PHYSICAL">物販</option>
-              <option value="DIGITAL">デジタル</option>
+              <option value="PHYSICAL">物品</option>
+              <option value="DIGITAL_PHOTO_SIGN">デジタル写真サイン</option>
+              <option value="DIGITAL_VIDEO_SIGN">デジタル動画サイン</option>
             </Select>
             <Input
               label="表示価格（円）"
@@ -201,7 +236,7 @@ export function ProductForm({
               onChange={(e) => set("basePrice", Number(e.target.value))}
             />
           </div>
-          {form.type === "PHYSICAL" && (
+          {form.productKind === "PHYSICAL" && (
             <Select
               label="発送元（CSV出力時に振り分けられます）"
               value={form.fulfillmentSource}
@@ -261,6 +296,113 @@ export function ProductForm({
           />
         </CardBody>
       </Card>
+
+      {(form.productKind === "DIGITAL_PHOTO_SIGN" ||
+        form.productKind === "DIGITAL_VIDEO_SIGN") && (
+        <Card>
+          <CardHeader
+            title="デジタルサイン設定"
+            subtitle={
+              form.productKind === "DIGITAL_PHOTO_SIGN"
+                ? "写真の原本と、購入者向け配信の設定。オンラインイベント中にタレントが原本にサインを描き、完了と同時にファンに即配信されます。"
+                : "動画の原本と、購入者向け配信の設定。オンラインイベント中にタレントが動画にサインを描き、完了と同時にファンに即配信されます。"
+            }
+          />
+          <CardBody className="space-y-4">
+            <Input
+              label="配信タイトル (任意)"
+              value={form.digitalSign.title}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  digitalSign: { ...f.digitalSign, title: e.target.value },
+                }))
+              }
+              placeholder="例: サイン入り2ショット写真"
+              hint="未入力の場合は「商品名 のサイン納品」で自動生成されます。"
+            />
+            <Textarea
+              label="配信の説明 (任意)"
+              value={form.digitalSign.description}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  digitalSign: {
+                    ...f.digitalSign,
+                    description: e.target.value,
+                  },
+                }))
+              }
+              className="min-h-20"
+              placeholder="購入者マイページに表示される説明文"
+            />
+            <ImageUploadField
+              name="digitalSign.baseImageUrl"
+              value={form.digitalSign.baseImageUrl}
+              onChange={(url) =>
+                setForm((f) => ({
+                  ...f,
+                  digitalSign: { ...f.digitalSign, baseImageUrl: url },
+                }))
+              }
+              bucket="private-admin"
+              purpose="delivery-base-image"
+              targetId={form.id ?? null}
+              label={
+                form.productKind === "DIGITAL_PHOTO_SIGN"
+                  ? "サイン用ベース画像"
+                  : "サイン用ベース動画URL"
+              }
+              hint={
+                form.productKind === "DIGITAL_PHOTO_SIGN"
+                  ? "タレントが上からサインを描く原本の写真。private-admin バケットに保存されます。"
+                  : "タレントが上からサインを描く原本の動画URL (mp4/webm 等)。動画はアップロードでも外部URLでもOK。"
+              }
+              previewAspect={
+                form.productKind === "DIGITAL_PHOTO_SIGN" ? "auto" : "none"
+              }
+            />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Input
+                label="閲覧可能日数 (任意)"
+                type="number"
+                min={1}
+                value={form.digitalSign.viewLimitDays}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    digitalSign: {
+                      ...f.digitalSign,
+                      viewLimitDays: e.target.value,
+                    },
+                  }))
+                }
+                placeholder="例: 30"
+                hint="空欄なら無期限。納品日から数える日数。"
+              />
+              {form.productKind === "DIGITAL_PHOTO_SIGN" && (
+                <Input
+                  label="ダウンロード回数上限 (任意)"
+                  type="number"
+                  min={1}
+                  value={form.digitalSign.downloadLimit}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      digitalSign: {
+                        ...f.digitalSign,
+                        downloadLimit: e.target.value,
+                      },
+                    }))
+                  }
+                  placeholder="例: 5"
+                  hint="空欄なら無制限。"
+                />
+              )}
+            </div>
+          </CardBody>
+        </Card>
+      )}
 
       <Card>
         <CardHeader

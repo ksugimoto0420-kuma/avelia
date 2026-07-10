@@ -18,6 +18,10 @@ export async function PATCH(
     if (!existing) throw new AppError("商品が見つかりません", 404);
 
     await prisma.$transaction(async (tx) => {
+      const kind = input.productKind ?? (input.type === "DIGITAL" ? "DIGITAL_PHOTO_SIGN" : "PHYSICAL");
+      const isDigitalSign =
+        kind === "DIGITAL_PHOTO_SIGN" || kind === "DIGITAL_VIDEO_SIGN";
+
       await tx.product.update({
         where: { id },
         data: {
@@ -26,6 +30,7 @@ export async function PATCH(
           name: input.name,
           description: input.description ?? null,
           type: input.type,
+          productKind: kind,
           fulfillmentSource: input.fulfillmentSource ?? "IN_HOUSE",
           basePrice: input.basePrice,
           imageUrl: input.imageUrl ?? null,
@@ -43,6 +48,43 @@ export async function PATCH(
           requiresNickname: input.variants.some((v) => v.requiresNickname),
         },
       });
+
+      // デジタルサイン系の DigitalContent は編集時にも同期する。
+      // 既に紐づく DigitalContent が無ければ作成、あれば baseImageUrl などを更新。
+      if (isDigitalSign) {
+        const digitalType = kind === "DIGITAL_VIDEO_SIGN" ? "FILE" : "IMAGE";
+        const existingDc = await tx.digitalContent.findFirst({
+          where: { productId: id },
+          orderBy: { createdAt: "asc" },
+        });
+        if (existingDc) {
+          await tx.digitalContent.update({
+            where: { id: existingDc.id },
+            data: {
+              title: input.digitalSign?.title || existingDc.title,
+              description: input.digitalSign?.description ?? existingDc.description,
+              type: digitalType,
+              deliveryType: "PERSONALIZED",
+              baseImageUrl: input.digitalSign?.baseImageUrl ?? existingDc.baseImageUrl,
+              viewLimitDays: input.digitalSign?.viewLimitDays ?? existingDc.viewLimitDays,
+              downloadLimit: input.digitalSign?.downloadLimit ?? existingDc.downloadLimit,
+            },
+          });
+        } else {
+          await tx.digitalContent.create({
+            data: {
+              productId: id,
+              title: input.digitalSign?.title || `${input.name} のサイン納品`,
+              description: input.digitalSign?.description ?? null,
+              type: digitalType,
+              deliveryType: "PERSONALIZED",
+              baseImageUrl: input.digitalSign?.baseImageUrl ?? null,
+              viewLimitDays: input.digitalSign?.viewLimitDays ?? null,
+              downloadLimit: input.digitalSign?.downloadLimit ?? null,
+            },
+          });
+        }
+      }
 
       for (const v of input.variants) {
         if (v.id) {

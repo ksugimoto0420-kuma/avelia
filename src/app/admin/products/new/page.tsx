@@ -23,6 +23,7 @@ export default async function NewProductPage({
     name: "",
     description: "",
     type: "PHYSICAL",
+    productKind: "PHYSICAL",
     fulfillmentSource: "IN_HOUSE",
     basePrice: 0,
     imageUrl: "",
@@ -46,6 +47,13 @@ export default async function NewProductPage({
         requiresNickname: false,
       },
     ],
+    digitalSign: {
+      title: "",
+      description: "",
+      baseImageUrl: "",
+      viewLimitDays: "",
+      downloadLimit: "",
+    },
   };
 
   return (
