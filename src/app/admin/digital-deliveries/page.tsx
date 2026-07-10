@@ -27,11 +27,26 @@ export default async function AdminDigitalDeliveriesPage({
   const q = sp.q?.trim() ?? "";
   const status = sp.status ?? "PENDING";
   const eventId = sp.eventId ?? "";
+  // #70: メディア種別タブ (all / photo / video)
+  const mediaTab = sp.media === "photo" || sp.media === "video" ? sp.media : "all";
   const page = Math.max(1, Number(sp.page ?? "1"));
+
+  const productKindValue =
+    mediaTab === "photo"
+      ? ("DIGITAL_PHOTO_SIGN" as const)
+      : mediaTab === "video"
+        ? ("DIGITAL_VIDEO_SIGN" as const)
+        : null;
 
   const where: Prisma.DigitalDeliveryWhereInput = {};
   if (status === "PENDING" || status === "READY") where.status = status;
-  if (eventId) where.digitalContent = { product: { eventId } };
+  // digitalContent.product に対する条件を組み立てる (eventId と productKind を統合)。
+  const productWhere: Prisma.ProductWhereInput = {};
+  if (eventId) productWhere.eventId = eventId;
+  if (productKindValue) productWhere.productKind = productKindValue;
+  if (Object.keys(productWhere).length > 0) {
+    where.digitalContent = { product: productWhere };
+  }
   if (q)
     where.OR = [
       { nickname: { contains: q, mode: "insensitive" } },
@@ -62,6 +77,7 @@ export default async function AdminDigitalDeliveriesPage({
             baseImageKey: true,
             baseImageUrl: true,
             productId: true,
+            product: { select: { productKind: true } },
           },
         },
         signature: { select: { id: true, status: true, writtenAt: true } },
@@ -79,7 +95,9 @@ export default async function AdminDigitalDeliveriesPage({
 
   const buildHref = (overrides: Record<string, string>) => {
     const p = new URLSearchParams();
-    const merged = { q, status, eventId, ...overrides };
+    // media は "all" のときはURLに載せない (デフォルト)
+    const mediaParam = mediaTab === "all" ? "" : mediaTab;
+    const merged = { q, status, eventId, media: mediaParam, ...overrides };
     for (const [k, v] of Object.entries(merged)) if (v) p.set(k, v);
     const qs = p.toString();
     return qs ? `/admin/digital-deliveries?${qs}` : "/admin/digital-deliveries";
@@ -103,7 +121,36 @@ export default async function AdminDigitalDeliveriesPage({
         従来通り <b>サイン入りファイルをアップロード</b> してください。 サイン記入セッションのサインは、運営側で確認・承認すると購入者に納品されます。
       </p>
 
+      {/* #70: メディア種別タブ (写真 / 動画) */}
+      <div className="flex gap-1 border-b border-gray-200">
+        {[
+          { key: "all" as const, label: "全て" },
+          { key: "photo" as const, label: "📷 写真サイン" },
+          { key: "video" as const, label: "🎬 動画サイン" },
+        ].map((t) => {
+          const active = mediaTab === t.key;
+          return (
+            <Link
+              key={t.key}
+              href={buildHref({ media: t.key === "all" ? "" : t.key })}
+              className={
+                "border-b-2 px-4 py-2 text-sm font-medium transition " +
+                (active
+                  ? "border-brand-600 text-brand-700"
+                  : "border-transparent text-gray-500 hover:text-gray-700")
+              }
+            >
+              {t.label}
+            </Link>
+          );
+        })}
+      </div>
+
       <FilterBar action="/admin/digital-deliveries" clearHref="/admin/digital-deliveries">
+        {/* タブ状態を form 送信でも保持する */}
+        {mediaTab !== "all" && (
+          <input type="hidden" name="media" value={mediaTab} />
+        )}
         <FilterField label="状態">
           <FilterSelect
             name="status"
@@ -176,7 +223,17 @@ export default async function AdminDigitalDeliveriesPage({
                           <p className="text-xs text-gray-400">{d.user.email}</p>
                         </td>
                         <td className="px-4 py-3">
-                          <p className="text-gray-900">{d.digitalContent.title}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-gray-900">{d.digitalContent.title}</p>
+                            {/* #70: 写真/動画のメディア種別バッジ */}
+                            {d.digitalContent.product?.productKind ===
+                              "DIGITAL_VIDEO_SIGN" ? (
+                              <Badge color="purple">🎬 動画</Badge>
+                            ) : d.digitalContent.product?.productKind ===
+                              "DIGITAL_PHOTO_SIGN" ? (
+                              <Badge color="blue">📷 写真</Badge>
+                            ) : null}
+                          </div>
                           <p className="text-xs text-gray-400">
                             {d.orderItem.productName}（{d.orderItem.variantName}）
                             {d.orderItem.quantity >= 2 &&
