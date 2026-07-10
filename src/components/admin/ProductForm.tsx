@@ -351,13 +351,17 @@ export function ProductForm({
               label={
                 form.productKind === "DIGITAL_PHOTO_SIGN"
                   ? "サイン用ベース画像"
-                  : "サイン用ベース動画URL"
+                  : "サイン用ベース動画"
               }
               hint={
                 form.productKind === "DIGITAL_PHOTO_SIGN"
                   ? "タレントが上からサインを描く原本の写真。private-admin バケットに保存されます。"
-                  : "タレントが上からサインを描く原本の動画URL (mp4/webm 等)。動画はアップロードでも外部URLでもOK。"
+                  : "タレントが上からサインを描く原本の動画 (mp4/webm 等)。private-admin バケットに保存されます。"
               }
+              accept={
+                form.productKind === "DIGITAL_VIDEO_SIGN" ? "video/*" : "image/*"
+              }
+              showUrlInput={false}
               previewAspect={
                 form.productKind === "DIGITAL_PHOTO_SIGN" ? "auto" : "none"
               }
