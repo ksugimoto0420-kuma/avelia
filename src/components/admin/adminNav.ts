@@ -54,6 +54,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { href: "/admin/admins", label: "管理者", icon: "🔑" },
       { href: "/admin/settings", label: "サイト設定", icon: "⚙️" },
       { href: "/admin/operation-logs", label: "操作ログ", icon: "📝" },
+      { href: "/admin/mail-debug", label: "メール送信テスト", icon: "📧" },
     ],
   },
 ];
