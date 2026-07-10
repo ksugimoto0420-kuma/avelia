@@ -152,8 +152,9 @@ model User {
   lotteryEntries      LotteryEntry[]
   digitalContents     UserDigitalContent[]
   digitalDeliveries   DigitalDelivery[]
-  passwordResetTokens PasswordResetToken[]
-  kujiDraws           KujiDraw[]
+  passwordResetTokens      PasswordResetToken[]
+  emailVerificationTokens  EmailVerificationToken[]
+  kujiDraws                KujiDraw[]
 
   @@map("users")
 }
@@ -197,6 +198,22 @@ model PasswordResetToken {
 
   @@index([userId])
   @@map("password_reset_tokens")
+}
+
+/// メール確認用トークン。#34 (Phase 1-C) で追加。
+/// 平文トークンはメールに一度だけ含めて送信し、DB には hash のみ保存する。
+model EmailVerificationToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("email_verification_tokens")
 }
 
 // ---------------------------------------------------------------------------
