@@ -167,9 +167,10 @@ export default async function AdminEventsPage({
             options={[
               { value: "", label: "すべて" },
               { value: "MEET_GREET", label: EVENT_TYPE_LABEL.MEET_GREET },
-              { value: "KUJI", label: EVENT_TYPE_LABEL.KUJI },
-              { value: "TRADING_CARD", label: EVENT_TYPE_LABEL.TRADING_CARD },
-              { value: "GOODS", label: EVENT_TYPE_LABEL.GOODS },
+              // Phase 1 では非表示。Phase 2 で復活予定。
+              // { value: "KUJI", label: EVENT_TYPE_LABEL.KUJI },
+              // { value: "TRADING_CARD", label: EVENT_TYPE_LABEL.TRADING_CARD },
+              // { value: "GOODS", label: EVENT_TYPE_LABEL.GOODS },
             ]}
           />
         </FilterField>
