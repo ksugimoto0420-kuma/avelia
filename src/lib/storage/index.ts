@@ -13,16 +13,17 @@
 import { env } from "@/lib/env";
 import type { StorageDriver } from "./driver";
 import { LocalDriver } from "./drivers/local";
+import { VercelBlobDriver } from "./drivers/vercel-blob";
 
 function createDriver(): StorageDriver {
   switch (env.storage.driver) {
     case "local":
       return new LocalDriver();
+    case "vercel-blob":
+      return new VercelBlobDriver();
     default:
       // 未対応ドライバーは起動時に気づけるように投げる。
-      throw new Error(
-        `storage driver "${env.storage.driver}" は未実装です (PR-2 以降で追加予定)`,
-      );
+      throw new Error(`storage driver "${env.storage.driver}" は未実装です`);
   }
 }
 
