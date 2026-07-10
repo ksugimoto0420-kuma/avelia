@@ -761,6 +761,22 @@ model Faq {
   @@map("faqs")
 }
 
+/// #62 で追加。運営から利用者へのお知らせ (NEWS/更新情報)。
+/// slug は URL に使う識別子。publishedAt は公開日 (未来日を入れれば予約公開)。
+model NewsPost {
+  id          String    @id @default(cuid())
+  slug        String    @unique
+  title       String
+  body        String    // Markdown or プレーンテキスト
+  isPublished Boolean   @default(false)
+  publishedAt DateTime? // 表示上の日付。null 時は非表示扱い
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([isPublished, publishedAt])
+  @@map("news_posts")
+}
+
 enum ContactStatus {
   OPEN // 未対応
   IN_PROGRESS // 対応中

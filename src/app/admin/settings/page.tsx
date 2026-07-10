@@ -1,8 +1,8 @@
-import { ImageUploadField } from "@/components/admin/ImageUploadField";
+import { HeroImagesField } from "@/components/admin/HeroImagesField";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { requireAdminPage } from "@/lib/auth/admin-page";
-import { getAllSettings } from "@/lib/settings";
+import { getAllSettings, getHeroImages } from "@/lib/settings";
 import { saveSettings } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +15,7 @@ const inputCls =
 
 export default async function AdminSettingsPage() {
   await requireAdminPage("MANAGER");
-  const s = await getAllSettings();
+  const [s, heroImages] = await Promise.all([getAllSettings(), getHeroImages()]);
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -33,16 +33,7 @@ export default async function AdminSettingsPage() {
             subtitle="ファーストビューに大きく表示するヒーロー画像"
           />
           <CardBody className="space-y-4">
-            <ImageUploadField
-              name="heroImageUrl"
-              defaultValue={s.heroImageUrl}
-              bucket="public-assets"
-              purpose="generic"
-              label="ヒーロー画像"
-              hint="推奨: 1600×900px（16:9）程度の横長画像。JPG/PNG/WebP。"
-              previewAspect="cover-16-9"
-              showUrlInput={false}
-            />
+            <HeroImagesField name="heroImages" defaultValue={heroImages} />
           </CardBody>
         </Card>
 
