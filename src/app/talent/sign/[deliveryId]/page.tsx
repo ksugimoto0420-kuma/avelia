@@ -23,9 +23,12 @@ export default async function TalentSignPage({
           title: true,
           baseImageKey: true,
           baseImageUrl: true,
+          productId: true,
           product: {
             select: {
+              id: true,
               imageUrl: true,
+              productKind: true,
               event: {
                 select: { id: true, title: true, artistId: true },
               },
@@ -41,7 +44,9 @@ export default async function TalentSignPage({
             select: {
               product: {
                 select: {
+                  id: true,
                   imageUrl: true,
+                  productKind: true,
                   event: {
                     select: { id: true, title: true, artistId: true },
                   },
@@ -113,7 +118,7 @@ export default async function TalentSignPage({
     },
   });
 
-  const baseImageUrl =
+  const baseUrl =
     delivery.digitalContent.baseImageUrl ??
     (delivery.digitalContent.baseImageKey
       ? `/api/admin/deliveries/base-image/${encodeURIComponent(delivery.digitalContent.baseImageKey)}`
@@ -121,6 +126,17 @@ export default async function TalentSignPage({
     delivery.digitalContent.product?.imageUrl ??
     delivery.orderItem.variant.product.imageUrl ??
     null;
+
+  // 動画/画像の判定。DIGITAL_VIDEO_SIGN の商品なら動画として表示。
+  const productKind =
+    delivery.digitalContent.product?.productKind ??
+    delivery.orderItem.variant.product.productKind ??
+    "PHYSICAL";
+  const mediaKind: "video" | "image" =
+    productKind === "DIGITAL_VIDEO_SIGN" ? "video" : "image";
+
+  // タレント側では商品編集導線は表示しない（運営操作の範囲外）。
+  const productEditHref: string | null = null;
 
   const eventTitle =
     delivery.digitalContent.product?.event.title ??
@@ -138,7 +154,9 @@ export default async function TalentSignPage({
       productName={delivery.orderItem.productName}
       eventTitle={eventTitle}
       unitLabel={unitLabel}
-      baseImageUrl={baseImageUrl}
+      baseImageUrl={baseUrl}
+      baseMediaKind={mediaKind}
+      productEditHref={productEditHref}
       pendingCount={pendingCount}
       nextDeliveryId={next?.id ?? null}
       exitHref="/talent"

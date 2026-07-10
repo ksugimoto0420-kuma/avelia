@@ -23,10 +23,13 @@ export default async function SignSessionPage({
           title: true,
           baseImageKey: true,
           baseImageUrl: true,
+          productId: true,
           // DigitalContent 自身が紐づく商品（PERSONALIZED 配信元）
           product: {
             select: {
+              id: true,
               imageUrl: true,
+              productKind: true,
               event: { select: { id: true, title: true } },
             },
           },
@@ -41,7 +44,9 @@ export default async function SignSessionPage({
             select: {
               product: {
                 select: {
+                  id: true,
                   imageUrl: true,
+                  productKind: true,
                   event: { select: { id: true, title: true } },
                 },
               },
@@ -96,12 +101,12 @@ export default async function SignSessionPage({
     },
   });
 
-  // 背景に出す原本画像URL（優先順位）：
-  // 1. DigitalContent.baseImageUrl （外部URL・MVPモック・運用での明示指定）
-  // 2. DigitalContent.baseImageKey （ローカルストレージ）
-  // 3. DigitalContent.product.imageUrl （DigitalContentが紐づく商品）
-  // 4. orderItem.variant.product.imageUrl （実際に購入された商品）
-  const baseImageUrl =
+  // サイン用ベース素材のURLを解決する（優先順位）：
+  // 1. DigitalContent.baseImageUrl （管理画面で明示指定）
+  // 2. DigitalContent.baseImageKey （旧: ローカルストレージ）
+  // 3. DigitalContent.product.imageUrl （商品画像フォールバック）
+  // 4. orderItem.variant.product.imageUrl （購入時商品スナップショット）
+  const baseUrl =
     delivery.digitalContent.baseImageUrl ??
     (delivery.digitalContent.baseImageKey
       ? `/api/admin/deliveries/base-image/${encodeURIComponent(delivery.digitalContent.baseImageKey)}`
@@ -109,6 +114,22 @@ export default async function SignSessionPage({
     delivery.digitalContent.product?.imageUrl ??
     delivery.orderItem.variant.product.imageUrl ??
     null;
+
+  // 動画/画像の判定。productKind が DIGITAL_VIDEO_SIGN なら動画背景として扱う。
+  const productKind =
+    delivery.digitalContent.product?.productKind ??
+    delivery.orderItem.variant.product.productKind ??
+    "PHYSICAL";
+  const mediaKind: "video" | "image" =
+    productKind === "DIGITAL_VIDEO_SIGN" ? "video" : "image";
+
+  // 商品編集ページへの導線（原本未登録時に表示）。
+  const productId =
+    delivery.digitalContent.productId ??
+    delivery.digitalContent.product?.id ??
+    delivery.orderItem.variant.product.id ??
+    null;
+  const productEditHref = productId ? `/admin/products/${productId}` : null;
 
   const eventTitle =
     delivery.digitalContent.product?.event.title ??
@@ -126,7 +147,9 @@ export default async function SignSessionPage({
       productName={delivery.orderItem.productName}
       eventTitle={eventTitle}
       unitLabel={unitLabel}
-      baseImageUrl={baseImageUrl}
+      baseImageUrl={baseUrl}
+      baseMediaKind={mediaKind}
+      productEditHref={productEditHref}
       pendingCount={pendingCount}
       nextDeliveryId={next?.id ?? null}
     />

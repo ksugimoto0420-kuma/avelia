@@ -48,8 +48,22 @@ export default async function AdminDigitalDeliveriesPage({
       include: {
         order: { select: { orderNumber: true } },
         user: { select: { email: true } },
-        orderItem: { select: { productName: true, variantName: true, quantity: true } },
-        digitalContent: { select: { title: true, baseImageKey: true } },
+        orderItem: {
+          select: {
+            productName: true,
+            variantName: true,
+            quantity: true,
+            variant: { select: { productId: true } },
+          },
+        },
+        digitalContent: {
+          select: {
+            title: true,
+            baseImageKey: true,
+            baseImageUrl: true,
+            productId: true,
+          },
+        },
         signature: { select: { id: true, status: true, writtenAt: true } },
       },
     }),
@@ -246,6 +260,7 @@ export default async function AdminDigitalDeliveriesPage({
                             </div>
                           ) : (
                             // 代替導線：サイン未記入 → 原本DL + 手動アップロード（小さく）
+                            // 原本未登録時は商品の編集画面へのリンクを提示
                             <div className="flex items-center justify-end gap-2 whitespace-nowrap">
                               {d.digitalContent.baseImageKey ? (
                                 <a
@@ -254,9 +269,36 @@ export default async function AdminDigitalDeliveriesPage({
                                 >
                                   原本DL
                                 </a>
-                              ) : (
-                                <span className="text-xs text-amber-600">原本未登録</span>
-                              )}
+                              ) : d.digitalContent.baseImageUrl ? (
+                                <a
+                                  href={d.digitalContent.baseImageUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="rounded-lg border border-gray-300 px-2.5 py-1 text-xs text-gray-600 hover:bg-gray-50"
+                                >
+                                  原本
+                                </a>
+                              ) : (() => {
+                                const productId =
+                                  d.digitalContent.productId ??
+                                  d.orderItem.variant?.productId ??
+                                  null;
+                                return (
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-xs text-amber-600">
+                                      原本未登録
+                                    </span>
+                                    {productId && (
+                                      <Link
+                                        href={`/admin/products/${productId}`}
+                                        className="rounded-lg border border-amber-300 px-2 py-1 text-xs text-amber-700 hover:bg-amber-50"
+                                      >
+                                        商品を編集
+                                      </Link>
+                                    )}
+                                  </div>
+                                );
+                              })()}
                               <DeliveryUploadRow
                                 deliveryId={d.id}
                                 isReady={d.status === "READY"}
