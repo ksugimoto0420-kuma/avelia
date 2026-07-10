@@ -1,6 +1,6 @@
 import { AppError, handleError, ok } from "@/lib/api";
 import { requireAdmin } from "@/lib/auth/guards";
-import { putFile } from "@/lib/storage";
+import { storage } from "@/lib/storage";
 
 export const runtime = "nodejs";
 
@@ -13,7 +13,7 @@ export async function POST(req: Request) {
       throw new AppError("ファイルが指定されていません", 400);
     }
     const buffer = Buffer.from(await file.arrayBuffer());
-    const stored = await putFile(buffer, file.name);
+    const stored = await storage.put(buffer, file.name);
     return ok(stored, 201);
   } catch (err) {
     return handleError(err);

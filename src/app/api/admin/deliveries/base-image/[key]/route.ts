@@ -1,7 +1,6 @@
-import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { requireAdmin } from "@/lib/auth/guards";
-import { localFilePath } from "@/lib/storage";
+import { storage, StorageNotFoundError } from "@/lib/storage";
 import { contentTypeFor } from "@/lib/mime";
 import { prisma } from "@/lib/prisma";
 
@@ -22,9 +21,9 @@ export async function GET(
     const { key: rawKey } = await params;
     const key = decodeURIComponent(rawKey);
 
-    // 1. ローカルストレージから読む
+    // 1. ローカル / Blob 等のストレージから読む
     try {
-      const buffer = await readFile(localFilePath(key));
+      const { buffer } = await storage.getFile(key);
       return new Response(new Uint8Array(buffer), {
         status: 200,
         headers: {
@@ -33,8 +32,9 @@ export async function GET(
           "Cache-Control": "private, no-store",
         },
       });
-    } catch {
-      // 続けて外部URLを試す
+    } catch (e) {
+      if (!(e instanceof StorageNotFoundError)) throw e;
+      // 見つからない場合は続けて外部URLを試す
     }
 
     // 2. baseImageKey に紐づく DigitalContent.baseImageUrl があればそれを使う
