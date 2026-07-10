@@ -6,12 +6,12 @@ import { signOut, useSession } from "next-auth/react";
 import { useCallback, useEffect, useState } from "react";
 import { Drawer } from "@/components/ui/Drawer";
 
-// sukisuki 風のシンプルナビ。アベリアくじ (Phase 1 対象外) は表示しない。
-// /events のタブと URL キーを揃えている。
+// #62: corazon 風のシンプル構成。イベント一覧はトップに集約したため
+// カテゴリタブは削除し、運営情報系のみ並べる。
 const NAV_LINKS: { href: string; label: string }[] = [
-  { href: "/events?tab=meet_greet", label: "オンライン特典会" },
-  { href: "/events?tab=trading_card", label: "トレカ" },
+  { href: "/news", label: "NEWS" },
   { href: "/faq", label: "よくある質問" },
+  { href: "/contact", label: "お問い合わせ" },
 ];
 
 export function UserHeader() {
