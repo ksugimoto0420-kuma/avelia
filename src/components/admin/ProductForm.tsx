@@ -9,7 +9,7 @@ import { DateTimeField } from "@/components/ui/DateTimeField";
 import { Input, Select, Textarea } from "@/components/ui/Input";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { useToast } from "@/components/ui/Toast";
-import { ImageUploadButton } from "./ImageUploadButton";
+import { ImageUploadField } from "./ImageUploadField";
 
 type VariantRow = {
   id?: string;
@@ -217,41 +217,17 @@ export function ProductForm({
               <option value="WAREHOUSE">倉庫出荷（新潟・佐川）</option>
             </Select>
           )}
-          <div className="space-y-2">
-            <div className="flex items-start gap-2">
-              <div className="flex-1">
-                <Input
-                  label="商品画像URL"
-                  value={form.imageUrl}
-                  onChange={(e) => set("imageUrl", e.target.value)}
-                  hint="推奨: 600×600px 以上の正方形（1:1）。商品カードと詳細ページで使われます。"
-                />
-              </div>
-              <div className="pt-6">
-                <ImageUploadButton
-                  bucket="public-assets"
-                  purpose="product"
-                  targetId={form.id ?? null}
-                  onUploaded={(url) => set("imageUrl", url)}
-                />
-              </div>
-            </div>
-            {form.imageUrl && (
-              <div className="overflow-hidden rounded-lg border border-gray-200">
-                <div className="aspect-square w-32 bg-gray-50">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={form.imageUrl}
-                    alt="プレビュー"
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-                <p className="bg-gray-50 px-2 py-1 text-xs text-gray-500">
-                  プレビュー（1:1 でトリミング）
-                </p>
-              </div>
-            )}
-          </div>
+          <ImageUploadField
+            name="imageUrl"
+            value={form.imageUrl}
+            onChange={(url) => set("imageUrl", url)}
+            bucket="public-assets"
+            purpose="product"
+            targetId={form.id ?? null}
+            label="商品画像"
+            hint="推奨: 600×600px 以上の正方形 (1:1)。商品カードと詳細ページで使用。"
+            previewAspect="square"
+          />
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Input
               label="特典内容"

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { KujiCampaignForm } from "@/components/admin/KujiCampaignForm";
+import { ImageUploadField } from "@/components/admin/ImageUploadField";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { requireAdminPage } from "@/lib/auth/admin-page";
@@ -394,17 +395,15 @@ function PrizeFormBody({
         />
       </div>
       <div className="sm:col-span-2">
-        <label
-          htmlFor={`prize-imageUrl-${prize?.id ?? "new"}`}
-          className={labelCls}
-        >
-          画像URL
-        </label>
-        <input
-          id={`prize-imageUrl-${prize?.id ?? "new"}`}
+        <ImageUploadField
           name="imageUrl"
           defaultValue={prize?.imageUrl ?? ""}
-          className={inputCls}
+          bucket="public-assets"
+          purpose="kuji-prize"
+          targetId={campaignId}
+          label="賞品画像"
+          hint="推奨: 正方形 (1:1) JPEG/PNG。くじ演出・結果表示で使用。"
+          previewAspect="square"
         />
       </div>
       <div>

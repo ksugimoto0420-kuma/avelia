@@ -4,7 +4,7 @@ import { DateTimeField } from "@/components/ui/DateTimeField";
 import { SearchableSelectField } from "@/components/ui/SearchableSelectField";
 import { saveEvent } from "@/app/admin/events/actions";
 import { toJstDateTimeLocalString } from "@/lib/utils";
-import { ImageUrlFieldWithUpload } from "./ImageUrlFieldWithUpload";
+import { ImageUploadField } from "./ImageUploadField";
 
 type EventData = {
   id: string;
@@ -131,16 +131,14 @@ export function EventForm({
               className={`${inputCls} min-h-28`}
             />
           </div>
-          <ImageUrlFieldWithUpload
+          <ImageUploadField
             name="coverImageUrl"
             defaultValue={event?.coverImageUrl ?? ""}
             bucket="public-assets"
             purpose="event"
             targetId={event?.id ?? null}
-            label="カバー画像URL"
-            labelClassName={labelCls}
-            inputClassName={inputCls}
-            hint="推奨：1200×675px（16:9 横長）のJPEG/PNG。一覧カードと詳細ヒーローで使われます。人物や文字は中央寄りに配置すると、端が切れにくくなります。"
+            label="カバー画像"
+            hint="推奨: 1200×675px (16:9 横長) の JPEG/PNG。一覧カードと詳細ヒーローで使用。"
             previewAspect="cover-16-9"
           />
         </CardBody>
