@@ -7,6 +7,7 @@ export type SettingKey =
   | "shippingFreeThreshold" // この金額以上で送料無料（円）。0で「無料閾値なし」。
   | "supportEmail" // サポート連絡先（特商法ページ等で利用）
   | "siteName" // サイト表示名
+  | "heroImageUrl" // トップページのヒーロー画像URL (public-assets)
   | "paymentFeeRate" // 決済手数料率（小数。例: 0.029 = 2.9%）。SoftBank/Stripe等。
   | "rsTier1Threshold" // R/S 階段制 第1閾値（円）。月次グロス売上のしきい値。
   | "rsTier1Rate" // 第1階段の弊社取り分率（小数。例: 0.03）
@@ -19,6 +20,7 @@ const DEFAULTS: Record<SettingKey, string> = {
   shippingFreeThreshold: "5000",
   supportEmail: "support@example.com",
   siteName: "Avelia FunClub",
+  heroImageUrl: "",
   paymentFeeRate: "0.029",
   rsTier1Threshold: "1000000",
   rsTier1Rate: "0.03",

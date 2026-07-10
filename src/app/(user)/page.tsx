@@ -1,119 +1,39 @@
-import Link from "next/link";
 import { EventCard, type EventCardData } from "@/components/user/EventCard";
-import { ProductCard } from "@/components/user/ProductCard";
-import { getOptionalUser } from "@/lib/auth/guards";
-import { availableStock } from "@/lib/inventory";
 import { prisma } from "@/lib/prisma";
-import { eventStageOrderBy, eventStageWhere, getSaleStatus } from "@/lib/sale";
+import { eventStageOrderBy, eventStageWhere } from "@/lib/sale";
+import { getSetting } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   const now = new Date();
-  const currentUser = await getOptionalUser();
 
-  // 「販売中（終了が近い順）→ 販売予定（開始が近い順）→ 終了」の順で
-  // 合計6件取る。各ステージから最大6件ずつ取って必要なだけ連結。
-  // KUJI 種別は独立した /kuji に切り出したのでトップからも除外する
-  const [onSale, upcoming, rawProducts] = await Promise.all([
+  // sukisuki 風のシンプル構成:
+  //   1. ヒーロー画像 (管理画面から heroImageUrl を設定)
+  //   2. イベント一覧のみ (販売中→販売予定 の順で最大 9 件)
+  // 商品一覧・検索フォーム・登録CTA は削除。
+  const [heroImageUrl, onSale, upcoming] = await Promise.all([
+    getSetting("heroImageUrl"),
     prisma.event.findMany({
       where: {
         isPublished: true,
-        eventType: { not: "KUJI" },
+        eventType: { in: ["MEET_GREET", "TRADING_CARD"] },
         ...eventStageWhere("on_sale", now),
       },
       orderBy: eventStageOrderBy.on_sale,
-      take: 6,
+      take: 9,
     }),
     prisma.event.findMany({
       where: {
         isPublished: true,
-        eventType: { not: "KUJI" },
+        eventType: { in: ["MEET_GREET", "TRADING_CARD"] },
         ...eventStageWhere("upcoming", now),
       },
       orderBy: eventStageOrderBy.upcoming,
-      take: 6,
-    }),
-    prisma.product.findMany({
-      where: {
-        isPublished: true,
-        event: { isPublished: true },
-        // 商品の saleStartAt が指定されていればそれを優先、null ならイベントの開始日を使う
-        AND: [
-          {
-            OR: [
-              { saleStartAt: { lte: now } },
-              {
-                saleStartAt: null,
-                event: { saleStartAt: { lte: now } },
-              },
-            ],
-          },
-          {
-            OR: [
-              { saleEndAt: { gte: now } },
-              {
-                saleEndAt: null,
-                event: { saleEndAt: { gte: now } },
-              },
-            ],
-          },
-        ],
-      },
-      // 販売終了が近い順 → 同じなら新しい順
-      orderBy: [{ createdAt: "desc" }],
-      take: 24,
-      include: {
-        event: true,
-        variants: { include: { inventory: true } },
-      },
+      take: 9,
     }),
   ]);
-  const events = [...onSale, ...upcoming].slice(0, 6);
-
-  // 取得した候補から「現在ON_SALE」のみを残し、販売終了の近い順に並べて8件に絞る。
-  // SQL の OR/AND と null 継承の組合せが複雑になりやすいため、最終判定は
-  // 既存の getSaleStatus に揃えて一貫性を確保している。
-  const products = rawProducts
-    .map((p) => {
-      const available = p.variants.reduce(
-        (s, v) => s + (v.inventory ? availableStock(v.inventory) : 0),
-        0,
-      );
-      const saleStartAt = p.saleStartAt ?? p.event.saleStartAt;
-      const saleEndAt = p.saleEndAt ?? p.event.saleEndAt;
-      const status = getSaleStatus({
-        isPublished: p.isPublished && p.event.isPublished,
-        saleStartAt,
-        saleEndAt,
-        available,
-      });
-      return { p, available, saleStartAt, saleEndAt, status };
-    })
-    .filter((x) => x.status === "ON_SALE")
-    .sort((a, b) => {
-      // 販売終了が早い順
-      const ae = a.saleEndAt ? a.saleEndAt.getTime() : Infinity;
-      const be = b.saleEndAt ? b.saleEndAt.getTime() : Infinity;
-      if (ae !== be) return ae - be;
-      // 終了が同じなら新しい順
-      return b.p.createdAt.getTime() - a.p.createdAt.getTime();
-    })
-    .slice(0, 8);
-
-  // トップに出す商品のうち、抽選販売のものを判定するためのproductIds集合
-  const productLotteries = await prisma.lottery.findMany({
-    where: {
-      productId: { in: products.map((x) => x.p.id) },
-      status: { in: ["OPEN", "CLOSED", "DRAWN"] },
-    },
-    select: { productId: true },
-  });
-  const lotteryProductIds = new Set(
-    productLotteries
-      .map((l) => l.productId)
-      .filter((id): id is string => !!id),
-  );
+  const events = [...onSale, ...upcoming].slice(0, 9);
 
   const eventCards: EventCardData[] = events.map((e) => ({
     id: e.id,
@@ -130,121 +50,38 @@ export default async function HomePage() {
 
   return (
     <div>
-      {/* ヒーロー */}
-      <section className="bg-gradient-to-br from-brand-600 to-brand-400 text-white">
-        <div className="mx-auto max-w-6xl px-4 py-20 md:py-28">
-          <p className="text-sm font-semibold uppercase tracking-widest text-brand-100">
-            Online Meet &amp; Greet Store
-          </p>
-          <h1 className="mt-3 max-w-2xl text-4xl font-extrabold leading-tight md:text-5xl">
-            推しと話せる、サインがもらえる。
-            <br />
-            オンライン特典会・サイン会ショップ。
-          </h1>
-          <p className="mt-4 max-w-xl text-brand-50">
-            オンライン特典会・サイン会の参加券、直筆サイン入りポスター・写真集、
-            アベリアくじ（抽選）やトレカまで。先着・抽選に対応したファン向けショップです。
-          </p>
-          <form
-            action="/events"
-            method="get"
-            className="mt-8 flex max-w-xl flex-col gap-2 sm:flex-row"
-          >
-            <input
-              name="q"
-              placeholder="アーティスト名・タイトルで検索"
-              className="flex-1 rounded-lg border-0 bg-white/95 px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-white"
+      {/* ヒーロー: 単一画像バナー */}
+      <section className="bg-gray-100">
+        <div className="mx-auto max-w-6xl">
+          {heroImageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={heroImageUrl}
+              alt=""
+              className="block aspect-[16/9] w-full object-cover md:aspect-[21/9]"
             />
-            <button
-              type="submit"
-              className="rounded-lg bg-gray-900 px-6 py-3 text-sm font-bold text-white hover:bg-gray-800"
-            >
-              検索
-            </button>
-          </form>
-
-          <div className="mt-6 flex flex-wrap gap-3">
-            <Link
-              href="/events"
-              className="inline-flex h-12 items-center rounded-lg bg-gray-900 px-6 text-base font-medium text-white hover:bg-gray-800"
-            >
-              特典会・サイン会を見る
-            </Link>
-            {!currentUser && (
-              <Link
-                href="/auth/register"
-                className="inline-flex h-12 items-center rounded-lg border-2 border-white bg-white/10 px-6 text-base font-medium text-white backdrop-blur hover:bg-white hover:text-brand-600"
-              >
-                新規登録
-              </Link>
-            )}
-          </div>
+          ) : (
+            <div className="flex aspect-[16/9] w-full items-center justify-center bg-gradient-to-br from-brand-100 to-brand-50 text-brand-600 md:aspect-[21/9]">
+              <p className="text-sm">
+                管理画面のサイト設定からヒーロー画像を設定してください
+              </p>
+            </div>
+          )}
         </div>
       </section>
 
+      {/* イベント一覧 */}
       <div className="mx-auto max-w-6xl px-4">
-        {/* 注目イベント */}
-        <section className="py-12">
-          <div className="mb-6 flex items-end justify-between">
-            <h2 className="text-2xl font-bold text-gray-900">
-              開催中・近日開催の特典会
-            </h2>
-            <Link
-              href="/events"
-              className="text-sm font-medium text-brand-600 hover:underline"
-            >
-              すべて見る →
-            </Link>
-          </div>
+        <section className="py-10">
           {eventCards.length === 0 ? (
             <p className="rounded-xl border border-dashed border-gray-200 py-12 text-center text-gray-400">
-              公開中の特典会はまだありません
+              公開中のイベントはまだありません
             </p>
           ) : (
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {eventCards.map((e) => (
                 <EventCard key={e.id} event={e} />
               ))}
-            </div>
-          )}
-        </section>
-
-        {/* 販売中商品 */}
-        <section id="products" className="py-12">
-          <h2 className="mb-6 text-2xl font-bold text-gray-900">
-            販売中の券種・商品
-          </h2>
-          {products.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-gray-200 py-12 text-center text-gray-400">
-              販売中の商品はまだありません
-            </p>
-          ) : (
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-              {products.map(({ p, available, saleStartAt, saleEndAt }) => {
-                const isLottery =
-                  p.lotteryOnly || lotteryProductIds.has(p.id);
-                return (
-                  <ProductCard
-                    key={p.id}
-                    product={{
-                      id: p.id,
-                      name: p.name,
-                      imageUrl: p.imageUrl,
-                      basePrice: p.basePrice,
-                      type: p.type,
-                      benefit: p.benefit,
-                      deliveryDate: p.deliveryDate,
-                      sale: {
-                        isPublished: p.isPublished && p.event.isPublished,
-                        saleStartAt,
-                        saleEndAt,
-                        available,
-                      },
-                      isLottery,
-                    }}
-                  />
-                );
-              })}
             </div>
           )}
         </section>

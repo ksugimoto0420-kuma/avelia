@@ -1,3 +1,4 @@
+import { ImageUploadField } from "@/components/admin/ImageUploadField";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { requireAdminPage } from "@/lib/auth/admin-page";
@@ -26,6 +27,25 @@ export default async function AdminSettingsPage() {
       </div>
 
       <form action={saveSettings} className="space-y-6">
+        <Card>
+          <CardHeader
+            title="トップページ"
+            subtitle="ファーストビューに大きく表示するヒーロー画像"
+          />
+          <CardBody className="space-y-4">
+            <ImageUploadField
+              name="heroImageUrl"
+              defaultValue={s.heroImageUrl}
+              bucket="public-assets"
+              purpose="generic"
+              label="ヒーロー画像"
+              hint="推奨: 1600×900px（16:9）程度の横長画像。JPG/PNG/WebP。"
+              previewAspect="cover-16-9"
+              showUrlInput={false}
+            />
+          </CardBody>
+        </Card>
+
         <Card>
           <CardHeader title="送料" subtitle="物販を含む注文のみ加算されます" />
           <CardBody className="space-y-4">

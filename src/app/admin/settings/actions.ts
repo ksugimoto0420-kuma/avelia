@@ -18,7 +18,11 @@ const RATE_KEYS: SettingKey[] = [
   "rsTier2Rate",
   "rsTier3Rate",
 ];
-const STRING_KEYS: SettingKey[] = ["supportEmail", "siteName"];
+const STRING_KEYS: SettingKey[] = [
+  "supportEmail",
+  "siteName",
+  "heroImageUrl",
+];
 
 export async function saveSettings(formData: FormData) {
   const admin = await requireAdmin("MANAGER");
