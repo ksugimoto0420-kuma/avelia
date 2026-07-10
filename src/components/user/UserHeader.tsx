@@ -6,10 +6,11 @@ import { signOut, useSession } from "next-auth/react";
 import { useCallback, useEffect, useState } from "react";
 import { Drawer } from "@/components/ui/Drawer";
 
+// sukisuki 風のシンプルナビ。アベリアくじ (Phase 1 対象外) は表示しない。
+// /events のタブと URL キーを揃えている。
 const NAV_LINKS: { href: string; label: string }[] = [
-  { href: "/events?type=MEET_GREET", label: "オンライン特典会" },
-  { href: "/kuji", label: "アベリアくじ" },
-  { href: "/events?type=TRADING_CARD", label: "トレカ" },
+  { href: "/events?tab=meet_greet", label: "オンライン特典会" },
+  { href: "/events?tab=trading_card", label: "トレカ" },
   { href: "/faq", label: "よくある質問" },
 ];
 
