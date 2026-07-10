@@ -4,6 +4,7 @@ import { DateTimeField } from "@/components/ui/DateTimeField";
 import { SearchableSelectField } from "@/components/ui/SearchableSelectField";
 import { saveEvent } from "@/app/admin/events/actions";
 import { toJstDateTimeLocalString } from "@/lib/utils";
+import { ImageUrlFieldWithUpload } from "./ImageUrlFieldWithUpload";
 
 type EventData = {
   id: string;
@@ -130,35 +131,18 @@ export function EventForm({
               className={`${inputCls} min-h-28`}
             />
           </div>
-          <div>
-            <label className={labelCls}>カバー画像URL</label>
-            <input
-              name="coverImageUrl"
-              defaultValue={event?.coverImageUrl ?? ""}
-              className={inputCls}
-              placeholder="https://…"
-            />
-            <p className="mt-1 text-xs text-gray-500">
-              推奨：<b>1200×675px（16:9 横長）</b> のJPEG/PNG。
-              一覧カードと詳細ヒーローで使われます。 人物や文字は
-              中央寄りに配置すると、端が切れにくくなります。
-            </p>
-            {event?.coverImageUrl && (
-              <div className="mt-2 overflow-hidden rounded-lg border border-gray-200">
-                <div className="aspect-[16/9] w-full bg-gray-50">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={event.coverImageUrl}
-                    alt="プレビュー"
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-                <p className="bg-gray-50 px-2 py-1 text-xs text-gray-500">
-                  プレビュー（16:9 でトリミングされます）
-                </p>
-              </div>
-            )}
-          </div>
+          <ImageUrlFieldWithUpload
+            name="coverImageUrl"
+            defaultValue={event?.coverImageUrl ?? ""}
+            bucket="public-assets"
+            purpose="event"
+            targetId={event?.id ?? null}
+            label="カバー画像URL"
+            labelClassName={labelCls}
+            inputClassName={inputCls}
+            hint="推奨：1200×675px（16:9 横長）のJPEG/PNG。一覧カードと詳細ヒーローで使われます。人物や文字は中央寄りに配置すると、端が切れにくくなります。"
+            previewAspect="cover-16-9"
+          />
         </CardBody>
       </Card>
 
