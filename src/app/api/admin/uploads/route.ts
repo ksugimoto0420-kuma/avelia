@@ -76,12 +76,17 @@ function resolvePathnamePrefix(args: {
       if (args.contentId) return `contents/${args.contentId}`;
       break;
     case "product":
-      // 新規作成時は entityId 未定なので new/{yyyymmdd} で受ける
       if (args.entityId) return StoragePaths.productThumbnail(args.entityId);
       return StoragePaths.productThumbnail("new");
     case "event":
       if (args.entityId) return StoragePaths.eventBanner(args.entityId);
       return StoragePaths.eventBanner("new");
+    case "artist":
+      return `artists/${args.entityId || "new"}/image`;
+    case "kuji-banner":
+      return `kuji/${args.entityId || "new"}/banner`;
+    case "kuji-prize":
+      return `kuji/${args.entityId || "new"}/prizes`;
   }
   const yyyymmdd = new Date().toISOString().slice(0, 10).replace(/-/g, "");
   return StoragePaths.adminUpload(args.adminId, yyyymmdd);

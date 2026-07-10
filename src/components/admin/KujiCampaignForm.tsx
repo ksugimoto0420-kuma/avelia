@@ -4,6 +4,7 @@ import { DateTimeField } from "@/components/ui/DateTimeField";
 import { SearchableSelectField } from "@/components/ui/SearchableSelectField";
 import { saveKujiCampaign } from "@/app/admin/kuji/actions";
 import { toJstDateTimeLocalString } from "@/lib/utils";
+import { ImageUploadField } from "./ImageUploadField";
 
 export type KujiCampaignFormData = {
   id?: string;
@@ -66,18 +67,16 @@ export function KujiCampaignForm({
               placeholder="くじの紹介文"
             />
           </div>
-          <div>
-            <label htmlFor="kuji-bannerImageUrl" className={labelCls}>
-              バナー画像 URL
-            </label>
-            <input
-              id="kuji-bannerImageUrl"
-              name="bannerImageUrl"
-              defaultValue={initial?.bannerImageUrl ?? ""}
-              className={inputCls}
-              placeholder="https://..."
-            />
-          </div>
+          <ImageUploadField
+            name="bannerImageUrl"
+            defaultValue={initial?.bannerImageUrl ?? ""}
+            bucket="public-assets"
+            purpose="kuji-banner"
+            targetId={initial?.id ?? null}
+            label="バナー画像"
+            hint="推奨: 1200×675px (16:9 横長) の JPEG/PNG。くじ一覧・詳細ページで使用。"
+            previewAspect="cover-16-9"
+          />
           <div>
             <label htmlFor="kuji-artistId" className={labelCls}>
               出演者
