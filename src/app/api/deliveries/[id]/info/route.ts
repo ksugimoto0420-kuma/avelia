@@ -70,17 +70,25 @@ export async function GET(
       return new Response("サイン画像が見つかりません", { status: 404 });
     }
 
-    // 原本画像のURL（外部URLか、ローカル/key配信ルート）
-    const baseUrl =
-      delivery.digitalContent.baseImageUrl ??
-      (delivery.digitalContent.baseImageKey
-        ? `/api/admin/deliveries/base-image/${encodeURIComponent(delivery.digitalContent.baseImageKey)}`
-        : null) ??
-      delivery.orderItem.variant.product.imageUrl ??
-      null;
-    if (!baseUrl) {
+    // 原本画像のURLを解決する。
+    // 一般ユーザーは購入者向けエンドポイント経由で返す (自ドメイン=CORS 汚染回避、
+    // 認可も同エンドポイント内でチェック済み)。管理者は admin 用エンドポイントを
+    // 引き続き使い、旧仕様の外部URL/商品画像フォールバックも維持する。
+    const hasAnyBaseSource =
+      !!delivery.digitalContent.baseImageKey ||
+      !!delivery.digitalContent.baseImageUrl ||
+      !!delivery.orderItem.variant.product.imageUrl;
+    if (!hasAnyBaseSource) {
       return new Response("原本画像が設定されていません", { status: 404 });
     }
+    const baseUrl = isAdmin
+      ? (delivery.digitalContent.baseImageUrl ??
+          (delivery.digitalContent.baseImageKey
+            ? `/api/admin/deliveries/base-image/${encodeURIComponent(delivery.digitalContent.baseImageKey)}`
+            : null) ??
+          delivery.orderItem.variant.product.imageUrl ??
+          "")
+      : `/api/deliveries/${delivery.id}/base-image`;
 
     // サインPNGを base64 で返す（数十KB目安）
     const sigBuf = Buffer.isBuffer(delivery.signature.imageData)
