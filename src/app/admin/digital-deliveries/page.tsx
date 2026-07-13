@@ -10,12 +10,9 @@ import { SearchableSelectField } from "@/components/ui/SearchableSelectField";
 import { requireAdminPage } from "@/lib/auth/admin-page";
 import { prisma } from "@/lib/prisma";
 import { formatDateTime } from "@/lib/utils";
-import {
-  approveSignature,
-  rejectSignature,
-  resendSignatureReadyMail,
-} from "./actions";
+import { approveSignature, rejectSignature } from "./actions";
 import { DeliveryUploadRow } from "./DeliveryUploadRow";
+import { ResendMailButton } from "./ResendMailButton";
 
 export const dynamic = "force-dynamic";
 
@@ -321,21 +318,8 @@ export default async function AdminDigitalDeliveriesPage({
                               >
                                 プレビュー
                               </Link>
-                              {/* #39: 通知メールの手動再送 */}
-                              <form action={resendSignatureReadyMail}>
-                                <input
-                                  type="hidden"
-                                  name="deliveryId"
-                                  value={d.id}
-                                />
-                                <button
-                                  type="submit"
-                                  className="whitespace-nowrap rounded-lg border border-gray-300 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
-                                  title="通知メールを再送信します"
-                                >
-                                  メール再送
-                                </button>
-                              </form>
+                              {/* #39: 通知メールの手動再送 (確認モーダル+完了トースト) */}
+                              <ResendMailButton deliveryId={d.id} />
                             </div>
                           ) : (
                             // 代替導線：サイン未記入 → 原本DL + 手動アップロード（小さく）

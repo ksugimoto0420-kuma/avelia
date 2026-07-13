@@ -162,37 +162,6 @@ export async function rejectSignature(formData: FormData) {
   revalidatePath("/admin/digital-deliveries");
 }
 
-/**
- * #39: サイン完了メールを手動で再送する。
- * 送信失敗時のリカバリ、顧客からの「届いていない」問い合わせ対応用。
- * DigitalDelivery が READY でない場合はエラー。
- */
-export async function resendSignatureReadyMail(formData: FormData) {
-  const admin = await requireAdmin("OPERATOR");
-  const deliveryId = formData.get("deliveryId") as string;
-  if (!deliveryId) throw new AppError("入力が不正です", 400);
-
-  const delivery = await prisma.digitalDelivery.findUnique({
-    where: { id: deliveryId },
-    select: { status: true },
-  });
-  if (!delivery) throw new AppError("納品が見つかりません", 404);
-  if (delivery.status !== "READY") {
-    throw new AppError("納品が完了していません", 409);
-  }
-
-  await sendSignatureReadyMail(deliveryId);
-
-  await logOperation({
-    adminUserId: admin.id,
-    action: "signature.mail.resend",
-    targetType: "DigitalDelivery",
-    targetId: deliveryId,
-  });
-
-  revalidatePath("/admin/digital-deliveries");
-}
-
 /** 納品を取消し PENDING に戻す（差し替え準備）。成果物キーをクリア。 */
 export async function cancelDelivery(formData: FormData) {
   const admin = await requireAdmin("OPERATOR");

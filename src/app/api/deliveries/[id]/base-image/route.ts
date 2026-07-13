@@ -93,30 +93,63 @@ export async function GET(
         });
       } catch (e) {
         if (!(e instanceof StorageNotFoundError)) throw e;
+        console.warn(
+          `[base-image] storage miss bucket=${delivery.digitalContent.baseImageBucket} key=${key} → fallback`,
+        );
         // 続けて 2. の外部URLへフォールバック
       }
     }
 
     // 2. baseImageUrl (公開URL) をプロキシ配信する
-    // - 直接 <img src> に外部URLを返してしまうと、Canvas 描画が CORS で
-    //   汚染される可能性があるため、自ドメインからバイナリで返して同一
-    //   オリジンにしておくと SignedImagePreview 側のロジックが安定する。
-    const externalUrl =
+    // ただし baseImageUrl が自ドメインの /api/admin/blob/... のような
+    // 認可保護付き Route Handler の URL の場合、サーバー間 fetch では
+    // セッションクッキーが乗らず 401 になる。そのケースはパスから
+    // bucket + key を復元して storage 経由で直接読む。
+    const proxyUrl =
       delivery.digitalContent.baseImageUrl ??
       delivery.orderItem.variant.product.imageUrl ??
       null;
-    if (externalUrl) {
-      const res = await fetch(externalUrl);
-      if (res.ok) {
-        const buffer = Buffer.from(await res.arrayBuffer());
-        const ct = res.headers.get("content-type") ?? contentTypeFor(externalUrl);
-        return new Response(new Uint8Array(buffer), {
-          status: 200,
-          headers: {
-            "Content-Type": ct,
-            "Cache-Control": "private, no-store",
-          },
-        });
+    if (proxyUrl) {
+      const adminBlob = parseAdminBlobUrl(proxyUrl);
+      if (adminBlob) {
+        try {
+          const { buffer } = await storage.getFile(
+            adminBlob.bucket,
+            adminBlob.key,
+          );
+          return new Response(new Uint8Array(buffer), {
+            status: 200,
+            headers: {
+              "Content-Type": contentTypeFor(adminBlob.key),
+              "Cache-Control": "private, no-store",
+            },
+          });
+        } catch (e) {
+          if (!(e instanceof StorageNotFoundError)) throw e;
+          console.warn(
+            `[base-image] admin blob miss bucket=${adminBlob.bucket} key=${adminBlob.key}`,
+          );
+        }
+      } else if (/^https?:\/\//i.test(proxyUrl)) {
+        // 外部の公開URL (Vercel Blob public 等) はそのまま fetch で取り込む
+        const res = await fetch(proxyUrl);
+        if (res.ok) {
+          const buffer = Buffer.from(await res.arrayBuffer());
+          const ct =
+            res.headers.get("content-type") ?? contentTypeFor(proxyUrl);
+          return new Response(new Uint8Array(buffer), {
+            status: 200,
+            headers: {
+              "Content-Type": ct,
+              "Cache-Control": "private, no-store",
+            },
+          });
+        }
+        console.warn(
+          `[base-image] external fetch failed ${res.status} for ${proxyUrl}`,
+        );
+      } else {
+        console.warn(`[base-image] unsupported proxy url: ${proxyUrl}`);
       }
     }
 
@@ -125,4 +158,20 @@ export async function GET(
     console.error("[api/deliveries/base-image] エラー", err);
     return new Response("エラーが発生しました", { status: 500 });
   }
+}
+
+/**
+ * `/api/admin/blob/<bucket>/<...key>` を再解析して bucket + key を復元する。
+ * VercelBlobDriver.buildAdminBlobUrl が生成する URL 形式に対応する。
+ */
+function parseAdminBlobUrl(
+  url: string,
+): { bucket: StorageBucket; key: string } | null {
+  const m = url.match(/^\/api\/admin\/blob\/([^/]+)\/(.+)$/);
+  if (!m) return null;
+  const bucket = decodeURIComponent(m[1]) as StorageBucket;
+  const segments = m[2].split("/").map((s) => decodeURIComponent(s));
+  // 保存時は bucket プレフィックスを除いた形で URL 化されているため戻す
+  const key = `${bucket}/${segments.join("/")}`;
+  return { bucket, key };
 }
