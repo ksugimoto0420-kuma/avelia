@@ -101,18 +101,19 @@ export async function GET(
       }
     }
 
-    // 2. baseImageUrl (公開URL) をプロキシ配信する
-    // ただし baseImageUrl が自ドメインの /api/admin/blob/... のような
-    // 認可保護付き Route Handler の URL の場合、サーバー間 fetch では
-    // セッションクッキーが乗らず 401 になる。そのケースはパスから
-    // bucket + key を復元して storage 経由で直接読む。
-    const proxyUrl =
-      delivery.digitalContent.baseImageUrl ??
-      delivery.digitalContent.product?.imageUrl ??
-      delivery.orderItem.variant.product.imageUrl ??
-      null;
-    if (proxyUrl) {
-      const adminBlob = parseAdminBlobUrl(proxyUrl);
+    // 2. baseImageUrl / 商品画像を順に試す。1件でも読めたらそれを返す。
+    // baseImageUrl が /api/admin/blob/... のような認可保護URLならパスから
+    // bucket+key を復元して storage 経由で直接読む (サーバー間 fetch では
+    // クッキーが乗らず 401 になるため)。
+    const candidates: string[] = [
+      delivery.digitalContent.baseImageUrl,
+      delivery.digitalContent.product?.imageUrl,
+      delivery.orderItem.variant.product.imageUrl,
+    ].filter((u): u is string => !!u);
+
+    const attempted: Array<{ url: string; via: string; result: string }> = [];
+    for (const url of candidates) {
+      const adminBlob = parseAdminBlobUrl(url);
       if (adminBlob) {
         try {
           const { buffer } = await storage.getFile(
@@ -128,42 +129,51 @@ export async function GET(
           });
         } catch (e) {
           if (!(e instanceof StorageNotFoundError)) throw e;
-          console.warn(
-            `[base-image] admin blob miss bucket=${adminBlob.bucket} key=${adminBlob.key}`,
-          );
+          attempted.push({
+            url,
+            via: `storage:${adminBlob.bucket}/${adminBlob.key}`,
+            result: "not-found",
+          });
+          continue;
         }
-      } else if (/^https?:\/\//i.test(proxyUrl)) {
-        // 外部の公開URL (Vercel Blob public 等) はそのまま fetch で取り込む
-        const res = await fetch(proxyUrl);
-        if (res.ok) {
-          const buffer = Buffer.from(await res.arrayBuffer());
-          const ct =
-            res.headers.get("content-type") ?? contentTypeFor(proxyUrl);
-          return new Response(new Uint8Array(buffer), {
-            status: 200,
-            headers: {
-              "Content-Type": ct,
-              "Cache-Control": "private, no-store",
-            },
+      }
+      if (/^https?:\/\//i.test(url)) {
+        try {
+          const res = await fetch(url);
+          if (res.ok) {
+            const buffer = Buffer.from(await res.arrayBuffer());
+            const ct = res.headers.get("content-type") ?? contentTypeFor(url);
+            return new Response(new Uint8Array(buffer), {
+              status: 200,
+              headers: {
+                "Content-Type": ct,
+                "Cache-Control": "private, no-store",
+              },
+            });
+          }
+          attempted.push({ url, via: "fetch", result: `http-${res.status}` });
+        } catch (e) {
+          attempted.push({
+            url,
+            via: "fetch",
+            result: `err:${e instanceof Error ? e.message : String(e)}`,
           });
         }
-        console.warn(
-          `[base-image] external fetch failed ${res.status} for ${proxyUrl}`,
-        );
-      } else {
-        console.warn(`[base-image] unsupported proxy url: ${proxyUrl}`);
+        continue;
       }
+      attempted.push({ url, via: "unknown-scheme", result: "skip" });
     }
 
-    // ここまで到達 = すべてのソースが空 or 到達不能。診断用に何が欠けているか記録する。
+    // ここまで到達 = 全ソースが空 or どれも到達不能。診断情報を返す。
     const diag = {
       hasBaseImageKey: !!delivery.digitalContent.baseImageKey,
       hasBaseImageUrl: !!delivery.digitalContent.baseImageUrl,
       hasDcProductImage: !!delivery.digitalContent.product?.imageUrl,
       hasVariantProductImage:
         !!delivery.orderItem.variant.product.imageUrl,
+      attempted,
     };
-    console.warn("[base-image] all sources empty or unreachable", {
+    console.warn("[base-image] all sources unreachable", {
       deliveryId: id,
       diag,
     });
