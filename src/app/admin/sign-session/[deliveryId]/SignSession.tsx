@@ -297,7 +297,11 @@ export function SignSession({
         disabled={submitting}
         className="flex-1 rounded-lg bg-brand-600 px-6 py-3 text-base font-bold text-white hover:bg-brand-700 disabled:opacity-50 sm:flex-initial"
       >
-        {submitting ? "送信中…" : "送信して次の方へ →"}
+        {submitting
+          ? "送信中…"
+          : nextDeliveryId
+            ? "送信して次の方へ →"
+            : "送信する（最後の1件） →"}
       </button>
     </div>
   );
