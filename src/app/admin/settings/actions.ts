@@ -23,6 +23,14 @@ const STRING_KEYS: SettingKey[] = [
   "siteName",
   "heroImageUrl",
   "heroImages",
+  // 納品書テンプレ (docs/orders-invoice-batch-spec.md 2-1)
+  "invoiceCompanyName",
+  "invoicePostalCode",
+  "invoiceAddress",
+  "invoicePhone",
+  "invoiceEmail",
+  "invoiceRepresentative",
+  "invoiceFooterMessage",
 ];
 
 export async function saveSettings(formData: FormData) {

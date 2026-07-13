@@ -72,6 +72,22 @@ export default async function MypageOrderDetail({
               )}
             </div>
           </div>
+          {order.status !== "PENDING" && (
+            // 発送以降 (SHIPPED / DELIVERED) は同封案内が届く可能性が高いので強調表示する
+            <div className="mt-4 flex justify-end">
+              <a
+                href={`/api/user/orders/${order.id}/invoice`}
+                className={
+                  order.shipment?.status === "SHIPPED" ||
+                  order.shipment?.status === "DELIVERED"
+                    ? "rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-brand-700"
+                    : "rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                }
+              >
+                📄 納品書をダウンロード
+              </a>
+            </div>
+          )}
         </CardBody>
       </Card>
 

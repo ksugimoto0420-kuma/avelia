@@ -14,7 +14,15 @@ export type SettingKey =
   | "rsTier1Rate" // 第1階段の弊社取り分率（小数。例: 0.03）
   | "rsTier2Threshold" // 第2閾値（円）。これ以上は Tier3 レートに切り替わる
   | "rsTier2Rate" // 第2階段の弊社取り分率
-  | "rsTier3Rate"; // 第3階段の弊社取り分率
+  | "rsTier3Rate" // 第3階段の弊社取り分率
+  // 納品書 (Invoice) テンプレート用の発行元情報。docs/orders-invoice-batch-spec.md 2-1
+  | "invoiceCompanyName"
+  | "invoicePostalCode"
+  | "invoiceAddress"
+  | "invoicePhone"
+  | "invoiceEmail"
+  | "invoiceRepresentative"
+  | "invoiceFooterMessage";
 
 const DEFAULTS: Record<SettingKey, string> = {
   shippingFlatRate: "500",
@@ -29,6 +37,15 @@ const DEFAULTS: Record<SettingKey, string> = {
   rsTier2Threshold: "5000000",
   rsTier2Rate: "0.05",
   rsTier3Rate: "0.1",
+  // 仮の発行元情報。/admin/settings から後で書き換える想定。
+  invoiceCompanyName: "株式会社アベリア",
+  invoicePostalCode: "150-0001",
+  invoiceAddress: "東京都渋谷区神宮前1-1-1",
+  invoicePhone: "03-0000-0000",
+  invoiceEmail: "support@avelia.example.com",
+  invoiceRepresentative: "代表取締役",
+  invoiceFooterMessage:
+    "このたびはご購入いただき、誠にありがとうございます。",
 };
 
 export async function getSetting(key: SettingKey): Promise<string> {
@@ -89,6 +106,51 @@ export async function setSetting(
     create: { key, value },
     update: { value },
   });
+}
+
+/** 納品書 (Invoice) の発行元情報。UI 側では null 相当を非表示扱いにする。 */
+export type InvoiceIssuerInfo = {
+  companyName: string;
+  postalCode: string;
+  address: string;
+  phone: string;
+  email: string;
+  representative: string;
+  footerMessage: string;
+};
+
+/**
+ * 納品書 PDF に載せる発行元情報を一括で取得する。
+ * 現状は AppSetting の KV に保存された値 (無ければ DEFAULTS) を返す。
+ * /admin/settings 実装後は同じキーで書き換えられる。
+ */
+export async function getInvoiceIssuerInfo(): Promise<InvoiceIssuerInfo> {
+  const [
+    companyName,
+    postalCode,
+    address,
+    phone,
+    email,
+    representative,
+    footerMessage,
+  ] = await Promise.all([
+    getSetting("invoiceCompanyName"),
+    getSetting("invoicePostalCode"),
+    getSetting("invoiceAddress"),
+    getSetting("invoicePhone"),
+    getSetting("invoiceEmail"),
+    getSetting("invoiceRepresentative"),
+    getSetting("invoiceFooterMessage"),
+  ]);
+  return {
+    companyName,
+    postalCode,
+    address,
+    phone,
+    email,
+    representative,
+    footerMessage,
+  };
 }
 
 /**
