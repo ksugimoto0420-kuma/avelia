@@ -45,6 +45,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     items: [
       { href: "/admin/exports/production-list", label: "制作リスト", icon: "🛠" },
       { href: "/admin/exports/shipping-list", label: "発送リスト", icon: "🚚" },
+      { href: "/admin/exports/invoices", label: "納品書一括DL", icon: "📄" },
       // Phase 1 では R/S 売上分配運用は行わない。設定・集計は保持している。
       // { href: "/admin/revenue-shares", label: "R/S売上", icon: "💴" },
     ],

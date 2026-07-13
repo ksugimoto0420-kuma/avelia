@@ -1,17 +1,11 @@
 import Link from "next/link";
-import { StatusBadge } from "@/components/admin/StatusBadge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody } from "@/components/ui/Card";
-import { Column, DataTable } from "@/components/ui/DataTable";
 import { Pagination } from "@/components/ui/Pagination";
 import { requireAdminPage } from "@/lib/auth/admin-page";
 import { prisma } from "@/lib/prisma";
-import {
-  cn,
-  currentJstPeriod,
-  formatDateTime,
-  formatYen,
-} from "@/lib/utils";
+import { cn, currentJstPeriod } from "@/lib/utils";
+import { OrdersBulkTable, type OrderRow } from "./OrdersBulkTable";
 import { OrdersFilterControls } from "./OrdersFilterControls";
 
 export const dynamic = "force-dynamic";
@@ -35,6 +29,7 @@ export default async function AdminOrdersPage({
     q?: string;
     page?: string;
     month?: string;
+    eventId?: string;
   }>;
 }) {
   await requireAdminPage();
@@ -46,6 +41,9 @@ export default async function AdminOrdersPage({
   const rawMonth = sp.month ?? "";
   const month = rawMonth === "all" ? "" : rawMonth;
   const defaultMonth = currentJstPeriod();
+  // #4: イベント別絞り込み。仕様書 3-1 に従い OrderItem→Variant→Product.eventId
+  // 経由で「注文にそのイベントの商品が1つでも含まれていれば表示」の条件を組む。
+  const eventId = sp.eventId ?? "";
   const page = Math.max(1, Number(sp.page ?? "1"));
 
   const where: Record<string, unknown> = {};
@@ -62,8 +60,11 @@ export default async function AdminOrdersPage({
     const end = new Date(y, m, 1);
     where.createdAt = { gte: start, lt: end };
   }
+  if (eventId) {
+    where.items = { some: { variant: { product: { eventId } } } };
+  }
 
-  const [orders, total] = await Promise.all([
+  const [orders, total, events] = await Promise.all([
     prisma.order.findMany({
       where,
       orderBy: { createdAt: "desc" },
@@ -76,55 +77,31 @@ export default async function AdminOrdersPage({
       },
     }),
     prisma.order.count({ where }),
+    prisma.event.findMany({
+      orderBy: { createdAt: "desc" },
+      select: { id: true, title: true, artistName: true },
+    }),
   ]);
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
-  type Row = (typeof orders)[number];
-  const columns: Column<Row>[] = [
-    {
-      key: "orderNumber",
-      header: "注文番号",
-      cell: (o) => (
-        <Link
-          href={`/admin/orders/${o.id}`}
-          className="font-medium text-brand-600 hover:underline"
-        >
-          {o.orderNumber}
-        </Link>
-      ),
-    },
-    { key: "user", header: "ユーザー", cell: (o) => o.user.email },
-    { key: "total", header: "金額", align: "right", cell: (o) => formatYen(o.total) },
-    {
-      key: "status",
-      header: "注文",
-      cell: (o) => <StatusBadge kind="order" status={o.status} />,
-    },
-    {
-      key: "payment",
-      header: "決済",
-      cell: (o) =>
-        o.payment ? <StatusBadge kind="payment" status={o.payment.status} /> : "-",
-    },
-    {
-      key: "shipment",
-      header: "発送",
-      cell: (o) =>
-        o.shipment ? (
-          <StatusBadge kind="shipment" status={o.shipment.status} />
-        ) : (
-          <span className="text-gray-300">—</span>
-        ),
-    },
-    { key: "createdAt", header: "日時", cell: (o) => formatDateTime(o.createdAt) },
-  ];
+  const rows: OrderRow[] = orders.map((o) => ({
+    id: o.id,
+    orderNumber: o.orderNumber,
+    userEmail: o.user.email,
+    total: o.total,
+    status: o.status,
+    paymentStatus: o.payment?.status ?? null,
+    shipmentStatus: o.shipment?.status ?? null,
+    createdAt: o.createdAt.toISOString(),
+  }));
 
   const qs = (overrides: Record<string, string>) => {
     const p = new URLSearchParams();
     if (status) p.set("status", status);
     if (q) p.set("q", q);
     if (month) p.set("month", month);
+    if (eventId) p.set("eventId", eventId);
     for (const [k, v] of Object.entries(overrides)) {
       if (v) p.set(k, v);
       else p.delete(k);
@@ -162,10 +139,15 @@ export default async function AdminOrdersPage({
               defaultMonth={defaultMonth}
               currentMonth={rawMonth}
               currentQ={q}
+              currentEventId={eventId}
+              events={events.map((e) => ({
+                id: e.id,
+                label: e.artistName ? `${e.artistName} / ${e.title}` : e.title,
+              }))}
             />
           </div>
 
-          <DataTable columns={columns} rows={orders} emptyMessage="注文がありません" />
+          <OrdersBulkTable rows={rows} />
 
           <Pagination
             page={page}

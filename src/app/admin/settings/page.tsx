@@ -121,6 +121,99 @@ export default async function AdminSettingsPage() {
           </CardBody>
         </Card>
 
+        <Card>
+          <CardHeader
+            title="納品書テンプレート"
+            subtitle="購入者DL・一括DLで発行される納品書の発行元情報"
+          />
+          <CardBody className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label htmlFor="invoiceCompanyName" className={labelCls}>
+                  会社名
+                </label>
+                <input
+                  id="invoiceCompanyName"
+                  name="invoiceCompanyName"
+                  defaultValue={s.invoiceCompanyName}
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label htmlFor="invoiceRepresentative" className={labelCls}>
+                  代表者名
+                </label>
+                <input
+                  id="invoiceRepresentative"
+                  name="invoiceRepresentative"
+                  defaultValue={s.invoiceRepresentative}
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label htmlFor="invoicePostalCode" className={labelCls}>
+                  郵便番号
+                </label>
+                <input
+                  id="invoicePostalCode"
+                  name="invoicePostalCode"
+                  defaultValue={s.invoicePostalCode}
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label htmlFor="invoicePhone" className={labelCls}>
+                  電話番号
+                </label>
+                <input
+                  id="invoicePhone"
+                  name="invoicePhone"
+                  defaultValue={s.invoicePhone}
+                  className={inputCls}
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <label htmlFor="invoiceAddress" className={labelCls}>
+                  住所
+                </label>
+                <input
+                  id="invoiceAddress"
+                  name="invoiceAddress"
+                  defaultValue={s.invoiceAddress}
+                  className={inputCls}
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <label htmlFor="invoiceEmail" className={labelCls}>
+                  連絡先メール
+                </label>
+                <input
+                  id="invoiceEmail"
+                  type="email"
+                  name="invoiceEmail"
+                  defaultValue={s.invoiceEmail}
+                  className={inputCls}
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <label htmlFor="invoiceFooterMessage" className={labelCls}>
+                  フッターメッセージ
+                </label>
+                <textarea
+                  id="invoiceFooterMessage"
+                  name="invoiceFooterMessage"
+                  rows={3}
+                  defaultValue={s.invoiceFooterMessage}
+                  className={inputCls}
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  納品書 PDF の末尾に印字されます。
+                </p>
+              </div>
+            </div>
+          </CardBody>
+        </Card>
+
         <div className="flex justify-end">
           <Button type="submit">保存する</Button>
         </div>
