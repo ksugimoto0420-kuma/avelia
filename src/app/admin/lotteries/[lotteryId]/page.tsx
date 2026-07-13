@@ -5,6 +5,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { requireAdminPage } from "@/lib/auth/admin-page";
 import { prisma } from "@/lib/prisma";
 import { deleteLottery } from "../actions";
+import { LotteryResendMailButton } from "./LotteryResendMailButton";
 
 export const dynamic = "force-dynamic";
 
@@ -59,12 +60,20 @@ export default async function EditLotteryPage({
           </Link>
           <h1 className="mt-1 text-2xl font-bold text-gray-900">抽選編集</h1>
         </div>
-        <Link
-          href={`/admin/lotteries/${lottery.id}/draw`}
-          className="rounded-lg border border-brand-600 bg-brand-50 px-4 py-2 text-sm font-bold text-brand-700 hover:bg-brand-100"
-        >
-          {lottery.status === "DRAWN" ? "結果を見る" : "抽選実施画面を開く"} →
-        </Link>
+        <div className="flex items-center gap-2">
+          {lottery.status === "DRAWN" && (
+            <LotteryResendMailButton
+              lotteryId={lottery.id}
+              lotteryTitle={lottery.title}
+            />
+          )}
+          <Link
+            href={`/admin/lotteries/${lottery.id}/draw`}
+            className="rounded-lg border border-brand-600 bg-brand-50 px-4 py-2 text-sm font-bold text-brand-700 hover:bg-brand-100"
+          >
+            {lottery.status === "DRAWN" ? "結果を見る" : "抽選実施画面を開く"} →
+          </Link>
+        </div>
       </div>
 
       <LotteryForm

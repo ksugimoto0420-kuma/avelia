@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth/guards";
+import { sendLotteryResultMails } from "@/lib/mail/sendLotteryResultMails";
 import { logOperation } from "@/lib/operation-log";
 import { prisma } from "@/lib/prisma";
 import { parseJstDateTimeLocal } from "@/lib/utils";
@@ -229,9 +230,75 @@ export async function drawLottery(formData: FormData) {
     },
   });
 
+  // #9: 抽選結果通知メール。Vercel Serverless 関数のライフサイクル外の
+  // background job は保証されないため、await で完了まで待つ。
+  // 応募人数が多いと Resend レートリミット (2 req/s) で数十秒かかる。
+  // 100件超えるようになったら分割ジョブ化を検討 (仕様書「大量送信時の
+  // レートリミット」)。失敗時はここでの例外を握りつぶし operation-log に
+  // 詳細を残す (drawLottery 自体は成功しているため revalidate は続行)。
+  try {
+    const mailResult = await sendLotteryResultMails(lotteryId);
+    await logOperation({
+      adminUserId: admin.id,
+      action: "lottery.mail.sent",
+      targetType: "Lottery",
+      targetId: lotteryId,
+      detail: mailResult,
+    });
+  } catch (err) {
+    console.error("[lottery-result-mail]", err);
+    await logOperation({
+      adminUserId: admin.id,
+      action: "lottery.mail.error",
+      targetType: "Lottery",
+      targetId: lotteryId,
+      detail: {
+        error: err instanceof Error ? err.message : String(err),
+      },
+    });
+  }
+
   revalidatePath("/admin/lotteries");
   revalidatePath(`/admin/lotteries/${lotteryId}`);
   revalidatePath(`/admin/lotteries/${lotteryId}/draw`);
+}
+
+/**
+ * #9: 抽選結果通知メールを手動で再送する (障害時のリカバリ / 一部再送)。
+ * DRAWN 状態の抽選のみ対象。idempotencyKey により重複送信は Resend 側で
+ * 弾かれるため、複数回叩いても安全。
+ */
+export async function resendLotteryResultMails(
+  formData: FormData,
+): Promise<{ success: boolean; message: string }> {
+  const admin = await requireAdmin("MANAGER");
+  const lotteryId = formData.get("lotteryId") as string;
+  if (!lotteryId) throw new Error("抽選IDが不正です");
+
+  const lottery = await prisma.lottery.findUnique({
+    where: { id: lotteryId },
+    select: { status: true, title: true },
+  });
+  if (!lottery) throw new Error("抽選が見つかりません");
+  if (lottery.status !== "DRAWN") {
+    throw new Error("抽選実行後のみ再送できます");
+  }
+
+  const mailResult = await sendLotteryResultMails(lotteryId);
+  await logOperation({
+    adminUserId: admin.id,
+    action: "lottery.mail.resent",
+    targetType: "Lottery",
+    targetId: lotteryId,
+    detail: mailResult,
+  });
+
+  revalidatePath(`/admin/lotteries/${lotteryId}`);
+
+  return {
+    success: mailResult.failures.length === 0,
+    message: `当選 ${mailResult.wonSent}件 / 落選 ${mailResult.lostSent}件 送信 (失敗 ${mailResult.failures.length}件${mailResult.skipped > 0 ? `, メール未設定 ${mailResult.skipped}件` : ""})`,
+  };
 }
 
 /**
