@@ -1,4 +1,5 @@
 import type Stripe from "stripe";
+import { sendPaymentFailedMail } from "@/lib/mail/sendPaymentFailedMail";
 import { markOrderPaid, releaseOrder } from "@/lib/order-status";
 import { constructWebhookEvent } from "@/lib/payment/stripe";
 import { prisma } from "@/lib/prisma";
@@ -48,7 +49,7 @@ export async function POST(req: Request) {
         const orderId =
           session.metadata?.orderId ?? session.client_reference_id ?? null;
         if (orderId) {
-          await releaseOrder({
+          const result = await releaseOrder({
             orderId,
             orderStatus:
               event.type === "checkout.session.expired"
@@ -60,6 +61,18 @@ export async function POST(req: Request) {
                 : "FAILED",
             reason: event.type,
           });
+          // #41: async_payment_failed のときだけ再決済案内メールを送る。
+          // expired は「時間切れによる自動キャンセル」なので通知不要。
+          // releaseOrder.changed が true (未処理→今回失敗にした) のときのみ
+          // 送ることで、多重 webhook でも冪等になる。
+          if (
+            event.type === "checkout.session.async_payment_failed" &&
+            result.changed
+          ) {
+            void sendPaymentFailedMail(orderId, event.type).catch((err) => {
+              console.error("[payment-failed-mail]", err);
+            });
+          }
         }
         break;
       }

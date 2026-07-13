@@ -3,6 +3,7 @@
 import type { OrderStatus, ShipmentStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth/guards";
+import { sendShippedMail } from "@/lib/mail/sendShippedMail";
 import { logOperation } from "@/lib/operation-log";
 import { prisma } from "@/lib/prisma";
 
@@ -138,6 +139,8 @@ export async function bulkUpdateShipmentStatus(
       continue;
     }
     try {
+      // #40: 初めて SHIPPED になったときだけメール送信 (差し替えでは飛ばさない)
+      const wasNotShippedYet = order.shipment?.status !== "SHIPPED";
       await prisma.$transaction(async (tx) => {
         await tx.shipment.upsert({
           where: { orderId },
@@ -157,6 +160,11 @@ export async function bulkUpdateShipmentStatus(
         });
       });
       result.successCount++;
+      if (newStatus === "SHIPPED" && wasNotShippedYet) {
+        void sendShippedMail(orderId).catch((err) => {
+          console.error("[shipped-mail]", err);
+        });
+      }
     } catch (e) {
       result.failures.push({
         orderId,
