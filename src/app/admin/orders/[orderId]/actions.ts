@@ -3,6 +3,7 @@
 import type { ShipmentStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth/guards";
+import { sendShippedMail } from "@/lib/mail/sendShippedMail";
 import { logOperation } from "@/lib/operation-log";
 import { getStripe, isStripeConfigured } from "@/lib/payment/stripe";
 import { prisma } from "@/lib/prisma";
@@ -13,6 +14,13 @@ export async function updateShipment(formData: FormData) {
   const status = formData.get("status") as ShipmentStatus;
   const carrier = (formData.get("carrier") as string) || null;
   const trackingNumber = (formData.get("trackingNumber") as string) || null;
+
+  // #40: 初めて SHIPPED になった瞬間にメール送信するため、更新前の状態を保持
+  const prev = await prisma.shipment.findUnique({
+    where: { orderId },
+    select: { status: true },
+  });
+  const wasNotShippedYet = prev?.status !== "SHIPPED";
 
   const now = new Date();
   await prisma.shipment.upsert({
@@ -34,6 +42,14 @@ export async function updateShipment(formData: FormData) {
     targetId: orderId,
     detail: { status },
   });
+
+  // 発送完了通知メール (#40)。初めて SHIPPED になったときだけ送る
+  // (差し替え=trackingNumber 修正で再送は避ける)
+  if (status === "SHIPPED" && wasNotShippedYet) {
+    void sendShippedMail(orderId).catch((err) => {
+      console.error("[shipped-mail]", err);
+    });
+  }
 
   revalidatePath(`/admin/orders/${orderId}`);
 }
