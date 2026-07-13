@@ -151,14 +151,6 @@ export default async function TalentHomePage() {
         </div>
       )}
 
-      <div className="text-right">
-        <Link
-          href="/talent/done"
-          className="text-sm text-gray-500 hover:text-gray-700"
-        >
-          完了したご注文を見る →
-        </Link>
-      </div>
     </div>
   );
 }
