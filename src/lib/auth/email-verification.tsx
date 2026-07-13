@@ -1,7 +1,8 @@
 import { env } from "@/lib/env";
-import { sendMailTemplate } from "@/lib/mail";
+import { sendTemplatedMail } from "@/lib/mail/resolveTemplate";
 import { VerifyEmailMail } from "@/lib/mail/templates/VerifyEmailMail";
 import { prisma } from "@/lib/prisma";
+import { getSetting } from "@/lib/settings";
 import { generateToken, hashToken } from "./tokens";
 
 /** トークン有効期限 (24時間)。 */
@@ -29,10 +30,19 @@ export async function issueEmailVerificationAndSend(userId: string): Promise<voi
   });
 
   const verifyUrl = `${env.appUrl}/auth/verify?token=${token}`;
-  await sendMailTemplate({
+  const siteName = await getSetting("siteName");
+  await sendTemplatedMail({
+    kind: "VERIFY_EMAIL",
     to: user.email,
-    subject: "【Avelia FunClub】メールアドレスの確認のお願い",
-    template: <VerifyEmailMail verifyUrl={verifyUrl} name={user.name} />,
+    variables: {
+      siteName,
+      userName: user.name ?? "",
+      verifyUrl,
+    },
+    fallback: {
+      subject: `【${siteName}】メールアドレスの確認のお願い`,
+      template: <VerifyEmailMail verifyUrl={verifyUrl} name={user.name} />,
+    },
   });
 }
 

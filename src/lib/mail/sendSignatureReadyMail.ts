@@ -1,6 +1,7 @@
-import { sendMailTemplate } from "@/lib/mail";
-import { SignatureReadyMail } from "@/lib/mail/templates/SignatureReadyMail";
 import { env } from "@/lib/env";
+import { sendTemplatedMail } from "@/lib/mail/resolveTemplate";
+import { SignatureReadyMail } from "@/lib/mail/templates/SignatureReadyMail";
+import { getSetting } from "@/lib/settings";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -62,22 +63,35 @@ export async function sendSignatureReadyMail(deliveryId: string): Promise<void> 
       ? `${env.appUrl}/mypage/digital-contents/signed/${delivery.id}`
       : mypageUrl;
 
-  await sendMailTemplate({
+  const siteName = await getSetting("siteName");
+  await sendTemplatedMail({
+    kind: mediaKind === "video" ? "SIGNATURE_READY_VIDEO" : "SIGNATURE_READY_PHOTO",
     to: delivery.user.email,
-    subject:
-      mediaKind === "video"
-        ? "【Avelia FunClub】動画サインが届きました🎬"
-        : "【Avelia FunClub】サイン入りコンテンツの準備ができました✨",
-    template: SignatureReadyMail({
-      customerName: delivery.user.name,
-      nickname: delivery.nickname,
-      productName,
+    variables: {
+      siteName,
+      userName: delivery.user.name ?? "",
+      artistName: artistName ?? "アーティスト",
+      nickname: delivery.nickname ? `「${delivery.nickname}」` : "",
       eventTitle,
-      artistName,
-      mediaKind,
-      mypageUrl,
-      playerUrl,
-    }),
+      productName,
+      viewUrl: playerUrl,
+    },
+    fallback: {
+      subject:
+        mediaKind === "video"
+          ? `【${siteName}】動画サインが届きました🎬`
+          : `【${siteName}】サイン入りコンテンツの準備ができました✨`,
+      template: SignatureReadyMail({
+        customerName: delivery.user.name,
+        nickname: delivery.nickname,
+        productName,
+        eventTitle,
+        artistName,
+        mediaKind,
+        mypageUrl,
+        playerUrl,
+      }),
+    },
     // 同じ deliveryId で複数回叩かれても Resend 側で重複を弾く冪等キー
     idempotencyKey: `signature-ready:${delivery.id}`,
   });

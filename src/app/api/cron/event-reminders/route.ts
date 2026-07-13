@@ -1,6 +1,7 @@
 import { env } from "@/lib/env";
-import { sendMailTemplate } from "@/lib/mail";
+import { sendTemplatedMail } from "@/lib/mail/resolveTemplate";
 import { EventReminderMail } from "@/lib/mail/templates/EventReminderMail";
+import { getSetting } from "@/lib/settings";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -53,6 +54,7 @@ export async function GET(req: Request) {
   let sentCount = 0;
   let skippedCount = 0;
   const failures: Array<{ orderId: string; reason: string }> = [];
+  const siteName = await getSetting("siteName");
 
   for (const ev of events) {
     // このイベントに紐づく PAID 注文のユニークユーザーを取得
@@ -86,16 +88,28 @@ export async function GET(req: Request) {
         continue;
       }
       try {
-        await sendMailTemplate({
+        const orderUrl = `${env.appUrl}/mypage/orders/${order.id}`;
+        await sendTemplatedMail({
+          kind: "EVENT_REMINDER",
           to: order.user.email,
-          subject: `【Avelia FunClub】明日開催: ${ev.title}`,
-          template: EventReminderMail({
-            customerName: order.user.name,
+          variables: {
+            siteName,
+            userName: order.user.name ?? "",
             eventTitle: ev.title,
-            eventDateLabel,
-            streamingUrl: ev.streamingUrl,
-            orderUrl: `${env.appUrl}/mypage/orders/${order.id}`,
-          }),
+            eventDate: eventDateLabel,
+            streamingUrl: ev.streamingUrl ?? "",
+            orderUrl,
+          },
+          fallback: {
+            subject: `【${siteName}】明日開催: ${ev.title}`,
+            template: EventReminderMail({
+              customerName: order.user.name,
+              eventTitle: ev.title,
+              eventDateLabel,
+              streamingUrl: ev.streamingUrl,
+              orderUrl,
+            }),
+          },
           // 同じイベント+注文+日付キーで一意 → 手動再実行しても重複送信されない
           idempotencyKey: `event-reminder:${ev.id}:${order.id}:${startUtc.toISOString().slice(0, 10)}`,
         });

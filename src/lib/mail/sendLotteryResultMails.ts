@@ -1,7 +1,8 @@
-import { sendMailTemplate } from "@/lib/mail";
+import { env } from "@/lib/env";
+import { sendTemplatedMail } from "@/lib/mail/resolveTemplate";
 import { LotteryLostMail } from "@/lib/mail/templates/LotteryLostMail";
 import { LotteryWonMail } from "@/lib/mail/templates/LotteryWonMail";
-import { env } from "@/lib/env";
+import { getSetting } from "@/lib/settings";
 import { prisma } from "@/lib/prisma";
 
 export type LotteryMailResult = {
@@ -65,6 +66,7 @@ export async function sendLotteryResultMails(
     ? `${env.appUrl}/products/${lottery.product.id}?lotteryId=${lottery.id}`
     : `${env.appUrl}/mypage/lottery-results`;
   const resultsUrl = `${env.appUrl}/mypage/lottery-results`;
+  const siteName = await getSetting("siteName");
 
   for (const entry of lottery.entries) {
     if (!entry.user.email) {
@@ -73,30 +75,52 @@ export async function sendLotteryResultMails(
     }
     try {
       if (entry.status === "WON") {
-        await sendMailTemplate({
+        await sendTemplatedMail({
+          kind: "LOTTERY_WON",
           to: entry.user.email,
-          subject: `【Avelia FunClub】「${lottery.title}」当選のお知らせ🎉`,
-          template: LotteryWonMail({
-            customerName: entry.user.name,
+          variables: {
+            siteName,
+            userName: entry.user.name ?? "",
             lotteryTitle: lottery.title,
-            productName: lottery.product?.name ?? null,
-            eventTitle: lottery.event?.title ?? null,
-            purchaseDeadlineLabel,
+            eventTitle: lottery.event?.title ?? "",
+            productName: lottery.product?.name ?? "",
+            purchaseDeadline: purchaseDeadlineLabel ?? "",
             purchaseUrl,
-          }),
+          },
+          fallback: {
+            subject: `【${siteName}】「${lottery.title}」当選のお知らせ🎉`,
+            template: LotteryWonMail({
+              customerName: entry.user.name,
+              lotteryTitle: lottery.title,
+              productName: lottery.product?.name ?? null,
+              eventTitle: lottery.event?.title ?? null,
+              purchaseDeadlineLabel,
+              purchaseUrl,
+            }),
+          },
           idempotencyKey: `lottery-won:${lottery.id}:${entry.id}`,
         });
         result.wonSent++;
       } else {
-        await sendMailTemplate({
+        await sendTemplatedMail({
+          kind: "LOTTERY_LOST",
           to: entry.user.email,
-          subject: `【Avelia FunClub】「${lottery.title}」抽選結果のお知らせ`,
-          template: LotteryLostMail({
-            customerName: entry.user.name,
+          variables: {
+            siteName,
+            userName: entry.user.name ?? "",
             lotteryTitle: lottery.title,
-            eventTitle: lottery.event?.title ?? null,
+            eventTitle: lottery.event?.title ?? "",
             resultsUrl,
-          }),
+          },
+          fallback: {
+            subject: `【${siteName}】「${lottery.title}」抽選結果のお知らせ`,
+            template: LotteryLostMail({
+              customerName: entry.user.name,
+              lotteryTitle: lottery.title,
+              eventTitle: lottery.event?.title ?? null,
+              resultsUrl,
+            }),
+          },
           idempotencyKey: `lottery-lost:${lottery.id}:${entry.id}`,
         });
         result.lostSent++;
