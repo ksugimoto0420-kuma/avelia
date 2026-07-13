@@ -98,7 +98,7 @@ export default async function SignSessionEntryPage() {
                     href={`/admin/sign-session/${g.firstDeliveryId}`}
                     size="sm"
                   >
-                    記入開始 →
+                    ✍ サインを書く
                   </Button>
                 }
               />

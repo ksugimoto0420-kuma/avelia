@@ -143,7 +143,7 @@ export default async function TalentHomePage() {
                   className="inline-flex h-14 shrink-0 items-center justify-center rounded-xl bg-brand-600 px-6 text-base font-bold text-white shadow sm:h-16 sm:px-8 sm:text-lg"
                   role="button"
                 >
-                  記入開始 →
+                  ✍ サインを書く
                 </span>
               </div>
             </Link>
