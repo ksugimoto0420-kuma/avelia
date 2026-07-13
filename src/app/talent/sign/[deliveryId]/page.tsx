@@ -118,14 +118,18 @@ export default async function TalentSignPage({
     },
   });
 
-  const baseUrl =
-    delivery.digitalContent.baseImageUrl ??
-    (delivery.digitalContent.baseImageKey
-      ? `/api/admin/deliveries/base-image/${encodeURIComponent(delivery.digitalContent.baseImageKey)}`
-      : null) ??
-    delivery.digitalContent.product?.imageUrl ??
-    delivery.orderItem.variant.product.imageUrl ??
-    null;
+  // #100: TALENT ロールは /api/admin/blob や /api/admin/deliveries/base-image
+  // にアクセスできないため、タレント専用エンドポイントを経由する。
+  // どの原本ソースにヒットするかはサーバー側で解決するので、ここでは
+  // 「原本ソースがあるか」だけを判定して URL を組む。
+  const hasAnyBaseSource =
+    !!delivery.digitalContent.baseImageKey ||
+    !!delivery.digitalContent.baseImageUrl ||
+    !!delivery.digitalContent.product?.imageUrl ||
+    !!delivery.orderItem.variant.product.imageUrl;
+  const baseUrl = hasAnyBaseSource
+    ? `/api/talent/deliveries/${delivery.id}/base-image`
+    : null;
 
   // 動画/画像の判定。DIGITAL_VIDEO_SIGN の商品なら動画として表示。
   const productKind =
@@ -163,6 +167,7 @@ export default async function TalentSignPage({
       nextHrefPrefix="/talent/sign/"
       doneHref="/talent/done"
       submitEndpoint="/api/talent/signatures"
+      fullscreen
     />
   );
 }

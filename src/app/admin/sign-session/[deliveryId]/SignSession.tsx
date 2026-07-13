@@ -27,6 +27,12 @@ type Props = {
   doneHref?: string;
   /** サイン送信先 API（既定: 管理者用） */
   submitEndpoint?: string;
+  /**
+   * タブレット横向き前提のフルスクリーンレイアウト (#100)。
+   * true にすると: viewport 全体を使う / 左右分割 / スクロールなし。
+   * 管理画面の従来レイアウトを保つため既定は false。
+   */
+  fullscreen?: boolean;
 };
 
 const PEN_COLORS: { label: string; value: string }[] = [
@@ -68,6 +74,7 @@ export function SignSession({
   nextHrefPrefix = "/admin/sign-session/",
   doneHref = "/admin/sign-session/done",
   submitEndpoint = "/api/admin/signatures",
+  fullscreen = false,
 }: Props) {
   const router = useRouter();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -164,164 +171,215 @@ export function SignSession({
     }
   }
 
-  return (
-    <div className="mx-auto max-w-3xl px-4 py-6 sm:py-10">
-      <div className="flex items-center justify-between gap-3">
-        <Link
-          href={exitHref}
-          className="text-sm text-gray-500 hover:text-gray-700"
-        >
-          ← 終了
-        </Link>
-        <span className="rounded-full bg-yellow-100 px-3 py-1 text-xs font-bold text-yellow-800">
-          残り {pendingCount} 件
-        </span>
-      </div>
+  // 共通の JSX (キャンバス / パレット / 太さ / ボタン群) は inline で使う。
+  // fullscreen=true のときは左右分割の viewport 全画面レイアウト、
+  // 既定 (管理画面) は従来の縦積みレイアウトを維持する。
 
-      <div className="mt-4 rounded-2xl bg-brand-50 px-5 py-4">
-        <div className="flex items-center gap-2 text-xs text-brand-500">
-          <span>{eventTitle}</span>
-          {/* #70: メディア種別バッジ (写真 / 動画) */}
-          {baseMediaKind === "video" ? (
-            <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-semibold text-purple-700">
-              🎬 動画サイン
-            </span>
-          ) : (
-            <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700">
-              📷 写真サイン
-            </span>
+  const canvasBox = (
+    <div
+      ref={containerRef}
+      className={
+        fullscreen
+          ? "relative h-full w-full overflow-hidden rounded-2xl border border-gray-200 bg-gray-100"
+          : "relative mt-5 aspect-[4/3] w-full overflow-hidden rounded-2xl border border-gray-200 bg-gray-100"
+      }
+    >
+      {baseImageUrl ? (
+        baseMediaKind === "video" ? (
+          <video
+            src={baseImageUrl}
+            controls
+            playsInline
+            className="absolute inset-0 h-full w-full object-contain"
+          />
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={baseImageUrl}
+            alt="原本"
+            className="absolute inset-0 h-full w-full object-contain"
+            draggable={false}
+          />
+        )
+      ) : (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4 text-center">
+          <p className="text-sm font-semibold text-amber-700">
+            サイン用ベース素材が未登録です
+          </p>
+          <p className="max-w-xs text-xs text-gray-600">
+            背景にする写真や動画が商品に登録されていません。
+            商品ページから「サイン用ベース画像/動画」を登録してください。
+          </p>
+          {productEditHref && (
+            <Link
+              href={productEditHref}
+              className="rounded-lg border border-amber-400 bg-white px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-50"
+            >
+              商品を編集する
+            </Link>
           )}
         </div>
-        <h1 className="mt-1 text-2xl font-bold text-brand-900">
-          「{nickname ?? "宛名なし"}」さんへ
-        </h1>
-        <p className="mt-1 text-sm text-brand-700">
-          {productName} {unitLabel && `／ ${unitLabel}`}
-        </p>
-      </div>
+      )}
+      <canvas
+        ref={canvasRef}
+        className="absolute inset-0 h-full w-full touch-none"
+        style={{ touchAction: "none" }}
+      />
+    </div>
+  );
 
-      <div
-        ref={containerRef}
-        className="relative mt-5 aspect-[4/3] w-full overflow-hidden rounded-2xl border border-gray-200 bg-gray-100"
+  const penPalette = (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="text-xs font-medium text-gray-500">ペン色</span>
+      {PEN_COLORS.map((c) => {
+        const active = penColor === c.value;
+        return (
+          <button
+            key={c.value}
+            type="button"
+            onClick={() => setPenColor(c.value)}
+            aria-label={`ペン色 ${c.label}`}
+            aria-pressed={active ? "true" : "false"}
+            className={`relative h-9 w-9 rounded-full border-2 transition ${
+              active
+                ? "border-brand-600 ring-2 ring-brand-200"
+                : "border-gray-300 hover:border-gray-500"
+            }`}
+            style={{ backgroundColor: c.value }}
+          >
+            <span className="sr-only">{c.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  const sizeSelector = (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="text-xs font-medium text-gray-500">太さ</span>
+      {PEN_SIZES.map((s, i) => {
+        const active = penSizeIndex === i;
+        return (
+          <button
+            key={s.label}
+            type="button"
+            onClick={() => setPenSizeIndex(i)}
+            aria-label={`ペン太さ ${s.label}`}
+            aria-pressed={active ? "true" : "false"}
+            className={`inline-flex h-9 min-w-16 items-center justify-center gap-2 rounded-lg border-2 px-3 text-xs font-semibold transition ${
+              active
+                ? "border-brand-600 bg-brand-50 text-brand-700"
+                : "border-gray-300 bg-white text-gray-600 hover:border-gray-500"
+            }`}
+          >
+            <span
+              className="block rounded-full bg-current"
+              style={{ width: s.preview, height: s.preview }}
+            />
+            {s.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  const actionButtons = (
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <button
+        onClick={clear}
+        disabled={submitting}
+        className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
       >
-        {baseImageUrl ? (
-          baseMediaKind === "video" ? (
-            <video
-              src={baseImageUrl}
-              controls
-              playsInline
-              className="absolute inset-0 h-full w-full object-contain"
-            />
-          ) : (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={baseImageUrl}
-              alt="原本"
-              className="absolute inset-0 h-full w-full object-contain"
-              draggable={false}
-            />
-          )
+        書き直す
+      </button>
+      <button
+        onClick={submit}
+        disabled={submitting}
+        className="flex-1 rounded-lg bg-brand-600 px-6 py-3 text-base font-bold text-white hover:bg-brand-700 disabled:opacity-50 sm:flex-initial"
+      >
+        {submitting ? "送信中…" : "送信して次の方へ →"}
+      </button>
+    </div>
+  );
+
+  const infoCard = (
+    <div className="rounded-2xl bg-brand-50 px-5 py-4">
+      <div className="flex items-center gap-2 text-xs text-brand-500">
+        <span>{eventTitle}</span>
+        {baseMediaKind === "video" ? (
+          <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-semibold text-purple-700">
+            🎬 動画サイン
+          </span>
         ) : (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4 text-center">
-            <p className="text-sm font-semibold text-amber-700">
-              サイン用ベース素材が未登録です
-            </p>
-            <p className="max-w-xs text-xs text-gray-600">
-              背景にする写真や動画が商品に登録されていません。
-              商品ページから「サイン用ベース画像/動画」を登録してください。
-            </p>
-            {productEditHref && (
-              <Link
-                href={productEditHref}
-                className="rounded-lg border border-amber-400 bg-white px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-50"
-              >
-                商品を編集する
-              </Link>
-            )}
-          </div>
+          <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700">
+            📷 写真サイン
+          </span>
         )}
-        <canvas
-          ref={canvasRef}
-          className="absolute inset-0 h-full w-full touch-none"
-          style={{ touchAction: "none" }}
-        />
       </div>
+      <h1 className="mt-1 text-2xl font-bold text-brand-900">
+        「{nickname ?? "宛名なし"}」さんへ
+      </h1>
+      <p className="mt-1 text-sm text-brand-700">
+        {productName} {unitLabel && `／ ${unitLabel}`}
+      </p>
+    </div>
+  );
 
-      {/* カラーパレット */}
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        <span className="text-xs font-medium text-gray-500">ペン色</span>
-        {PEN_COLORS.map((c) => {
-          const active = penColor === c.value;
-          return (
-            <button
-              key={c.value}
-              type="button"
-              onClick={() => setPenColor(c.value)}
-              aria-label={`ペン色 ${c.label}`}
-              aria-pressed={active ? "true" : "false"}
-              className={`relative h-9 w-9 rounded-full border-2 transition ${
-                active
-                  ? "border-brand-600 ring-2 ring-brand-200"
-                  : "border-gray-300 hover:border-gray-500"
-              }`}
-              style={{ backgroundColor: c.value }}
-            >
-              <span className="sr-only">{c.label}</span>
-            </button>
-          );
-        })}
+  const topBar = (
+    <div className="flex items-center justify-between gap-3">
+      <Link
+        href={exitHref}
+        className="text-sm text-gray-500 hover:text-gray-700"
+      >
+        ← 終了
+      </Link>
+      <span className="rounded-full bg-yellow-100 px-3 py-1 text-xs font-bold text-yellow-800">
+        残り {pendingCount} 件
+      </span>
+    </div>
+  );
+
+  // ─── fullscreen (タブレット横向き) レイアウト ──────────────────────
+  if (fullscreen) {
+    return (
+      <div className="fixed inset-0 flex h-screen w-screen flex-col bg-gradient-to-br from-brand-50 to-white p-3">
+        <div className="mb-2 shrink-0">{topBar}</div>
+        <div className="flex min-h-0 flex-1 gap-3">
+          {/* 左: キャンバス (画面幅の可能な限り) */}
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            {canvasBox}
+          </div>
+          {/* 右: 情報 + パレット + ボタン (固定幅) */}
+          <div className="flex w-72 shrink-0 flex-col gap-3 overflow-y-auto lg:w-80">
+            {infoCard}
+            {penPalette}
+            {sizeSelector}
+            {error && (
+              <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+                {error}
+              </div>
+            )}
+            <div className="mt-auto">{actionButtons}</div>
+          </div>
+        </div>
       </div>
+    );
+  }
 
-      {/* 太さセレクタ */}
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <span className="text-xs font-medium text-gray-500">太さ</span>
-        {PEN_SIZES.map((s, i) => {
-          const active = penSizeIndex === i;
-          return (
-            <button
-              key={s.label}
-              type="button"
-              onClick={() => setPenSizeIndex(i)}
-              aria-label={`ペン太さ ${s.label}`}
-              aria-pressed={active ? "true" : "false"}
-              className={`inline-flex h-9 min-w-16 items-center justify-center gap-2 rounded-lg border-2 px-3 text-xs font-semibold transition ${
-                active
-                  ? "border-brand-600 bg-brand-50 text-brand-700"
-                  : "border-gray-300 bg-white text-gray-600 hover:border-gray-500"
-              }`}
-            >
-              <span
-                className="block rounded-full bg-current"
-                style={{ width: s.preview, height: s.preview }}
-              />
-              {s.label}
-            </button>
-          );
-        })}
-      </div>
-
+  // ─── 従来レイアウト (管理画面: 縦積み) ───────────────────────────
+  return (
+    <div className="mx-auto max-w-3xl px-4 py-6 sm:py-10">
+      {topBar}
+      <div className="mt-4">{infoCard}</div>
+      {canvasBox}
+      <div className="mt-4">{penPalette}</div>
+      <div className="mt-3">{sizeSelector}</div>
       {error && (
         <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
           {error}
         </div>
       )}
-
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-        <button
-          onClick={clear}
-          disabled={submitting}
-          className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-        >
-          書き直す
-        </button>
-        <button
-          onClick={submit}
-          disabled={submitting}
-          className="flex-1 rounded-lg bg-brand-600 px-6 py-3 text-base font-bold text-white hover:bg-brand-700 disabled:opacity-50 sm:flex-initial"
-        >
-          {submitting ? "送信中…" : "送信して次の方へ →"}
-        </button>
-      </div>
+      <div className="mt-4">{actionButtons}</div>
     </div>
   );
 }
