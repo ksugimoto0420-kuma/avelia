@@ -3,8 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { AppError } from "@/lib/api";
 import { requireAdmin } from "@/lib/auth/guards";
-import { env } from "@/lib/env";
-import { sendMail } from "@/lib/mail";
+import { sendSignatureReadyMail } from "@/lib/mail/sendSignatureReadyMail";
 import { logOperation } from "@/lib/operation-log";
 import { prisma } from "@/lib/prisma";
 
@@ -60,11 +59,7 @@ export async function markDeliveryReady(formData: FormData) {
 
   // 初回 READY 化のときのみ購入者へ通知（差し替えでは再送しない）
   if (wasPending) {
-    await sendMail({
-      to: delivery.user.email,
-      subject: "【Avelia FunClub】サイン入りコンテンツの準備ができました",
-      text: `${delivery.user.name ?? "お客"}様\n\nご注文 ${delivery.order.orderNumber} の「${delivery.digitalContent.title}」（宛名: ${delivery.nickname ?? "-"}）のサイン入りコンテンツの準備ができました。\n\nマイページ（ログイン後）の「デジタルコンテンツ」からダウンロードいただけます。\n${env.appUrl}/mypage/digital-contents`,
-    });
+    await sendSignatureReadyMail(deliveryId);
   }
 
   revalidatePath("/admin/digital-deliveries");
@@ -128,11 +123,8 @@ export async function approveSignature(formData: FormData) {
     targetId: deliveryId,
   });
 
-  await sendMail({
-    to: delivery.user.email,
-    subject: "【Avelia FunClub】サイン入りコンテンツの準備ができました",
-    text: `${delivery.user.name ?? "お客"}様\n\nご注文 ${delivery.order.orderNumber} の「${delivery.digitalContent.title}」（宛名: ${delivery.nickname ?? "-"}）のサイン入りコンテンツの準備ができました。\n\nマイページの「デジタルコンテンツ」からダウンロードいただけます。\n${env.appUrl}/mypage/digital-contents`,
-  });
+  // #39: 写真/動画で本文を分岐する統一テンプレートで送信
+  await sendSignatureReadyMail(deliveryId);
 
   revalidatePath("/admin/digital-deliveries");
 }
@@ -165,6 +157,37 @@ export async function rejectSignature(formData: FormData) {
     targetType: "DigitalDelivery",
     targetId: deliveryId,
     detail: { reason },
+  });
+
+  revalidatePath("/admin/digital-deliveries");
+}
+
+/**
+ * #39: サイン完了メールを手動で再送する。
+ * 送信失敗時のリカバリ、顧客からの「届いていない」問い合わせ対応用。
+ * DigitalDelivery が READY でない場合はエラー。
+ */
+export async function resendSignatureReadyMail(formData: FormData) {
+  const admin = await requireAdmin("OPERATOR");
+  const deliveryId = formData.get("deliveryId") as string;
+  if (!deliveryId) throw new AppError("入力が不正です", 400);
+
+  const delivery = await prisma.digitalDelivery.findUnique({
+    where: { id: deliveryId },
+    select: { status: true },
+  });
+  if (!delivery) throw new AppError("納品が見つかりません", 404);
+  if (delivery.status !== "READY") {
+    throw new AppError("納品が完了していません", 409);
+  }
+
+  await sendSignatureReadyMail(deliveryId);
+
+  await logOperation({
+    adminUserId: admin.id,
+    action: "signature.mail.resend",
+    targetType: "DigitalDelivery",
+    targetId: deliveryId,
   });
 
   revalidatePath("/admin/digital-deliveries");
