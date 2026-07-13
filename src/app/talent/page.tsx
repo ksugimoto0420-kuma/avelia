@@ -1,7 +1,6 @@
 import { Prisma } from "@prisma/client";
 import Link from "next/link";
 import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { requireTalentPage } from "@/lib/auth/talent-page";
 import { prisma } from "@/lib/prisma";
@@ -108,37 +107,46 @@ export default async function TalentHomePage() {
       {groups.length === 0 ? (
         <Card>
           <CardBody>
-            <p className="py-12 text-center text-gray-400">
+            <p className="py-16 text-center text-gray-400">
               現在サイン待ちのご注文はありません ✨
             </p>
           </CardBody>
         </Card>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-4">
           {groups.map((g) => (
-            <Card key={g.eventId}>
-              <CardHeader
-                title={
-                  <span className="flex flex-wrap items-center gap-2">
+            <Link
+              key={g.eventId}
+              href={`/talent/sign/${g.firstDeliveryId}`}
+              className="block"
+            >
+              {/* タブレットで押しやすい大きめのタッチ領域。カード全体がタップ対象。 */}
+              <div className="flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition hover:border-brand-300 hover:shadow-md sm:flex-row sm:items-center sm:justify-between sm:p-6">
+                <div className="min-w-0 flex-1 space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <Badge color="yellow">サイン待ち {g.pendingCount}件</Badge>
-                    {/* #70: 写真/動画の内訳バッジ */}
                     {g.photoCount > 0 && (
                       <Badge color="blue">📷 写真 {g.photoCount}件</Badge>
                     )}
                     {g.videoCount > 0 && (
                       <Badge color="purple">🎬 動画 {g.videoCount}件</Badge>
                     )}
+                  </div>
+                  <p className="text-lg font-bold text-gray-900 sm:text-xl">
                     {g.eventTitle}
-                  </span>
-                }
-                subtitle={g.artistName ?? undefined}
-                action={
-                  <Button href={`/talent/sign/${g.firstDeliveryId}`} size="sm">
-                    記入開始 →
-                  </Button>
-                }
-              />
-            </Card>
+                  </p>
+                  {g.artistName && (
+                    <p className="text-sm text-gray-500">{g.artistName}</p>
+                  )}
+                </div>
+                <span
+                  className="inline-flex h-14 shrink-0 items-center justify-center rounded-xl bg-brand-600 px-6 text-base font-bold text-white shadow sm:h-16 sm:px-8 sm:text-lg"
+                  role="button"
+                >
+                  記入開始 →
+                </span>
+              </div>
+            </Link>
           ))}
         </div>
       )}
