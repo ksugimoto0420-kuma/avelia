@@ -7,10 +7,11 @@ export default function TalentDonePage() {
     <div className="mx-auto max-w-md px-4 py-24 text-center">
       <p className="text-6xl">✨</p>
       <h1 className="mt-6 text-3xl font-bold text-gray-900">
-        ありがとうございました！
+        すべて書き終わりました！
       </h1>
       <p className="mt-3 text-base text-gray-500">
-        書いていただいたサインは即時、購入者にメールで通知されます。
+        サイン待ちのご注文はすべて完了しました。
+        書いていただいたサインは即時、購入者にメールで通知されています。
         おつかれさまでした。
       </p>
       <div className="mt-10 flex flex-wrap justify-center gap-3">
