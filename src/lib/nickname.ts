@@ -11,12 +11,16 @@ export type UnitNickname = {
  * 不足分は空、超過分は切り捨て。
  *
  * `fallback` に単一入力 (nickname / nicknameKana) が渡された場合、
- * 「まだ埋まっていない最初の枠」にそれを差し込む。
+ * 「まだ埋まっていない枠すべて」にそれを流し込む。
+ * 既に埋まっている枠は上書きしない (2回目の追加で別名を入れられる)。
  *
- * 例) 既存 [{kuma, くま}] に「太郎」を追加すると
- *   → [{kuma, くま}, {太郎, ...}] になる (2個目に落ち着く)
- * 例) 既存 なしで数量2 + 「太郎」を送ると
- *   → [{太郎, ...}, {null, null}] になる (先頭に入る)
+ * 例)
+ * - 既存なしで数量2 + 「太郎」で追加
+ *   → [{太郎}, {太郎}]  (同じ名前で複数個買う想定)
+ * - 既存 [{kuma}] に数量1 + 「太郎」で追加 (合計数量2)
+ *   → [{kuma}, {太郎}]  (2個目に太郎が入る)
+ * - 既存 [{kuma}, {太郎}] に数量1 + 「三郎」で追加 (合計数量3)
+ *   → [{kuma}, {太郎}, {三郎}]
  */
 export function normalizeUnitNicknames(
   input: unknown,
@@ -38,18 +42,21 @@ export function normalizeUnitNicknames(
     });
   }
 
-  // fallback (単一入力) を「未入力の最初の枠」に差し込む。
-  // 既存の入力を上書きしないため、追加投入時の挙動が直感的になる。
+  // fallback (単一入力) を「未入力の枠すべて」に流し込む。
+  // 既に埋まっている枠は上書きしないので、
+  // - 数量2 新規 + 太郎 → [太郎, 太郎] (同じ名前で複数個)
+  // - 既存 kuma に太郎追加 → [kuma, 太郎] (kuma は上書きされない)
   const fbNickname = fallback?.nickname?.trim();
   const fbKana = fallback?.nicknameKana?.trim();
   const fbNote = fallback?.note?.trim();
   if (fbNickname || fbKana || fbNote) {
-    const idx = out.findIndex((u) => !u.nickname && !u.nicknameKana && !u.note);
-    if (idx >= 0) {
-      out[idx] = {
-        nickname: fbNickname || out[idx].nickname,
-        nicknameKana: fbKana || out[idx].nicknameKana,
-        note: fbNote || out[idx].note,
+    for (let i = 0; i < out.length; i++) {
+      const u = out[i];
+      if (u.nickname || u.nicknameKana || u.note) continue;
+      out[i] = {
+        nickname: fbNickname || null,
+        nicknameKana: fbKana || null,
+        note: fbNote || null,
       };
     }
   }
