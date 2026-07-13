@@ -6,6 +6,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { requireAdminPage } from "@/lib/auth/admin-page";
 import { prisma } from "@/lib/prisma";
 import { deleteEvent } from "../actions";
+import { EventCancelButton } from "./EventCancelButton";
 
 export const dynamic = "force-dynamic";
 
@@ -71,6 +72,21 @@ export default async function EditEventPage({
         </Link>
       </p>
 
+      {/* #42: 開催中止フロー。対象注文があるときのみ意味があるので表示条件をつける */}
+      {orderCount > 0 && (
+        <Card className="border-red-200">
+          <CardHeader title="開催中止" />
+          <CardBody className="space-y-3">
+            <p className="text-sm text-gray-600">
+              対象の支払済注文 ({orderCount} 件) を Stripe で全額返金し、
+              イベントを非公開化、対象ファンに開催中止メールを送信します。
+              確認モーダルで対象件数と返金総額をプレビューできます。
+            </p>
+            <EventCancelButton eventId={event.id} eventTitle={event.title} />
+          </CardBody>
+        </Card>
+      )}
+
       <Card className="border-red-200">
         <CardHeader title="削除" />
         <CardBody className="space-y-3">
@@ -91,7 +107,7 @@ export default async function EditEventPage({
             </>
           ) : (
             <p className="text-sm text-gray-600">
-              このイベントには {orderCount} 件の注文があるため削除できません。販売を終了する場合は「非公開」に切り替えてください。
+              このイベントには {orderCount} 件の注文があるため削除できません。販売を終了する場合は「非公開」に切り替えるか、上の「開催中止」から一括返金してください。
             </p>
           )}
         </CardBody>
