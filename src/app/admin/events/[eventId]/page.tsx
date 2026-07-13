@@ -44,15 +44,25 @@ export default async function EditEventPage({
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-bold text-gray-900">イベント編集</h1>
-        <Button
-          href={`/admin/products?eventId=${event.id}`}
-          variant="outline"
-          size="sm"
-        >
-          商品を管理（{event.products.length}）
-        </Button>
+        <div className="flex items-center gap-2">
+          {/* #4: 関連注文を見る */}
+          <Button
+            href={`/admin/orders?eventId=${event.id}&month=all`}
+            variant="outline"
+            size="sm"
+          >
+            📦 関連注文を見る
+          </Button>
+          <Button
+            href={`/admin/products?eventId=${event.id}`}
+            variant="outline"
+            size="sm"
+          >
+            商品を管理（{event.products.length}）
+          </Button>
+        </div>
       </div>
       <EventForm event={event} artists={artists} />
       <p className="text-right text-sm">

@@ -288,3 +288,22 @@ export function InvoiceDocument(props: InvoiceDocumentProps) {
     </Document>
   );
 }
+
+/**
+ * 複数注文の連結 PDF ドキュメント。1ファイルに全件が並ぶ (仕様書 5-3)。
+ */
+export function InvoiceBundleDocument({
+  invoices,
+  title,
+}: {
+  invoices: InvoiceDocumentProps[];
+  title: string;
+}) {
+  return (
+    <Document title={title}>
+      {invoices.map((inv) => (
+        <InvoicePage key={inv.invoiceNumber} {...inv} />
+      ))}
+    </Document>
+  );
+}
