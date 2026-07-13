@@ -1,9 +1,10 @@
 import { handleError, ok } from "@/lib/api";
 import { generateToken } from "@/lib/auth/tokens";
 import { env } from "@/lib/env";
-import { sendMailTemplate } from "@/lib/mail";
+import { sendTemplatedMail } from "@/lib/mail/resolveTemplate";
 import { PasswordResetMail } from "@/lib/mail/templates/PasswordResetMail";
 import { prisma } from "@/lib/prisma";
+import { getSetting } from "@/lib/settings";
 import { requestResetSchema } from "@/lib/validators";
 
 export const runtime = "nodejs";
@@ -32,10 +33,19 @@ export async function POST(req: Request) {
       });
 
       const resetUrl = `${env.appUrl}/auth/reset-password?token=${token}`;
-      await sendMailTemplate({
+      const siteName = await getSetting("siteName");
+      await sendTemplatedMail({
+        kind: "PASSWORD_RESET",
         to: user.email,
-        subject: "【Avelia FunClub】パスワード再設定のご案内",
-        template: <PasswordResetMail resetUrl={resetUrl} name={user.name} />,
+        variables: {
+          siteName,
+          userName: user.name ?? "",
+          resetUrl,
+        },
+        fallback: {
+          subject: `【${siteName}】パスワード再設定のご案内`,
+          template: <PasswordResetMail resetUrl={resetUrl} name={user.name} />,
+        },
       });
     }
 

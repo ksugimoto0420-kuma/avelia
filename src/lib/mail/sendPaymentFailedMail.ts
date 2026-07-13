@@ -1,6 +1,7 @@
-import { sendMailTemplate } from "@/lib/mail";
-import { PaymentFailedMail } from "@/lib/mail/templates/PaymentFailedMail";
 import { env } from "@/lib/env";
+import { sendTemplatedMail } from "@/lib/mail/resolveTemplate";
+import { PaymentFailedMail } from "@/lib/mail/templates/PaymentFailedMail";
+import { getSetting } from "@/lib/settings";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -29,16 +30,39 @@ export async function sendPaymentFailedMail(
 
   const retryUrl = `${env.appUrl}/mypage/orders/${order.id}`;
 
-  await sendMailTemplate({
+  const siteName = await getSetting("siteName");
+  const humanReason = humanizeReason(reason);
+  const reservationLabel = order.reservationExpiresAt
+    ? new Intl.DateTimeFormat("ja-JP", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone: "Asia/Tokyo",
+      }).format(order.reservationExpiresAt)
+    : "";
+  await sendTemplatedMail({
+    kind: "PAYMENT_FAILED",
     to: order.user.email,
-    subject: `【Avelia FunClub】ご注文 ${order.orderNumber} の決済ができませんでした`,
-    template: PaymentFailedMail({
-      customerName: order.user.name,
+    variables: {
+      siteName,
+      userName: order.user.name ?? "",
       orderNumber: order.orderNumber,
-      reason: humanizeReason(reason),
+      reason: humanReason ?? "",
+      reservationExpiresAt: reservationLabel,
       retryUrl,
-      reservationExpiresAt: order.reservationExpiresAt,
-    }),
+    },
+    fallback: {
+      subject: `【${siteName}】ご注文 ${order.orderNumber} の決済ができませんでした`,
+      template: PaymentFailedMail({
+        customerName: order.user.name,
+        orderNumber: order.orderNumber,
+        reason: humanReason,
+        retryUrl,
+        reservationExpiresAt: order.reservationExpiresAt,
+      }),
+    },
     idempotencyKey: `payment-failed:${order.id}`,
   });
 }

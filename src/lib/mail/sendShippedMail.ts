@@ -1,6 +1,7 @@
-import { sendMailTemplate } from "@/lib/mail";
-import { ShippedMail } from "@/lib/mail/templates/ShippedMail";
 import { env } from "@/lib/env";
+import { sendTemplatedMail } from "@/lib/mail/resolveTemplate";
+import { ShippedMail } from "@/lib/mail/templates/ShippedMail";
+import { getSetting } from "@/lib/settings";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -51,17 +52,31 @@ export async function sendShippedMail(orderId: string): Promise<void> {
     order.shipment?.trackingNumber ?? null,
   );
 
-  await sendMailTemplate({
+  const siteName = await getSetting("siteName");
+  const orderUrl = `${env.appUrl}/mypage/orders/${order.id}`;
+  await sendTemplatedMail({
+    kind: "SHIPPED",
     to: order.user.email,
-    subject: `【Avelia FunClub】ご注文 ${order.orderNumber} を発送しました`,
-    template: ShippedMail({
-      customerName: order.user.name,
+    variables: {
+      siteName,
+      userName: order.user.name ?? "",
       orderNumber: order.orderNumber,
-      carrier: order.shipment?.carrier ?? null,
-      trackingNumber: order.shipment?.trackingNumber ?? null,
-      trackingUrl,
-      orderUrl: `${env.appUrl}/mypage/orders/${order.id}`,
-    }),
+      carrier: order.shipment?.carrier ?? "",
+      trackingNumber: order.shipment?.trackingNumber ?? "",
+      trackingUrl: trackingUrl ?? "",
+      orderUrl,
+    },
+    fallback: {
+      subject: `【${siteName}】ご注文 ${order.orderNumber} を発送しました`,
+      template: ShippedMail({
+        customerName: order.user.name,
+        orderNumber: order.orderNumber,
+        carrier: order.shipment?.carrier ?? null,
+        trackingNumber: order.shipment?.trackingNumber ?? null,
+        trackingUrl,
+        orderUrl,
+      }),
+    },
     // 同じ orderId で複数回呼ばれても Resend 側で重複を弾く
     idempotencyKey: `shipped:${order.id}`,
   });
