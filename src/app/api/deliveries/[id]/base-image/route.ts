@@ -189,7 +189,12 @@ export async function GET(
 
 /**
  * `/api/admin/blob/<bucket>/<...key>` を再解析して bucket + key を復元する。
- * VercelBlobDriver.buildAdminBlobUrl が生成する URL 形式に対応する。
+ * 管理者ルート (`/api/admin/blob/[bucket]/[...key]`) と同じ流儀で、
+ * key は bucket プレフィックス無しの形で storage.getFile に渡す。
+ * 実データの pathname には bucket が二重に含まれるケースもあるが (旧仕様の
+ * put() 実装が bucket を先頭に埋め込むため)、その場合も URL の [...key] 側に
+ * "private-admin/private-admin/..." のように現れるので、そのまま渡せば
+ * 実 pathname と一致する。
  */
 function parseAdminBlobUrl(
   url: string,
@@ -197,8 +202,6 @@ function parseAdminBlobUrl(
   const m = url.match(/^\/api\/admin\/blob\/([^/]+)\/(.+)$/);
   if (!m) return null;
   const bucket = decodeURIComponent(m[1]) as StorageBucket;
-  const segments = m[2].split("/").map((s) => decodeURIComponent(s));
-  // 保存時は bucket プレフィックスを除いた形で URL 化されているため戻す
-  const key = `${bucket}/${segments.join("/")}`;
+  const key = m[2].split("/").map((s) => decodeURIComponent(s)).join("/");
   return { bucket, key };
 }
