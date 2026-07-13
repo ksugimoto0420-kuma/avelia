@@ -7,7 +7,7 @@ export const metadata: Metadata = {
     template: "%s | Avelia FunClub",
   },
   description:
-    "アイドル・アーティストのオンライン特典会・サイン会、直筆サイン入りグッズ・アベリアくじ・トレカのファン向けショップ",
+    "アイドル・アーティストのオンライン特典会・サイン会、直筆サイン入りグッズのファン向けショップ",
 };
 
 export const viewport: Viewport = {
