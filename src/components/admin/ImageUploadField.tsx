@@ -43,6 +43,11 @@ export type ImageUploadFieldProps = {
   /** input が受け付ける MIME (デフォルト image/*)。 */
   accept?: string;
   /**
+   * メディア種別。UI の文言 (「画像」/「動画」)、プレビュー表示方式、
+   * スマホでのカメラ起動属性 (capture) を切り替える。既定 "image"。
+   */
+  mediaKind?: "image" | "video";
+  /**
    * URL 手入力欄を表示するかどうか。デフォルト true。
    * サイン用ベース画像/動画のようにアップロード専用で運用する項目では false にする。
    */
@@ -77,6 +82,7 @@ export function ImageUploadField({
   hint = "JPG / PNG / WebP に対応。",
   previewAspect = "cover-16-9",
   accept = "image/*",
+  mediaKind = "image",
   showUrlInput = true,
   className,
 }: ImageUploadFieldProps) {
@@ -101,8 +107,12 @@ export function ImageUploadField({
   const [uploadedFilename, setUploadedFilename] = useState<string | null>(null);
 
   const [uploading, setUploading] = useState(false);
+  /** アップロード進捗 (0-100)。fetch は progress 非対応なので XHR を使う。 */
+  const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
+
+  const noun = mediaKind === "video" ? "動画" : "画像";
 
   const inputRef = useRef<HTMLInputElement | null>(null);
   const openPicker = () => {
@@ -111,45 +121,76 @@ export function ImageUploadField({
     inputRef.current?.click();
   };
 
-  const upload = async (file: File) => {
+  const upload = (file: File) => {
     setUploading(true);
+    setProgress(0);
     setError(null);
-    try {
-      const form = new FormData();
-      form.append("file", file);
-      form.append("bucket", bucket);
-      form.append("purpose", purpose);
-      if (
-        purpose === "product" ||
-        purpose === "event" ||
-        purpose === "artist" ||
-        purpose === "kuji-banner" ||
-        purpose === "kuji-prize"
-      ) {
-        form.append("entityId", targetId ?? "");
-      } else {
-        form.append("contentId", targetId ?? "");
-      }
 
-      const res = await fetch("/api/admin/uploads", {
-        method: "POST",
-        body: form,
-      });
-      if (!res.ok) {
-        const body = await res.text();
-        throw new Error(`${res.status}: ${body || "アップロードに失敗しました"}`);
-      }
-      const json = (await res.json()) as { data?: { url?: string } };
-      const uploadedUrl = json.data?.url;
-      if (!uploadedUrl) throw new Error("URLが取得できませんでした");
-      setUrl(uploadedUrl);
-      setMode("uploaded");
-      setUploadedFilename(file.name);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setUploading(false);
+    const form = new FormData();
+    form.append("file", file);
+    form.append("bucket", bucket);
+    form.append("purpose", purpose);
+    if (
+      purpose === "product" ||
+      purpose === "event" ||
+      purpose === "artist" ||
+      purpose === "kuji-banner" ||
+      purpose === "kuji-prize"
+    ) {
+      form.append("entityId", targetId ?? "");
+    } else {
+      form.append("contentId", targetId ?? "");
     }
+
+    // XHR で進捗を取る (fetch は progress 非対応)
+    return new Promise<void>((resolve) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", "/api/admin/uploads");
+      xhr.upload.addEventListener("progress", (e) => {
+        if (e.lengthComputable) {
+          setProgress(Math.round((e.loaded / e.total) * 100));
+        }
+      });
+      xhr.addEventListener("load", () => {
+        try {
+          if (xhr.status < 200 || xhr.status >= 300) {
+            const body = xhr.responseText || "";
+            // 代表的なエラーを人間向け文言に変換
+            if (xhr.status === 413) {
+              throw new Error(
+                `${noun}のサイズが大きすぎます (アップロード可能な上限を超えました)`,
+              );
+            }
+            throw new Error(
+              `${noun}のアップロードに失敗しました (${xhr.status}${body ? `: ${body}` : ""})`,
+            );
+          }
+          const json = JSON.parse(xhr.responseText || "{}") as {
+            data?: { url?: string };
+          };
+          const uploadedUrl = json.data?.url;
+          if (!uploadedUrl) throw new Error("URLが取得できませんでした");
+          setUrl(uploadedUrl);
+          setMode("uploaded");
+          setUploadedFilename(file.name);
+        } catch (e) {
+          setError(e instanceof Error ? e.message : String(e));
+        } finally {
+          setUploading(false);
+          setProgress(null);
+          resolve();
+        }
+      });
+      xhr.addEventListener("error", () => {
+        setError(
+          `${noun}のアップロード中にネットワークエラーが発生しました。電波の良い場所で再度お試しください。`,
+        );
+        setUploading(false);
+        setProgress(null);
+        resolve();
+      });
+      xhr.send(form);
+    });
   };
 
   const onFilesSelected = async (files: FileList | null) => {
@@ -233,6 +274,9 @@ export function ImageUploadField({
           type="file"
           accept={accept}
           className="hidden"
+          // 動画のときはスマホで「カメラ起動」も選択可能に。
+          // (image でも user-facing カメラは有用だが、既存の挙動を維持したいので動画のみ)
+          {...(mediaKind === "video" ? { capture: "environment" as const } : {})}
           onChange={(e) => {
             void onFilesSelected(e.target.files);
             e.target.value = "";
@@ -241,7 +285,21 @@ export function ImageUploadField({
         {uploading ? (
           <>
             <span className="h-5 w-5 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
-            <span className="text-sm">アップロード中...</span>
+            <span className="text-sm">
+              {noun}をアップロード中
+              {progress != null ? ` … ${progress}%` : "…"}
+            </span>
+            {progress != null && (
+              <div className="mt-1 h-2 w-full max-w-xs overflow-hidden rounded-full bg-gray-200">
+                <div
+                  className="h-full bg-brand-500 transition-[width] duration-150"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+            )}
+            <span className="text-xs text-gray-500">
+              画面を閉じずにお待ちください
+            </span>
           </>
         ) : mode === "uploaded" ? (
           <>
@@ -251,18 +309,20 @@ export function ImageUploadField({
               {uploadedFilename ? `: ${uploadedFilename}` : ""}
             </span>
             <span className="text-xs">
-              差し替えるには、ここをクリック / ドロップしてください
+              差し替えるには、ここをタップして{noun}を選び直してください
             </span>
           </>
         ) : (
           <>
             <span className="text-2xl leading-none">
-              {isUploadDisabled ? "🔒" : "📷"}
+              {isUploadDisabled ? "🔒" : mediaKind === "video" ? "🎬" : "📷"}
             </span>
             <span className="text-sm font-medium">
               {isUploadDisabled
                 ? "URL入力が有効なため無効化されています"
-                : "画像をドラッグ&ドロップ、またはクリックして選択"}
+                : mediaKind === "video"
+                  ? "タップして動画を選ぶ（スマホはカメラで撮影も可）"
+                  : "画像をタップして選択（PCではドラッグ&ドロップも可）"}
             </span>
             <span className="text-xs">{hint}</span>
           </>
@@ -314,21 +374,36 @@ export function ImageUploadField({
                   : "w-full bg-gray-50"
             }
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={url}
-              alt="プレビュー"
-              className={
-                previewAspect === "auto"
-                  ? "block max-h-64 w-auto"
-                  : "h-full w-full object-cover"
-              }
-            />
+            {mediaKind === "video" ? (
+              <video
+                src={url}
+                controls
+                playsInline
+                className={
+                  previewAspect === "auto"
+                    ? "block max-h-64 w-auto"
+                    : "h-full w-full object-contain"
+                }
+              />
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={url}
+                alt="プレビュー"
+                className={
+                  previewAspect === "auto"
+                    ? "block max-h-64 w-auto"
+                    : "h-full w-full object-cover"
+                }
+              />
+            )}
           </div>
           <p className="bg-gray-50 px-2 py-1 text-xs text-gray-500">
             プレビュー
-            {previewAspect === "cover-16-9" && "（16:9 でトリミング）"}
-            {previewAspect === "square" && "（1:1 でトリミング）"}
+            {mediaKind !== "video" && previewAspect === "cover-16-9" &&
+              "（16:9 でトリミング）"}
+            {mediaKind !== "video" && previewAspect === "square" &&
+              "（1:1 でトリミング）"}
           </p>
         </div>
       )}
