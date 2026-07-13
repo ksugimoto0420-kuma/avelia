@@ -1,23 +1,11 @@
-import { KujiCampaignForm } from "@/components/admin/KujiCampaignForm";
-import { requireAdminPage } from "@/lib/auth/admin-page";
-import { prisma } from "@/lib/prisma";
+import { notFound } from "next/navigation";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "新規アベリアくじ" };
 
+/**
+ * 管理: 新規アベリアくじ。Phase 1 では非表示。
+ * 実装は git history に残っている。Phase 2 で戻す際に復元する。
+ */
 export default async function NewKujiPage() {
-  await requireAdminPage("OPERATOR");
-  const artists = await prisma.artist.findMany({
-    orderBy: { createdAt: "desc" },
-    take: 200,
-    select: { id: true, name: true },
-  });
-  return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">新規アベリアくじ</h1>
-      <KujiCampaignForm
-        artists={artists.map((a) => ({ id: a.id, label: a.name }))}
-      />
-    </div>
-  );
+  notFound();
 }

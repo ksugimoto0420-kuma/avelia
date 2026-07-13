@@ -44,6 +44,9 @@ export default async function MypageOverview() {
   ]);
   const contentCount = grantCount + deliveryCount;
 
+  // Phase 1 ではアベリアくじカードは非表示。集計 (kujiDrawCount) は
+  // 保持しておくが、UI からは外す。Phase 2 で戻す際にコメントを外す。
+  void kujiDrawCount;
   const stats = [
     { label: "注文数", value: orderCount, href: "/mypage/orders" },
     {
@@ -57,11 +60,11 @@ export default async function MypageOverview() {
       href: "/mypage/digital-contents",
     },
     { label: "当選", value: wonCount, href: "/mypage/lottery-results" },
-    {
-      label: "アベリアくじ",
-      value: kujiDrawCount,
-      href: "/mypage/kuji",
-    },
+    // {
+    //   label: "アベリアくじ",
+    //   value: kujiDrawCount,
+    //   href: "/mypage/kuji",
+    // },
   ];
 
   return (
