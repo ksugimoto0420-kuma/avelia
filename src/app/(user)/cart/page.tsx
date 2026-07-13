@@ -147,6 +147,30 @@ export default function CartPage() {
     }
   }
 
+  /**
+   * 「N個目のニックネームだけ」を削除する。
+   * quantity を -1 して、対応する index の unitNickname を配列から抜いた
+   * 状態で PATCH する。quantity が 1 の場合はカートアイテム全体を削除する。
+   */
+  async function removeUnit(item: CartItem, unitIndex: number) {
+    if (item.quantity <= 1) {
+      await removeItem(item.id);
+      return;
+    }
+    const currentDraft = drafts[item.id] ?? [];
+    const units = currentDraft
+      .map((d) => ({
+        nickname: d.nickname.trim() || null,
+        nicknameKana: d.nicknameKana.trim() || null,
+      }))
+      .filter((_, i) => i !== unitIndex);
+    const ok = await patchItem(item.id, {
+      quantity: item.quantity - 1,
+      unitNicknames: units,
+    });
+    if (ok) show(`${unitIndex + 1}個目を削除しました`);
+  }
+
   if (loading) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-20 text-center text-gray-400">
@@ -261,49 +285,31 @@ export default function CartPage() {
                     </div>
 
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div className="flex items-center gap-2">
-                        <label className="text-xs font-medium text-gray-500">
-                          数量
-                        </label>
-                        <select
-                          value={item.quantity}
-                          disabled={busyId === item.id}
-                          onChange={(e) =>
-                            patchItem(item.id, {
-                              quantity: Number(e.target.value),
-                            })
-                          }
-                          className="h-10 rounded-lg border border-gray-300 px-3 text-base focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200 sm:h-9 sm:text-sm"
-                        >
-                          {Array.from(
-                            {
-                              length: Math.max(
-                                item.quantity,
-                                item.available,
-                                1,
-                              ),
-                            },
-                            (_, i) => i + 1,
-                          ).map((n) => (
-                            <option key={n} value={n}>
-                              {n}
-                            </option>
-                          ))}
-                        </select>
+                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <span className="font-medium">
+                          数量: {item.quantity}
+                        </span>
+                        {item.requiresNickname && (
+                          <span className="text-xs text-gray-400">
+                            (下のニックネーム欄の × から個別に削除できます)
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <p className="hidden font-bold text-gray-900 sm:block">
+                          {formatYen(item.lineTotal)}
+                        </p>
                         <button
                           type="button"
                           onClick={() => removeItem(item.id)}
                           disabled={busyId === item.id}
-                          className="inline-flex h-10 items-center gap-1 rounded-lg border border-gray-200 px-3 text-sm font-medium text-gray-600 hover:border-red-300 hover:bg-red-50 hover:text-red-600 disabled:opacity-50 sm:h-9"
-                          aria-label="この商品をカートから削除"
+                          className="inline-flex h-9 items-center gap-1 rounded-lg border border-gray-200 px-3 text-xs font-medium text-gray-500 hover:border-red-300 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                          aria-label="この商品を全て削除"
                         >
                           <TrashIcon />
-                          削除
+                          全て削除
                         </button>
                       </div>
-                      <p className="hidden font-bold text-gray-900 sm:block">
-                        {formatYen(item.lineTotal)}
-                      </p>
                     </div>
                   </div>
                 </div>
@@ -330,45 +336,80 @@ export default function CartPage() {
                       )}
                     </p>
                     <div className="space-y-2">
-                      {ds.map((d, idx) => (
-                        <div
-                          key={idx}
-                          className="flex flex-wrap items-center gap-2"
-                        >
-                          {item.quantity >= 2 && (
-                            <span className="w-full shrink-0 text-xs font-medium text-gray-500 sm:w-12">
-                              {idx + 1}個目
-                            </span>
-                          )}
-                          <input
-                            type="text"
-                            maxLength={10}
-                            placeholder="ニックネーム"
-                            value={d.nickname}
-                            disabled={busyId === item.id}
-                            onChange={(e) =>
-                              setDraft(item.id, idx, { nickname: e.target.value })
-                            }
-                            onBlur={() => saveNicknames(item)}
-                            className="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-2 text-base focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200 sm:text-sm"
-                          />
-                          <input
-                            type="text"
-                            maxLength={20}
-                            placeholder="よみがな"
-                            value={d.nicknameKana}
-                            disabled={busyId === item.id}
-                            onChange={(e) =>
-                              setDraft(item.id, idx, {
-                                nicknameKana: e.target.value,
-                              })
-                            }
-                            onBlur={() => saveNicknames(item)}
-                            className="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-2 text-base focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200 sm:text-sm"
-                          />
-                        </div>
-                      ))}
+                      {ds.map((d, idx) => {
+                        // 未入力: 保存済みでもドラフトでも空 (どちらかが未入力)
+                        const rowMissing =
+                          !d.nickname.trim() || !d.nicknameKana.trim();
+                        return (
+                          <div
+                            key={idx}
+                            className={`flex flex-wrap items-center gap-2 rounded-lg border px-2 py-1 ${
+                              rowMissing
+                                ? "border-red-300 bg-red-50/50"
+                                : "border-transparent"
+                            }`}
+                          >
+                            {item.quantity >= 2 && (
+                              <span className="w-12 shrink-0 text-xs font-medium text-gray-500">
+                                {idx + 1}個目
+                              </span>
+                            )}
+                            <input
+                              type="text"
+                              maxLength={10}
+                              placeholder="ニックネーム"
+                              value={d.nickname}
+                              disabled={busyId === item.id}
+                              onChange={(e) =>
+                                setDraft(item.id, idx, {
+                                  nickname: e.target.value,
+                                })
+                              }
+                              onBlur={() => saveNicknames(item)}
+                              className={`min-w-0 flex-1 rounded-lg border px-3 py-2 text-base focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200 sm:text-sm ${
+                                !d.nickname.trim()
+                                  ? "border-red-300 bg-white"
+                                  : "border-gray-300"
+                              }`}
+                            />
+                            <input
+                              type="text"
+                              maxLength={20}
+                              placeholder="よみがな"
+                              value={d.nicknameKana}
+                              disabled={busyId === item.id}
+                              onChange={(e) =>
+                                setDraft(item.id, idx, {
+                                  nicknameKana: e.target.value,
+                                })
+                              }
+                              onBlur={() => saveNicknames(item)}
+                              className={`min-w-0 flex-1 rounded-lg border px-3 py-2 text-base focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200 sm:text-sm ${
+                                !d.nicknameKana.trim()
+                                  ? "border-red-300 bg-white"
+                                  : "border-gray-300"
+                              }`}
+                            />
+                            {item.quantity >= 2 && (
+                              <button
+                                type="button"
+                                onClick={() => removeUnit(item, idx)}
+                                disabled={busyId === item.id}
+                                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:border-red-300 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                                aria-label={`${idx + 1}個目を削除`}
+                                title={`${idx + 1}個目を削除`}
+                              >
+                                <XIcon />
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
+                    <p className="mt-2 text-xs text-gray-400">
+                      同じ商品を追加で買う場合は、商品ページの
+                      「カートに追加」からもう一度追加してください。
+                    </p>
                   </div>
                 )}
               </div>
@@ -434,6 +475,25 @@ function TrashIcon() {
       <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
       <line x1="10" y1="11" x2="10" y2="17" />
       <line x1="14" y1="11" x2="14" y2="17" />
+    </svg>
+  );
+}
+
+function XIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
     </svg>
   );
 }
