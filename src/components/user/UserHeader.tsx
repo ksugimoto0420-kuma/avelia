@@ -121,12 +121,22 @@ export function UserHeader() {
               </button>
             </>
           ) : (
-            <Link
-              href="/auth/login"
-              className="rounded-lg bg-brand-600 px-3 py-2 font-medium text-white hover:bg-brand-700 sm:px-4"
-            >
-              ログイン
-            </Link>
+            <>
+              <Link
+                href="/auth/login"
+                className="rounded-lg bg-brand-600 px-3 py-2 font-medium text-white hover:bg-brand-700 sm:px-4"
+              >
+                ログイン
+              </Link>
+              {/* PC 表示のみ、ログインの隣に新規登録ボタンを並べる。
+                  モバイルはハンバーガードロワー内の導線があるため非表示。 */}
+              <Link
+                href="/auth/register"
+                className="hidden rounded-lg border border-brand-600 px-3 py-2 font-medium text-brand-600 hover:bg-brand-50 sm:inline-block sm:px-4"
+              >
+                新規登録
+              </Link>
+            </>
           )}
         </div>
       </div>
