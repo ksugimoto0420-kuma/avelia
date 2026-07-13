@@ -1,10 +1,11 @@
 import type { OrderStatus, PaymentStatus, Prisma } from "@prisma/client";
 import { env } from "@/lib/env";
 import { confirmStock, releaseStock } from "@/lib/inventory";
-import { sendMailTemplate } from "@/lib/mail";
+import { sendTemplatedMail } from "@/lib/mail/resolveTemplate";
 import { OrderConfirmationMail } from "@/lib/mail/templates/OrderConfirmationMail";
 import { normalizeUnitNicknames } from "@/lib/nickname";
 import { prisma } from "@/lib/prisma";
+import { getSetting } from "@/lib/settings";
 import { formatDate } from "@/lib/utils";
 
 /**
@@ -258,26 +259,40 @@ async function sendOrderConfirmationMail(orderId: string): Promise<void> {
 
   const paidAt = formatDate(order.paidAt ?? new Date());
   const mypageUrl = `${env.appUrl}/mypage/orders/${order.id}`;
+  const siteName = await getSetting("siteName");
 
   const bcc = env.alertEmailTo
     ? env.alertEmailTo.split(",").map((s) => s.trim()).filter(Boolean)
     : undefined;
 
-  await sendMailTemplate({
+  await sendTemplatedMail({
+    kind: "ORDER_CONFIRMATION",
     to: order.user.email,
-    subject: `【Avelia FunClub】ご注文ありがとうございます (${order.orderNumber})`,
+    variables: {
+      siteName,
+      userName: order.user.name ?? "",
+      orderNumber: order.orderNumber,
+      paidAt,
+      totalAmount: `¥${order.total.toLocaleString("ja-JP")}`,
+      mypageUrl,
+    },
+    fallback: {
+      subject: `【${siteName}】ご注文ありがとうございます (${order.orderNumber})`,
+      template: (
+        <OrderConfirmationMail
+          orderNumber={order.orderNumber}
+          paidAt={paidAt}
+          customerName={order.user.name}
+          lines={lines}
+          totalAmount={order.total}
+          deliveryEta={
+            latestDeliveryDate ? formatDate(latestDeliveryDate) : null
+          }
+          shippingAddress={shippingAddress}
+          mypageUrl={mypageUrl}
+        />
+      ),
+    },
     bcc,
-    template: (
-      <OrderConfirmationMail
-        orderNumber={order.orderNumber}
-        paidAt={paidAt}
-        customerName={order.user.name}
-        lines={lines}
-        totalAmount={order.total}
-        deliveryEta={latestDeliveryDate ? formatDate(latestDeliveryDate) : null}
-        shippingAddress={shippingAddress}
-        mypageUrl={mypageUrl}
-      />
-    ),
   });
 }

@@ -64,6 +64,11 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { href: "/admin/users", label: "ユーザー", icon: "👥" },
       { href: "/admin/admins", label: "管理者", icon: "🔑" },
       { href: "/admin/settings", label: "サイト設定", icon: "⚙️" },
+      {
+        href: "/admin/settings/mail-templates",
+        label: "メールテンプレ",
+        icon: "📧",
+      },
       { href: "/admin/operation-logs", label: "操作ログ", icon: "📝" },
       // デバッグ用。Phase 1 運用中は非表示。障害調査時に一時的に戻す。
       // { href: "/admin/mail-debug", label: "メール送信テスト", icon: "📧" },

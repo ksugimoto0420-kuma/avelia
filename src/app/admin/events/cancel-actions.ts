@@ -4,11 +4,12 @@ import { revalidatePath } from "next/cache";
 import { AppError } from "@/lib/api";
 import { requireAdmin } from "@/lib/auth/guards";
 import { env } from "@/lib/env";
-import { sendMailTemplate } from "@/lib/mail";
+import { sendTemplatedMail } from "@/lib/mail/resolveTemplate";
 import { EventCancelledMail } from "@/lib/mail/templates/EventCancelledMail";
 import { logOperation } from "@/lib/operation-log";
 import { getStripe, isStripeConfigured } from "@/lib/payment/stripe";
 import { prisma } from "@/lib/prisma";
+import { getSetting } from "@/lib/settings";
 
 export type EventCancelPreview = {
   targetOrderCount: number;
@@ -75,6 +76,7 @@ export async function cancelEvent(formData: FormData): Promise<EventCancelResult
   });
 
   const now = new Date();
+  const siteName = await getSetting("siteName");
   const result: EventCancelResult = {
     refundedCount: 0,
     failures: [],
@@ -111,17 +113,30 @@ export async function cancelEvent(formData: FormData): Promise<EventCancelResult
 
       // 通知メール (Bcc は付けない: 個別通知)
       if (order.user.email) {
-        await sendMailTemplate({
+        const orderUrl = `${env.appUrl}/mypage/orders/${order.id}`;
+        await sendTemplatedMail({
+          kind: "EVENT_CANCELLED",
           to: order.user.email,
-          subject: `【Avelia FunClub】「${event.title}」開催中止のお知らせ`,
-          template: EventCancelledMail({
-            customerName: order.user.name,
+          variables: {
+            siteName,
+            userName: order.user.name ?? "",
             eventTitle: event.title,
             orderNumber: order.orderNumber,
-            reason,
-            refundAmount: order.total,
-            orderUrl: `${env.appUrl}/mypage/orders/${order.id}`,
-          }),
+            refundAmount: `¥${order.total.toLocaleString("ja-JP")}`,
+            reason: reason ?? "",
+            orderUrl,
+          },
+          fallback: {
+            subject: `【${siteName}】「${event.title}」開催中止のお知らせ`,
+            template: EventCancelledMail({
+              customerName: order.user.name,
+              eventTitle: event.title,
+              orderNumber: order.orderNumber,
+              reason,
+              refundAmount: order.total,
+              orderUrl,
+            }),
+          },
           idempotencyKey: `event-cancelled:${event.id}:${order.id}`,
         });
       }
