@@ -46,6 +46,7 @@ export async function GET(
             baseImageBucket: true,
             baseImageUrl: true,
             downloadLimit: true,
+            product: { select: { imageUrl: true } },
           },
         },
         orderItem: {
@@ -107,6 +108,7 @@ export async function GET(
     // bucket + key を復元して storage 経由で直接読む。
     const proxyUrl =
       delivery.digitalContent.baseImageUrl ??
+      delivery.digitalContent.product?.imageUrl ??
       delivery.orderItem.variant.product.imageUrl ??
       null;
     if (proxyUrl) {
@@ -153,7 +155,22 @@ export async function GET(
       }
     }
 
-    return new Response("原本画像が設定されていません", { status: 404 });
+    // ここまで到達 = すべてのソースが空 or 到達不能。診断用に何が欠けているか記録する。
+    const diag = {
+      hasBaseImageKey: !!delivery.digitalContent.baseImageKey,
+      hasBaseImageUrl: !!delivery.digitalContent.baseImageUrl,
+      hasDcProductImage: !!delivery.digitalContent.product?.imageUrl,
+      hasVariantProductImage:
+        !!delivery.orderItem.variant.product.imageUrl,
+    };
+    console.warn("[base-image] all sources empty or unreachable", {
+      deliveryId: id,
+      diag,
+    });
+    return new Response(
+      `原本画像が設定されていません: ${JSON.stringify(diag)}`,
+      { status: 404 },
+    );
   } catch (err) {
     console.error("[api/deliveries/base-image] エラー", err);
     return new Response("エラーが発生しました", { status: 500 });
