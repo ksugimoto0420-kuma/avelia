@@ -274,9 +274,9 @@ export function ImageUploadField({
           type="file"
           accept={accept}
           className="hidden"
-          // 動画のときはスマホで「カメラ起動」も選択可能に。
-          // (image でも user-facing カメラは有用だが、既存の挙動を維持したいので動画のみ)
-          {...(mediaKind === "video" ? { capture: "environment" as const } : {})}
+          // capture 属性は付けない。付けると iOS でカメラアプリが直接起動し、
+          // アルバムから選ぶことができなくなる。属性なしなら OS 標準の
+          // 「写真ライブラリ / カメラで撮影 / ファイルを選択」のシートが出る。
           onChange={(e) => {
             void onFilesSelected(e.target.files);
             e.target.value = "";
@@ -321,7 +321,7 @@ export function ImageUploadField({
               {isUploadDisabled
                 ? "URL入力が有効なため無効化されています"
                 : mediaKind === "video"
-                  ? "タップして動画を選ぶ（スマホはカメラで撮影も可）"
+                  ? "タップしてアルバムから動画を選択"
                   : "画像をタップして選択（PCではドラッグ&ドロップも可）"}
             </span>
             <span className="text-xs">{hint}</span>

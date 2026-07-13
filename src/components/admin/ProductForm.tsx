@@ -359,7 +359,7 @@ export function ProductForm({
               hint={
                 form.productKind === "DIGITAL_PHOTO_SIGN"
                   ? "タレントが上からサインを描く原本の写真。JPG / PNG 対応。"
-                  : "タレントが上からサインを描く原本の動画。MP4 / WebM 対応。推奨: 720p / 60秒以内 / 100MB 以下 (アップロード上限あり)。スマホは カメラで撮影 or アルバムから選択できます。"
+                  : "タレントが上からサインを描く原本の動画。MP4 / WebM 対応。推奨: 720p / 60秒以内 / 100MB 以下 (アップロード上限あり)。"
               }
               accept={
                 form.productKind === "DIGITAL_VIDEO_SIGN" ? "video/*" : "image/*"
