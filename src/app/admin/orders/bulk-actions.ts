@@ -11,6 +11,98 @@ export type BulkResult = {
   failures: Array<{ orderId: string; reason: string }>;
 };
 
+/** 事前チェック結果。UI が実行前にモーダルで警告するために使う。 */
+export type BulkPreview = {
+  /** 遷移可能な注文数 */
+  applicableCount: number;
+  /** 遷移できない注文の内訳。orderId + orderNumber + 理由 */
+  blocked: Array<{
+    orderId: string;
+    orderNumber: string;
+    reason: string;
+  }>;
+};
+
+/** 注文ステータス遷移の可否と理由。null = 遷移可能。 */
+function checkOrderTransition(
+  currentStatus: OrderStatus,
+  newStatus: OrderStatus,
+): string | null {
+  const allowed =
+    (currentStatus === "PENDING" && newStatus === "CANCELLED") ||
+    (currentStatus === "PAID" && newStatus === "REFUNDED");
+  if (allowed) return null;
+  if (currentStatus === "PAID" && newStatus === "CANCELLED") {
+    // 運用アクシデントで支払い済み注文を取り消したいケースの誤操作対策
+    return "支払済のため直接キャンセルできません。返金 (REFUNDED) を選択してください";
+  }
+  if (currentStatus === newStatus) {
+    return "既に同じステータスです";
+  }
+  return `${currentStatus} から ${newStatus} には変更できません`;
+}
+
+/** 発送ステータス遷移の可否と理由。null = 遷移可能。 */
+function checkShipmentTransition(
+  orderStatus: OrderStatus,
+): string | null {
+  if (orderStatus === "PENDING") {
+    return "未決済のため発送状態を変更できません";
+  }
+  if (orderStatus === "CANCELLED" || orderStatus === "REFUNDED") {
+    return `注文が ${orderStatus} のため発送状態を変更できません`;
+  }
+  return null;
+}
+
+/**
+ * 一括変更前のプレビュー。UI が確認モーダルで
+ * 「N件変更可能 / M件は不正な遷移 (理由)」を出すために叩く。
+ * 実際の書き込みは行わない (副作用なし・冪等)。
+ */
+export async function previewBulkStatus(
+  orderIds: string[],
+  kind: "shipment" | "order",
+  newStatus: string,
+): Promise<BulkPreview> {
+  await requireAdmin("OPERATOR");
+  if (!Array.isArray(orderIds) || orderIds.length === 0) {
+    return { applicableCount: 0, blocked: [] };
+  }
+  const orders = await prisma.order.findMany({
+    where: { id: { in: orderIds } },
+    select: { id: true, orderNumber: true, status: true },
+  });
+  const byId = new Map(orders.map((o) => [o.id, o]));
+  const blocked: BulkPreview["blocked"] = [];
+  let applicable = 0;
+  for (const id of orderIds) {
+    const o = byId.get(id);
+    if (!o) {
+      blocked.push({
+        orderId: id,
+        orderNumber: id,
+        reason: "注文が見つかりません",
+      });
+      continue;
+    }
+    const reason =
+      kind === "shipment"
+        ? checkShipmentTransition(o.status)
+        : checkOrderTransition(o.status, newStatus as OrderStatus);
+    if (reason) {
+      blocked.push({
+        orderId: o.id,
+        orderNumber: o.orderNumber,
+        reason,
+      });
+    } else {
+      applicable++;
+    }
+  }
+  return { applicableCount: applicable, blocked };
+}
+
 /**
  * #6: 発送ステータスの一括変更。
  * 仕様書 6-2 の遷移 (UNFULFILLED→PREPARING→SHIPPED→DELIVERED, 任意→RETURNED)
@@ -28,7 +120,6 @@ export async function bulkUpdateShipmentStatus(
   const result: BulkResult = { successCount: 0, failures: [] };
   const now = new Date();
 
-  // 未払い注文 (PENDING) は発送状態変更を弾く。
   const orders = await prisma.order.findMany({
     where: { id: { in: orderIds } },
     include: { shipment: true },
@@ -41,11 +132,9 @@ export async function bulkUpdateShipmentStatus(
       result.failures.push({ orderId, reason: "注文が見つかりません" });
       continue;
     }
-    if (order.status === "PENDING") {
-      result.failures.push({
-        orderId,
-        reason: "未決済のため発送状態を変更できません",
-      });
+    const blockReason = checkShipmentTransition(order.status);
+    if (blockReason) {
+      result.failures.push({ orderId, reason: blockReason });
       continue;
     }
     try {
@@ -124,15 +213,9 @@ export async function bulkUpdateOrderStatus(
       result.failures.push({ orderId, reason: "注文が見つかりません" });
       continue;
     }
-    // 許可される遷移だけ通す
-    const allowed =
-      (order.status === "PENDING" && newStatus === "CANCELLED") ||
-      (order.status === "PAID" && newStatus === "REFUNDED");
-    if (!allowed) {
-      result.failures.push({
-        orderId,
-        reason: `不正な遷移: ${order.status} → ${newStatus}`,
-      });
+    const blockReason = checkOrderTransition(order.status, newStatus);
+    if (blockReason) {
+      result.failures.push({ orderId, reason: blockReason });
       continue;
     }
     try {
