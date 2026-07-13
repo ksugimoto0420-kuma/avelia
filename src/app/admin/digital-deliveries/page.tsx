@@ -122,7 +122,8 @@ export default async function AdminDigitalDeliveriesPage({
       </div>
       <p className="text-sm text-gray-500">
         出演者がタブレットで直接サインを書く <b>「サイン記入セッション」</b> を使うか、
-        従来通り <b>サイン入りファイルをアップロード</b> してください。 サイン記入セッションのサインは、運営側で確認・承認すると購入者に納品されます。
+        従来通り <b>サイン入りファイルをアップロード</b> してください。
+        サイン記入セッションで送信すると、その場で購入者に通知メールが送信されます。
       </p>
 
       {/* #70: メディア種別タブ (写真 / 動画) */}
@@ -279,7 +280,9 @@ export default async function AdminDigitalDeliveriesPage({
                         </td>
                         <td className="px-4 py-3 align-top">
                           {d.signature?.status === "WRITTEN" ? (
-                            // 主導線：サインが書かれている → プレビューページ + 承認/却下
+                            // 旧データ互換：本番仕様では送信=即READYになったため、
+                            // WRITTEN のまま残っているのは旧仕様時のデータ。
+                            // 手動で納品確定 (メール送信) できるようにボタンを残す。
                             <div className="flex items-center justify-end gap-2">
                               <Link
                                 href={`/admin/digital-deliveries/${d.id}/preview`}
@@ -293,8 +296,9 @@ export default async function AdminDigitalDeliveriesPage({
                                   <button
                                     type="submit"
                                     className="whitespace-nowrap rounded-lg bg-brand-600 px-3 py-1 text-xs font-medium text-white hover:bg-brand-700"
+                                    title="旧データを納品確定して購入者にメール送信"
                                   >
-                                    承認して納品
+                                    納品して通知
                                   </button>
                                 </form>
                                 <form action={rejectSignature}>
