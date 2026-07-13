@@ -68,7 +68,12 @@ export function SignedImagePreview({
     if (!canvas) return;
 
     const original = new Image();
-    original.crossOrigin = "anonymous";
+    // 自ドメイン相対URLのときは crossOrigin をつけない。
+    // つけると同一オリジンでもブラウザが Access-Control-Allow-Origin を要求し、
+    // Next.js の Route Handler が既定でヘッダを付けていない場合に読み込みが失敗する。
+    // 外部URL (http/https 絶対URL) のときだけ anonymous を指定して canvas 汚染を回避する。
+    const isAbsolute = /^https?:\/\//i.test(info.baseImageUrl);
+    if (isAbsolute) original.crossOrigin = "anonymous";
     original.onload = () => {
       const sig = new Image();
       sig.onload = () => {
@@ -91,8 +96,19 @@ export function SignedImagePreview({
       sig.onerror = () => setError("サイン画像を表示できませんでした");
       sig.src = `data:image/png;base64,${info.signaturePngBase64}`;
     };
-    original.onerror = () =>
-      setError("原本画像を表示できませんでした（URLにアクセスできません）");
+    original.onerror = () => {
+      // 原因切り分けのために、実際の HTTP レスポンスを確認する
+      fetch(info.baseImageUrl, { credentials: "same-origin" })
+        .then(async (r) => {
+          const body = await r.text().catch(() => "");
+          setError(
+            `原本画像を表示できませんでした (HTTP ${r.status}${body ? ` / ${body.slice(0, 80)}` : ""})`,
+          );
+        })
+        .catch(() => {
+          setError("原本画像を表示できませんでした（ネットワークエラー）");
+        });
+    };
     original.src = info.baseImageUrl;
   }, [info]);
 
