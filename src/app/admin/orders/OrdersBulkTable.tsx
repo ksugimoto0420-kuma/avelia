@@ -11,6 +11,8 @@ import { formatDateTime, formatYen } from "@/lib/utils";
 import {
   bulkUpdateOrderStatus,
   bulkUpdateShipmentStatus,
+  previewBulkStatus,
+  type BulkPreview,
   type BulkResult,
 } from "./bulk-actions";
 
@@ -55,6 +57,7 @@ export function OrdersBulkTable({ rows }: { rows: OrderRow[] }) {
   const [shipmentTo, setShipmentTo] = useState<ShipmentStatusOpt>("PREPARING");
   const [orderTo, setOrderTo] = useState<OrderStatusOpt>("CANCELLED");
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [preview, setPreview] = useState<BulkPreview | null>(null);
   const [result, setResult] = useState<BulkResult | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -82,6 +85,25 @@ export function OrdersBulkTable({ rows }: { rows: OrderRow[] }) {
 
   const orderIds = Array.from(selected);
 
+  const openConfirm = () => {
+    // 実行前に事前チェック。適用可能件数と、弾かれる注文の理由を確認モーダルに表示する。
+    setResult(null);
+    setPreview(null);
+    startTransition(async () => {
+      try {
+        const p = await previewBulkStatus(
+          orderIds,
+          target,
+          target === "shipment" ? shipmentTo : orderTo,
+        );
+        setPreview(p);
+        setConfirmOpen(true);
+      } catch (e) {
+        show(e instanceof Error ? e.message : "確認に失敗しました");
+      }
+    });
+  };
+
   const doApply = () => {
     setResult(null);
     startTransition(async () => {
@@ -92,6 +114,7 @@ export function OrdersBulkTable({ rows }: { rows: OrderRow[] }) {
             : await bulkUpdateOrderStatus(orderIds, orderTo);
         setResult(res);
         setConfirmOpen(false);
+        setPreview(null);
         if (res.failures.length === 0) {
           show(`${res.successCount}件のステータスを更新しました`);
           setSelected(new Set());
@@ -245,8 +268,8 @@ export function OrdersBulkTable({ rows }: { rows: OrderRow[] }) {
                 ))}
               </select>
             )}
-            <Button onClick={() => setConfirmOpen(true)} disabled={pending}>
-              {pending ? "実行中..." : "実行"}
+            <Button onClick={openConfirm} disabled={pending}>
+              {pending ? "確認中..." : "実行"}
             </Button>
             <button
               type="button"
@@ -272,18 +295,54 @@ export function OrdersBulkTable({ rows }: { rows: OrderRow[] }) {
             >
               キャンセル
             </Button>
-            <Button onClick={doApply} disabled={pending}>
-              {pending ? "実行中..." : "実行する"}
+            <Button
+              onClick={doApply}
+              disabled={pending || (preview?.applicableCount ?? 0) === 0}
+            >
+              {pending
+                ? "実行中..."
+                : preview
+                  ? `${preview.applicableCount}件を変更する`
+                  : "実行する"}
             </Button>
           </>
         }
       >
         <p className="text-sm text-gray-700">
-          選択中 {selected.size} 件を「{targetLabel}」に変更します。
+          選択中 {selected.size} 件を「{targetLabel}」に変更しようとしています。
         </p>
-        <p className="mt-2 text-xs text-gray-500">
-          遷移として不正な注文はスキップされ、結果は次画面で確認できます。
-        </p>
+        {preview && (
+          <div className="mt-3 space-y-2">
+            <p className="text-sm text-gray-800">
+              変更可能: <span className="font-semibold">{preview.applicableCount}件</span>
+              {preview.blocked.length > 0 && (
+                <>
+                  {" / "}
+                  変更不可: <span className="font-semibold text-red-700">{preview.blocked.length}件</span>
+                </>
+              )}
+            </p>
+            {preview.blocked.length > 0 && (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-3">
+                <p className="text-xs font-semibold text-red-800">
+                  ⚠ 以下は本来あり得ない遷移のためスキップされます。意図した操作か確認してください。
+                </p>
+                <ul className="mt-2 max-h-40 space-y-1 overflow-auto text-xs text-red-700">
+                  {preview.blocked.map((b) => (
+                    <li key={b.orderId}>
+                      <span className="font-mono">{b.orderNumber}</span>: {b.reason}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {preview.applicableCount === 0 && (
+              <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                変更可能な注文がありません。対象の選択か新ステータスを見直してください。
+              </p>
+            )}
+          </div>
+        )}
       </Modal>
 
       {result && result.failures.length > 0 && (
