@@ -348,6 +348,9 @@ export function ProductForm({
               bucket="private-admin"
               purpose="delivery-base-image"
               targetId={form.id ?? null}
+              mediaKind={
+                form.productKind === "DIGITAL_VIDEO_SIGN" ? "video" : "image"
+              }
               label={
                 form.productKind === "DIGITAL_PHOTO_SIGN"
                   ? "サイン用ベース画像"
@@ -355,15 +358,17 @@ export function ProductForm({
               }
               hint={
                 form.productKind === "DIGITAL_PHOTO_SIGN"
-                  ? "タレントが上からサインを描く原本の写真。private-admin バケットに保存されます。"
-                  : "タレントが上からサインを描く原本の動画 (mp4/webm 等)。private-admin バケットに保存されます。"
+                  ? "タレントが上からサインを描く原本の写真。JPG / PNG 対応。"
+                  : "タレントが上からサインを描く原本の動画。MP4 / WebM 対応。推奨: 720p / 60秒以内 / 100MB 以下 (アップロード上限あり)。スマホは カメラで撮影 or アルバムから選択できます。"
               }
               accept={
                 form.productKind === "DIGITAL_VIDEO_SIGN" ? "video/*" : "image/*"
               }
               showUrlInput={false}
               previewAspect={
-                form.productKind === "DIGITAL_PHOTO_SIGN" ? "auto" : "none"
+                form.productKind === "DIGITAL_VIDEO_SIGN"
+                  ? "cover-16-9"
+                  : "auto"
               }
             />
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
