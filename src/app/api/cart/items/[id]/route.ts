@@ -46,12 +46,26 @@ export async function PATCH(
       nicknameKana !== undefined ||
       note !== undefined ||
       quantity !== undefined;
+    // PATCH では unitNicknames が「編集後の完全な状態」として送られる想定なので、
+    // 単一入力の fallback は渡さない (空にした枠を勝手に埋めないため)。
+    // 単一 nickname のみ送られたケース (旧 UI 互換) は、その値を単純に配列先頭に反映する。
+    const fallback =
+      unitNicknames === undefined &&
+      (nickname !== undefined ||
+        nicknameKana !== undefined ||
+        note !== undefined)
+        ? {
+            nickname: nickname ?? item.nickname,
+            nicknameKana: nicknameKana ?? item.nicknameKana,
+            note: note ?? item.note,
+          }
+        : undefined;
     const units = touchesNickname
-      ? normalizeUnitNicknames(unitNicknames ?? item.unitNicknames, nextQty, {
-          nickname: nickname ?? item.nickname,
-          nicknameKana: nicknameKana ?? item.nicknameKana,
-          note: note ?? item.note,
-        })
+      ? normalizeUnitNicknames(
+          unitNicknames ?? item.unitNicknames,
+          nextQty,
+          fallback,
+        )
       : null;
 
     await prisma.cartItem.update({
