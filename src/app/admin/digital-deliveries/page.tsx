@@ -10,7 +10,11 @@ import { SearchableSelectField } from "@/components/ui/SearchableSelectField";
 import { requireAdminPage } from "@/lib/auth/admin-page";
 import { prisma } from "@/lib/prisma";
 import { formatDateTime } from "@/lib/utils";
-import { approveSignature, rejectSignature } from "./actions";
+import {
+  approveSignature,
+  rejectSignature,
+  resendSignatureReadyMail,
+} from "./actions";
 import { DeliveryUploadRow } from "./DeliveryUploadRow";
 
 export const dynamic = "force-dynamic";
@@ -305,7 +309,7 @@ export default async function AdminDigitalDeliveriesPage({
                               </div>
                             </div>
                           ) : d.status === "READY" && d.fileKey?.startsWith("signature:") ? (
-                            // 納品済み（サイン経由） → プレビューページ
+                            // 納品済み（サイン経由） → プレビュー + メール再送
                             <div className="flex items-center justify-end gap-2">
                               <Link
                                 href={`/admin/digital-deliveries/${d.id}/preview`}
@@ -313,7 +317,21 @@ export default async function AdminDigitalDeliveriesPage({
                               >
                                 プレビュー
                               </Link>
-                              <span className="text-xs text-gray-500 whitespace-nowrap">納品済み</span>
+                              {/* #39: 通知メールの手動再送 */}
+                              <form action={resendSignatureReadyMail}>
+                                <input
+                                  type="hidden"
+                                  name="deliveryId"
+                                  value={d.id}
+                                />
+                                <button
+                                  type="submit"
+                                  className="whitespace-nowrap rounded-lg border border-gray-300 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                                  title="通知メールを再送信します"
+                                >
+                                  メール再送
+                                </button>
+                              </form>
                             </div>
                           ) : (
                             // 代替導線：サイン未記入 → 原本DL + 手動アップロード（小さく）
