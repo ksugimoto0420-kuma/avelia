@@ -23,6 +23,7 @@
     "@prisma/client": "^6.2.1",
     "@react-email/components": "^1.0.12",
     "@react-email/render": "^2.0.10",
+    "@react-pdf/renderer": "^4.5.1",
     "@vercel/blob": "^2.6.1",
     "bcryptjs": "^2.4.3",
     "next": "^15.1.4",
