@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { Providers } from "@/components/Providers";
 import { TalentHeader } from "@/components/talent/TalentHeader";
+import { TalentLayoutShell } from "@/components/talent/TalentLayoutShell";
 
 export const metadata = {
   title: "Avelia for Talent",
@@ -22,13 +23,21 @@ export default async function TalentLayout({
 
   return (
     <Providers>
-      <div className="flex min-h-screen flex-col bg-gradient-to-br from-brand-50 to-white">
-        <TalentHeader
-          name={session.user.name ?? session.user.email ?? "ゲスト"}
-          role={session.user.role ?? "TALENT"}
-        />
-        <main className="flex-1">{children}</main>
-      </div>
+      {/*
+        #100: サイン記入画面 (/talent/sign/*) はタブレット横向きで
+        画面全体を使うため、TalentLayoutShell で pathname を見て
+        ヘッダーの有無・スクロール抑止を切り替える。
+      */}
+      <TalentLayoutShell
+        header={
+          <TalentHeader
+            name={session.user.name ?? session.user.email ?? "ゲスト"}
+            role={session.user.role ?? "TALENT"}
+          />
+        }
+      >
+        {children}
+      </TalentLayoutShell>
     </Providers>
   );
 }
