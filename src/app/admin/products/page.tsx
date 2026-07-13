@@ -121,17 +121,23 @@ export default async function AdminProductsPage({
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      {/* header: スマホでは縦積み、sm 以上で横並び */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold text-gray-900">商品管理</h1>
         <Button href="/admin/products/new">＋ 新規商品</Button>
       </div>
 
       <FilterBar action="/admin/products" clearHref="/admin/products">
         <FilterField label="キーワード">
-          <FilterText name="q" defaultValue={q} placeholder="商品名" />
+          <FilterText
+            name="q"
+            defaultValue={q}
+            placeholder="商品名"
+            className="w-full sm:w-56"
+          />
         </FilterField>
         <FilterField label="イベント">
-          <div className="w-64">
+          <div className="w-full sm:w-64">
             <SearchableSelectField
               name="eventId"
               defaultValue={eventId}
@@ -148,6 +154,7 @@ export default async function AdminProductsPage({
           <FilterSelect
             name="eventType"
             defaultValue={eventType}
+            className="w-full sm:w-40"
             options={[
               { value: "", label: "すべて" },
               { value: "MEET_GREET", label: EVENT_TYPE_LABEL.MEET_GREET },
@@ -161,7 +168,7 @@ export default async function AdminProductsPage({
           <FilterSelect
             name="type"
             defaultValue={type}
-            className="w-28"
+            className="w-full sm:w-28"
             options={[
               { value: "", label: "すべて" },
               { value: "PHYSICAL", label: "物販" },
@@ -173,7 +180,7 @@ export default async function AdminProductsPage({
           <FilterSelect
             name="published"
             defaultValue={published}
-            className="w-28"
+            className="w-full sm:w-28"
             options={[
               { value: "", label: "すべて" },
               { value: "published", label: "公開中" },
@@ -185,13 +192,81 @@ export default async function AdminProductsPage({
 
       <Card>
         <CardBody className="space-y-4">
-          <p className="text-sm text-gray-500">{total} 件中 {products.length} 件を表示</p>
-          <DataTable
-            columns={columns}
-            rows={products}
-            emptyMessage="該当する商品がありません"
+          <p className="text-sm text-gray-500">
+            {total} 件中 {products.length} 件を表示
+          </p>
+
+          {/* sm 以上: 従来のテーブル表示 */}
+          <div className="hidden sm:block">
+            <DataTable
+              columns={columns}
+              rows={products}
+              emptyMessage="該当する商品がありません"
+            />
+          </div>
+
+          {/* sm 未満: カードスタック表示 (タップしやすい大きめのタッチ領域) */}
+          <div className="space-y-2 sm:hidden">
+            {products.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-gray-200 px-4 py-10 text-center text-sm text-gray-400">
+                該当する商品がありません
+              </p>
+            ) : (
+              products.map((p) => {
+                const avail = p.variants.reduce(
+                  (s, v) =>
+                    s + (v.inventory ? availableStock(v.inventory) : 0),
+                  0,
+                );
+                return (
+                  <Link
+                    key={p.id}
+                    href={`/admin/products/${p.id}`}
+                    className="block rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition hover:border-brand-300"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="min-w-0 flex-1 break-words font-semibold text-brand-600">
+                        {p.name}
+                      </p>
+                      {p.isPublished ? (
+                        <Badge color="green">公開中</Badge>
+                      ) : (
+                        <Badge color="gray">非公開</Badge>
+                      )}
+                    </div>
+                    <p className="mt-1 text-xs text-gray-500">
+                      {p.event.title}
+                    </p>
+                    <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+                      {p.type === "DIGITAL" ? (
+                        <Badge color="purple">デジタル</Badge>
+                      ) : (
+                        <Badge color="blue">物販</Badge>
+                      )}
+                      <span className="font-bold text-gray-900">
+                        {formatYen(p.basePrice)}
+                      </span>
+                      <span
+                        className={
+                          avail <= 5
+                            ? "font-bold text-red-600"
+                            : "text-gray-500"
+                        }
+                      >
+                        在庫 {avail}
+                      </span>
+                    </div>
+                  </Link>
+                );
+              })
+            )}
+          </div>
+
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            buildHref={(p) => buildHref({ page: String(p) })}
           />
-          <Pagination page={page} totalPages={totalPages} buildHref={(p) => buildHref({ page: String(p) })} />
         </CardBody>
       </Card>
     </div>
