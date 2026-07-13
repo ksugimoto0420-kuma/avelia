@@ -102,7 +102,7 @@ export function SignedImagePreview({
         .then(async (r) => {
           const body = await r.text().catch(() => "");
           setError(
-            `原本画像を表示できませんでした (HTTP ${r.status}${body ? ` / ${body.slice(0, 80)}` : ""})`,
+            `原本画像を表示できませんでした (HTTP ${r.status}${body ? ` / ${body}` : ""})`,
           );
         })
         .catch(() => {
